@@ -2,6 +2,7 @@ package com.largomodo.floppyconvert.service;
 
 import org.apache.commons.exec.*;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 
 /**
@@ -29,6 +30,20 @@ public abstract class ExternalProcessDriver {
      * @throws ProcessFailureException if exit code != 0 or execution fails
      */
     protected int executeCommand(String[] cmdArray, long timeoutMs) throws IOException {
+        return executeCommand(cmdArray, timeoutMs, null);
+    }
+
+    /**
+     * Execute external command with timeout, exit code validation, and custom working directory.
+     *
+     * @param cmdArray Command and arguments (cmdArray[0] = binary path)
+     * @param timeoutMs Watchdog timeout in milliseconds
+     * @param workingDirectory Working directory for process execution (null = JVM default)
+     * @return Exit code (always 0; non-zero throws exception)
+     * @throws ProcessTimeoutException if watchdog kills process
+     * @throws ProcessFailureException if exit code != 0 or execution fails
+     */
+    protected int executeCommand(String[] cmdArray, long timeoutMs, File workingDirectory) throws IOException {
         // Validate timeout is positive (prevents disabling watchdog or immediate kills)
         if (timeoutMs <= 0) {
             throw new IllegalArgumentException("Timeout must be positive, got: " + timeoutMs + "ms");
@@ -37,7 +52,7 @@ public abstract class ExternalProcessDriver {
         // Build CommandLine from array (Commons Exec handles escaping/quoting)
         CommandLine cmdLine = new CommandLine(cmdArray[0]);
         for (int i = 1; i < cmdArray.length; i++) {
-            cmdLine.addArgument(cmdArray[i]);
+            cmdLine.addArgument(cmdArray[i], false);
         }
 
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
@@ -45,6 +60,12 @@ public abstract class ExternalProcessDriver {
 
         DefaultExecutor executor = new DefaultExecutor();
         executor.setStreamHandler(new PumpStreamHandler(stdout, stderr));
+
+        // Set working directory if provided
+        // ucon64 creates output files in current working directory, not in source file directory
+        if (workingDirectory != null) {
+            executor.setWorkingDirectory(workingDirectory);
+        }
 
         // Watchdog terminates process if execution exceeds timeout
         // Prevents hung ucon64/mtools processes from stalling batch jobs indefinitely

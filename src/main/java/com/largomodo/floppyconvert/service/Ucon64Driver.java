@@ -29,8 +29,9 @@ public class Ucon64Driver extends ExternalProcessDriver {
     /**
      * Split ROM file into parts using ucon64.
      *
-     * Strategy: Copy ROM to temp directory, execute format-specific split command,
-     * list all output files (excluding source), sort by RomPartComparator.
+     * Strategy: Two-step process to ensure correct format handling:
+     * 1. Convert .sfc to target format (--fig/--swc/--ufo/--gd3)
+     * 2. Split the converted file into parts
      *
      * @param format Backup unit format (determines ucon64 flag and output naming)
      * @param romFile Source ROM file (.sfc format expected)
@@ -48,37 +49,67 @@ public class Ucon64Driver extends ExternalProcessDriver {
         Path tempRom = tempDir.resolve(romFile.getName());
         Files.copy(romFile.toPath(), tempRom);
 
-        String[] cmd = {
+        // Step 1: Convert .sfc to target format
+        String[] convertCmd = {
             ucon64Path,
-            format.getCmdFlag(),  // Format-specific flag (--fig, --swc, --ufo, --gd3)
-            "--nbak",     // No backup files (prevents .bak clutter in temp dir)
-            "--ncol",     // No ANSI color codes (prevents terminal escape pollution in logs)
-            "-s",         // Split mode
-            "--ssize=4",  // Split size: 4 megabits per part (~500KB, fits 3 per 1.6MB floppy)
+            format.getCmdFlag(),
+            "--nbak",
+            "--ncol",
             tempRom.toString()
         };
 
-        executeCommand(cmd, DEFAULT_TIMEOUT_MS);
+        executeCommand(convertCmd, DEFAULT_TIMEOUT_MS, tempDir.toFile());
 
-        // List all files except source ROM (ucon64 creates parts in same directory)
-        // Why filter-all: Resilient to ucon64 naming changes across formats (no regex maintenance)
-        // Relies on temp directory isolation invariant (only source + ucon64 output present)
-        String sourceFileName = tempRom.getFileName().toString();
+        // Step 2: Find the converted file (GD3 uses special naming, others use .ext)
+        Path convertedFile;
+        if (format == CopierFormat.GD3) {
+            try (var stream = Files.list(tempDir)) {
+                convertedFile = stream
+                    .filter(p -> !p.equals(tempRom))
+                    .filter(p -> !p.getFileName().toString().startsWith("."))
+                    .findFirst()
+                    .orElseThrow(() -> new IOException("Conversion failed: no GD3 file created"));
+            }
+        } else {
+            String baseName = tempRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
+            String formatExt = format.getFileExtension();
+            convertedFile = tempDir.resolve(baseName + "." + formatExt);
+            if (!Files.exists(convertedFile)) {
+                throw new IOException("Conversion failed: expected file not created: " + convertedFile);
+            }
+        }
 
+        String[] splitCmd = {
+            ucon64Path,
+            "--nbak",
+            "--ncol",
+            "-s",
+            "--ssize=4",
+            convertedFile.toString()
+        };
+
+        executeCommand(splitCmd, DEFAULT_TIMEOUT_MS, tempDir.toFile());
+
+        // Discover split parts using format-specific filter
         List<File> parts;
         try (var stream = Files.list(tempDir)) {
             parts = stream
                 .map(Path::toFile)
-                .filter(f -> !f.getName().equals(sourceFileName))  // Exclude source ROM from parts list
-                .map(File::getAbsolutePath)  // Convert to absolute paths for deduplication
-                .distinct()  // Deduplicate to prevent mcopy overwrites causing silent data loss
-                .map(File::new)  // Convert back to File objects
-                .sorted(new RomPartComparator())  // Universal sorting (handles FIG numeric + GD3 alphanumeric)
+                .filter(format.getSplitPartFilter())
+                .map(File::getAbsolutePath)
+                .distinct()
+                .map(File::new)
+                .sorted(new RomPartComparator())
                 .collect(Collectors.toList());
         }
 
         if (parts.isEmpty()) {
-            throw new IOException("ucon64 produced no split parts (ROM too small or corrupted)");
+            // No split parts found - check if converted file exists (ROM <=4 Mbit, too small to split)
+            // In this case, return the converted file itself as the single "part"
+            if (Files.exists(convertedFile)) {
+                return List.of(convertedFile.toFile());
+            }
+            throw new IOException("ucon64 produced no split parts (ROM may be corrupted or invalid)");
         }
 
         return parts;

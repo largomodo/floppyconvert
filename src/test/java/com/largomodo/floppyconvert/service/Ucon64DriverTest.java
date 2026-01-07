@@ -20,7 +20,7 @@ class Ucon64DriverTest {
 
     @Test
     void testSplitRomWithNonExistentFile(@TempDir Path tempDir) {
-        Ucon64Driver driver = new Ucon64Driver("/usr/bin/ucon64");
+        Ucon64Driver driver = new Ucon64Driver("/usr/local/bin/ucon64");
         File nonExistentFile = new File("/tmp/nonexistent.sfc");
 
         IllegalArgumentException exception = assertThrows(
@@ -40,7 +40,7 @@ class Ucon64DriverTest {
 
         // This test verifies the command-line structure but will fail without actual ucon64
         // In production, this would be replaced with a mock-based test
-        Ucon64Driver driver = new Ucon64Driver("/usr/bin/ucon64");
+        Ucon64Driver driver = new Ucon64Driver("/usr/local/bin/ucon64");
 
         // The actual command executed should be:
         // ucon64 --fig --nbak --ncol -s --ssize=4 <tempRom>
@@ -67,16 +67,20 @@ class Ucon64DriverTest {
         Path workDir = tempDir.resolve("work");
         Files.createDirectories(workDir);
 
-        Ucon64Driver driver = new Ucon64Driver("/usr/bin/ucon64") {
+        Ucon64Driver driver = new Ucon64Driver("/mock/ucon64") {
             @Override
-            protected int executeCommand(String[] cmd, long timeoutMs) throws IOException {
-                // Mock: skip actual ucon64 execution, but create mock output files
-                Path workDirPath = cmd[cmd.length - 1].endsWith("game.sfc")
-                    ? new File(cmd[cmd.length - 1]).toPath().getParent()
-                    : null;
-                if (workDirPath != null) {
-                    Files.write(workDirPath.resolve("game.1"), new byte[512]);
-                    Files.write(workDirPath.resolve("game.2"), new byte[512]);
+            protected int executeCommand(String[] cmd, long timeoutMs, File workingDir) throws IOException {
+                // Mock: two-step process - first convert, then split
+                // Step 1: Conversion creates game.fig from game.sfc
+                // Step 2: Split creates game.1, game.2 from game.fig
+                String lastArg = cmd[cmd.length - 1];
+                if (lastArg.endsWith("game.sfc")) {
+                    // Conversion step - create .fig file
+                    Files.write(workingDir.toPath().resolve("game.fig"), new byte[512]);
+                } else if (lastArg.endsWith("game.fig")) {
+                    // Split step - create part files
+                    Files.write(workingDir.toPath().resolve("game.1"), new byte[512]);
+                    Files.write(workingDir.toPath().resolve("game.2"), new byte[512]);
                 }
                 return 0;
             }
@@ -98,16 +102,18 @@ class Ucon64DriverTest {
         Path workDir = tempDir.resolve("work");
         Files.createDirectories(workDir);
 
-        Ucon64Driver driver = new Ucon64Driver("/usr/bin/ucon64") {
+        Ucon64Driver driver = new Ucon64Driver("/mock/ucon64") {
             @Override
-            protected int executeCommand(String[] cmd, long timeoutMs) throws IOException {
-                // Mock: skip actual ucon64 execution, but create mock GD3 output files
-                Path workDirPath = cmd[cmd.length - 1].endsWith("game.sfc")
-                    ? new File(cmd[cmd.length - 1]).toPath().getParent()
-                    : null;
-                if (workDirPath != null) {
-                    Files.write(workDirPath.resolve("SF32CHRB.078"), new byte[512]);
-                    Files.write(workDirPath.resolve("SF32CHRA.078"), new byte[512]);
+            protected int executeCommand(String[] cmd, long timeoutMs, File workingDir) throws IOException {
+                // Mock: two-step process for GD3 format
+                String lastArg = cmd[cmd.length - 1];
+                if (lastArg.endsWith("game.sfc")) {
+                    // Conversion step - GD3 creates sf<hash> file (without extension)
+                    Files.write(workingDir.toPath().resolve("sf32gam"), new byte[512]);
+                } else {
+                    // Split step - create GD3 part files with alphanumeric suffixes
+                    Files.write(workingDir.toPath().resolve("SF32CHRB.078"), new byte[512]);
+                    Files.write(workingDir.toPath().resolve("SF32CHRA.078"), new byte[512]);
                 }
                 return 0;
             }

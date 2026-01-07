@@ -1,5 +1,8 @@
 package com.largomodo.floppyconvert.core;
 
+import java.io.File;
+import java.util.function.Predicate;
+
 /**
  * Enum representing SNES backup unit formats supported by ucon64.
  * Encapsulates the command-line flag for each format.
@@ -20,6 +23,15 @@ public enum CopierFormat {
         return cmdFlag;
     }
 
+    public String getFileExtension() {
+        return switch (this) {
+            case FIG -> "fig";
+            case SWC -> "swc";
+            case UFO -> "ufo";
+            case GD3 -> "078";
+        };
+    }
+
     public static CopierFormat fromCliArgument(String arg) {
         if (arg == null) {
             throw new IllegalArgumentException("Format argument cannot be null. Supported: FIG, SWC, UFO, GD3");
@@ -29,5 +41,26 @@ public enum CopierFormat {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Invalid format: " + arg + ". Supported: FIG, SWC, UFO, GD3");
         }
+    }
+
+    public Predicate<File> getSplitPartFilter() {
+        return switch (this) {
+            case FIG -> file -> {
+                String name = file.getName();
+                return name.matches(".*\\.[0-9]+$");
+            };
+            case SWC -> file -> {
+                String name = file.getName();
+                return name.matches(".*\\.[0-9]+$");
+            };
+            case UFO -> file -> {
+                String name = file.getName();
+                return name.matches(".*\\.[0-9]+gm$");
+            };
+            case GD3 -> file -> {
+                String name = file.getName();
+                return name.matches(".*[A-Z]\\.078$");
+            };
+        };
     }
 }
