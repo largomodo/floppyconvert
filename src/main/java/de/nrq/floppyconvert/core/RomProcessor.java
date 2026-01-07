@@ -20,7 +20,7 @@ import java.util.Map;
  *
  * Coordinates multi-step workflow:
  *   1. Split ROM into parts (ucon64)
- *   2. Calculate disk count (3 parts per 1.6MB disk)
+ *   2. Pack parts onto floppy disks by actual size (not fixed count)
  *   3. For each disk: copy template, inject parts with DOS names, move to output
  *   4. Cleanup temp directory
  *
@@ -29,16 +29,17 @@ import java.util.Map;
  */
 public class RomProcessor {
 
-    // Conservative limit: 1.6MB floppy / 500KB avg part = 3.2 theoretical max
-    // Using 3 provides safety margin for FAT12 filesystem overhead
-    // Prevents mcopy "disk full" errors that would require complex retry logic
-    private static final int PARTS_PER_DISK = 3;
+    // 1.6MB floppy = 1,638,400 bytes (80 tracks * 2 heads * 20 sectors * 512 bytes)
+    // FAT12 overhead: ~18KB (boot sector + 2 FATs + root directory)
+    // Usable data area: ~1,620,000 bytes
+    // Using 1,600,000 as safe threshold (allows 3 x 512KB parts = 1,536,000 bytes)
+    private static final long DISK_CAPACITY_BYTES = 1_600_000;
 
     /**
      * Process single ROM file through full conversion pipeline.
      *
-     * Strategy: Create isolated temp dir, split ROM, partition parts across disks
-     * (3 per disk), inject into floppy images, move to output, cleanup.
+     * Strategy: Create isolated temp dir, split ROM, pack parts onto disks
+     * by actual file size, inject into floppy images, move to output, cleanup.
      *
      * Multi-disk naming: GameName_1.img, GameName_2.img (explicit numbering for manual sorting).
      * Single-disk naming: GameName.img (no suffix needed).
@@ -74,10 +75,6 @@ public class RomProcessor {
                 throw new IOException("ucon64 produced no split parts for " + romFile.getName());
             }
 
-            // Calculate floppy disk count: 3 parts per 1.6MB disk (conservative capacity planning)
-            // ceil(7 parts / 3) = 3 disks
-            int totalDisks = (int) Math.ceil((double) parts.size() / PARTS_PER_DISK);
-
             // Extract base name by removing extension: "SuperMario.sfc" → "SuperMario"
             // Regex removes everything from last dot onward
             String baseName = romFile.getName().replaceFirst("\\.[^.]+$", "");
@@ -87,13 +84,35 @@ public class RomProcessor {
             Path gameOutputDir = outputBaseDir.resolve(baseName);
             Files.createDirectories(gameOutputDir);
 
-            // Process each floppy disk sequentially (I/O-bound, parallelism would cause contention)
-            for (int diskIdx = 0; diskIdx < totalDisks; diskIdx++) {
+            // Pack parts onto disks by actual size (not fixed count)
+            // GD3 produces ~1MB parts, others produce ~512KB parts
+            int totalDisks = calculateTotalDisks(parts);
+            int diskNumber = 1;
+            int partIdx = 0;
+
+            while (partIdx < parts.size()) {
+                long diskUsed = 0;
+                List<File> diskParts = new java.util.ArrayList<>();
+
+                // Fill current disk until capacity reached
+                while (partIdx < parts.size()) {
+                    File part = parts.get(partIdx);
+                    long partSize = part.length();
+
+                    // If disk is empty, always add the part (even if oversized - will fail-fast at mcopy)
+                    // Otherwise, check if part fits within remaining capacity
+                    if (diskUsed + partSize <= DISK_CAPACITY_BYTES || diskParts.isEmpty()) {
+                        diskParts.add(part);
+                        diskUsed += partSize;
+                        partIdx++;
+                    } else {
+                        break; // Start new disk
+                    }
+                }
                 String diskName;
                 if (totalDisks > 1) {
                     // Multi-disk: explicit numbering (_1, _2) for manual sorting clarity
-                    // Starts at 1 (not 0) to match user mental model (disk 1, disk 2)
-                    diskName = baseName + "_" + (diskIdx + 1) + ".img";
+                    diskName = baseName + "_" + diskNumber + ".img";
                 } else {
                     // Single disk: no suffix needed (cleaner naming)
                     diskName = baseName + ".img";
@@ -102,22 +121,15 @@ public class RomProcessor {
                 File targetImage = tempDir.resolve(diskName).toFile();
 
                 // Copy empty FAT12 template as base for this disk
-                // Template must be pre-formatted (tool does not format filesystems)
                 Files.copy(emptyImageTemplate.toPath(), targetImage.toPath(),
                           StandardCopyOption.REPLACE_EXISTING);
 
-                // Partition parts across disks: disk 0 gets parts [0,3), disk 1 gets [3,6), etc.
-                int startIdx = diskIdx * PARTS_PER_DISK;
-                int endIdx = Math.min(startIdx + PARTS_PER_DISK, parts.size());
-                List<File> diskParts = parts.subList(startIdx, endIdx);
-
                 // Inject each part into floppy image with DOS-compliant name
-                // Track DOS names to detect 8.3 truncation collisions (e.g., SF32CHRA.078 vs SF32CHRAEXTRA.078)
                 Map<String, File> dosNameMap = new LinkedHashMap<>();
                 for (File part : diskParts) {
                     String dosName = DosNameUtil.sanitize(part.getName());
                     if (dosNameMap.containsKey(dosName)) {
-                        throw new IOException("DOS name collision on disk " + (diskIdx + 1) + ": " + dosName +
+                        throw new IOException("DOS name collision on disk " + diskNumber + ": " + dosName +
                             " would overwrite " + dosNameMap.get(dosName).getName() +
                             " with " + part.getName() + " (8.3 truncation conflict)");
                     }
@@ -126,22 +138,20 @@ public class RomProcessor {
                 }
 
                 // Move completed disk image to final output directory
-                // Ensures partial images don't pollute output on failure (atomic move)
                 Path finalPath = gameOutputDir.resolve(diskName);
                 Files.move(targetImage.toPath(), finalPath,
                           StandardCopyOption.REPLACE_EXISTING);
 
                 System.out.println("  Created: " + diskName +
                                  " (" + diskParts.size() + " parts)");
+                diskNumber++;
             }
 
             System.out.println("Success: " + romFile.getName() +
-                             " -> " + totalDisks + " disk(s) [" + format.name() + "]");
-            // Format in log output enables tracing which backup unit format was used for each ROM
+                             " -> " + (diskNumber - 1) + " disk(s) [" + format.name() + "]");
 
         } finally {
             // Cleanup temp directory even on failure to prevent disk space leaks
-            // Reverse order traversal deletes files before parent directories
             if (Files.exists(tempDir)) {
                 try (var stream = Files.walk(tempDir)) {
                     stream.sorted(Comparator.reverseOrder())
@@ -150,5 +160,31 @@ public class RomProcessor {
                 }
             }
         }
+    }
+
+    /**
+     * Calculate total number of disks needed for given parts based on size-based packing.
+     */
+    private int calculateTotalDisks(List<File> parts) {
+        int disks = 0;
+        int partIdx = 0;
+
+        while (partIdx < parts.size()) {
+            long diskUsed = 0;
+            boolean diskHasPart = false;
+
+            while (partIdx < parts.size()) {
+                long partSize = parts.get(partIdx).length();
+                if (diskUsed + partSize <= DISK_CAPACITY_BYTES || !diskHasPart) {
+                    diskUsed += partSize;
+                    diskHasPart = true;
+                    partIdx++;
+                } else {
+                    break;
+                }
+            }
+            disks++;
+        }
+        return disks;
     }
 }
