@@ -1,5 +1,6 @@
 package com.largomodo.floppyconvert.service;
 
+import com.largomodo.floppyconvert.core.CopierFormat;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -24,7 +25,7 @@ class Ucon64DriverTest {
 
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> driver.splitRom(nonExistentFile, tempDir)
+            () -> driver.splitRom(nonExistentFile, tempDir, CopierFormat.FIG)
         );
 
         assertTrue(exception.getMessage().contains("ROM file does not exist"));
@@ -48,7 +49,7 @@ class Ucon64DriverTest {
         // This will throw ProcessFailureException if ucon64 is not installed,
         // which is acceptable for a unit test environment
         try {
-            List<File> parts = driver.splitRom(romFile.toFile(), tempDir);
+            List<File> parts = driver.splitRom(romFile.toFile(), tempDir, CopierFormat.FIG);
             // If ucon64 is available and the file is valid, parts should be returned
             assertNotNull(parts);
         } catch (ExternalProcessDriver.ProcessFailureException e) {
@@ -56,5 +57,66 @@ class Ucon64DriverTest {
             assertTrue(e.getMessage().contains("Process failed") ||
                       e.getMessage().contains("Process exited"));
         }
+    }
+
+    @Test
+    void testSourceExclusionFromParts(@TempDir Path tempDir) throws IOException {
+        Path romFile = tempDir.resolve("game.sfc");
+        Files.write(romFile, new byte[1024]);
+
+        Path workDir = tempDir.resolve("work");
+        Files.createDirectories(workDir);
+
+        Ucon64Driver driver = new Ucon64Driver("/usr/bin/ucon64") {
+            @Override
+            protected int executeCommand(String[] cmd, long timeoutMs) throws IOException {
+                // Mock: skip actual ucon64 execution, but create mock output files
+                Path workDirPath = cmd[cmd.length - 1].endsWith("game.sfc")
+                    ? new File(cmd[cmd.length - 1]).toPath().getParent()
+                    : null;
+                if (workDirPath != null) {
+                    Files.write(workDirPath.resolve("game.1"), new byte[512]);
+                    Files.write(workDirPath.resolve("game.2"), new byte[512]);
+                }
+                return 0;
+            }
+        };
+
+        List<File> parts = driver.splitRom(romFile.toFile(), workDir, CopierFormat.FIG);
+
+        assertEquals(2, parts.size());
+        assertTrue(parts.stream().noneMatch(f -> f.getName().equals("game.sfc")));
+        assertTrue(parts.stream().anyMatch(f -> f.getName().equals("game.1")));
+        assertTrue(parts.stream().anyMatch(f -> f.getName().equals("game.2")));
+    }
+
+    @Test
+    void testAlphanumericSorting(@TempDir Path tempDir) throws IOException {
+        Path romFile = tempDir.resolve("game.sfc");
+        Files.write(romFile, new byte[1024]);
+
+        Path workDir = tempDir.resolve("work");
+        Files.createDirectories(workDir);
+
+        Ucon64Driver driver = new Ucon64Driver("/usr/bin/ucon64") {
+            @Override
+            protected int executeCommand(String[] cmd, long timeoutMs) throws IOException {
+                // Mock: skip actual ucon64 execution, but create mock GD3 output files
+                Path workDirPath = cmd[cmd.length - 1].endsWith("game.sfc")
+                    ? new File(cmd[cmd.length - 1]).toPath().getParent()
+                    : null;
+                if (workDirPath != null) {
+                    Files.write(workDirPath.resolve("SF32CHRB.078"), new byte[512]);
+                    Files.write(workDirPath.resolve("SF32CHRA.078"), new byte[512]);
+                }
+                return 0;
+            }
+        };
+
+        List<File> parts = driver.splitRom(romFile.toFile(), workDir, CopierFormat.GD3);
+
+        assertEquals(2, parts.size());
+        assertEquals("SF32CHRA.078", parts.get(0).getName());
+        assertEquals("SF32CHRB.078", parts.get(1).getName());
     }
 }

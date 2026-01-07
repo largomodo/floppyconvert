@@ -1,5 +1,8 @@
 package com.largomodo.floppyconvert.service;
 
+import com.largomodo.floppyconvert.core.CopierFormat;
+import com.largomodo.floppyconvert.core.RomPartComparator;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -26,15 +29,16 @@ public class Ucon64Driver extends ExternalProcessDriver {
     /**
      * Split ROM file into parts using ucon64.
      *
-     * Strategy: Copy ROM to temp directory (ucon64 modifies source directory),
-     * execute split command, scan for .1/.2/.3 files, sort by numeric extension.
+     * Strategy: Copy ROM to temp directory, execute format-specific split command,
+     * list all output files (excluding source), sort by RomPartComparator.
      *
+     * @param format Backup unit format (determines ucon64 flag and output naming)
      * @param romFile Source ROM file (.sfc format expected)
      * @param tempDir Isolated temp directory for split output
      * @return Sorted list of part files (ordered by numeric extension: .1, .2, .3)
      * @throws IOException if ucon64 fails or no parts generated
      */
-    public List<File> splitRom(File romFile, Path tempDir) throws IOException {
+    public List<File> splitRom(File romFile, Path tempDir, CopierFormat format) throws IOException {
         if (!romFile.exists()) {
             throw new IllegalArgumentException("ROM file does not exist: " + romFile);
         }
@@ -46,7 +50,7 @@ public class Ucon64Driver extends ExternalProcessDriver {
 
         String[] cmd = {
             ucon64Path,
-            "--fig",      // FIG format (Doctor V64 format for SNES copiers)
+            format.getCmdFlag(),  // Format-specific flag (--fig, --swc, --ufo, --gd3)
             "--nbak",     // No backup files (prevents .bak clutter in temp dir)
             "--ncol",     // No ANSI color codes (prevents terminal escape pollution in logs)
             "-s",         // Split mode
@@ -56,21 +60,20 @@ public class Ucon64Driver extends ExternalProcessDriver {
 
         executeCommand(cmd, DEFAULT_TIMEOUT_MS);
 
-        // ucon64 creates .1, .2, .3, etc. files in same directory as input
-        // Numeric sorting ensures part order for multi-disk spanning (disk 1 gets .1/.2/.3, disk 2 gets .4/.5/.6)
-        // Extract base name for filtering: "game.sfc" → "game"
-        String baseName = tempRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
+        // List all files except source ROM (ucon64 creates parts in same directory)
+        // Why filter-all: Resilient to ucon64 naming changes across formats (no regex maintenance)
+        // Relies on temp directory isolation invariant (only source + ucon64 output present)
+        String sourceFileName = tempRom.getFileName().toString();
 
         List<File> parts;
         try (var stream = Files.list(tempDir)) {
             parts = stream
                 .map(Path::toFile)
-                .filter(f -> f.getName().matches(baseName + "\\.\\d+$"))  // Match only ROM-specific parts
-                .sorted((a, b) -> {
-                    int numA = Integer.parseInt(a.getName().replaceAll(".*\\.(\\d+)$", "$1"));
-                    int numB = Integer.parseInt(b.getName().replaceAll(".*\\.(\\d+)$", "$1"));
-                    return Integer.compare(numA, numB);
-                })
+                .filter(f -> !f.getName().equals(sourceFileName))  // Exclude source ROM from parts list
+                .map(File::getAbsolutePath)  // Convert to absolute paths for deduplication
+                .distinct()  // Deduplicate to prevent mcopy overwrites causing silent data loss
+                .map(File::new)  // Convert back to File objects
+                .sorted(new RomPartComparator())  // Universal sorting (handles FIG numeric + GD3 alphanumeric)
                 .collect(Collectors.toList());
         }
 

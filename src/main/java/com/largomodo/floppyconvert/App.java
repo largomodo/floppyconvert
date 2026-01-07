@@ -1,5 +1,6 @@
 package com.largomodo.floppyconvert;
 
+import com.largomodo.floppyconvert.core.CopierFormat;
 import com.largomodo.floppyconvert.core.RomProcessor;
 import com.largomodo.floppyconvert.service.Ucon64Driver;
 import com.largomodo.floppyconvert.service.MtoolsDriver;
@@ -53,6 +54,7 @@ public class App {
         String emptyImage = null;
         String ucon64Path = "ucon64";   // Default assumes binary in PATH
         String mtoolsPath = "mcopy";    // Default assumes binary in PATH
+        CopierFormat format = CopierFormat.FIG;  // FIG default provides backward compatibility for existing scripts
 
         // Iterate with manual index increment to consume values after flags
         for (int i = 0; i < args.length; i++) {
@@ -77,6 +79,12 @@ public class App {
                     if (i + 1 >= args.length) throw new IllegalArgumentException("--mtools-path requires a value");
                     mtoolsPath = args[++i];
                 }
+                case "--format" -> {
+                    if (i + 1 >= args.length) throw new IllegalArgumentException("--format requires a value");
+                    // Validate at parseArgs time (fail-fast before I/O operations)
+                    // Why early validation: Prevents wasted work (temp directory creation, ROM copying)
+                    format = CopierFormat.fromCliArgument(args[++i]);
+                }
                 default -> throw new IllegalArgumentException("Unknown argument: " + args[i]);
             }
         }
@@ -85,7 +93,7 @@ public class App {
             throw new IllegalArgumentException("Missing required arguments");
         }
 
-        return new Config(inputDir, outputDir, emptyImage, ucon64Path, mtoolsPath);
+        return new Config(inputDir, outputDir, emptyImage, ucon64Path, mtoolsPath, format);
     }
 
     /**
@@ -128,7 +136,8 @@ public class App {
                     Paths.get(config.outputDir),
                     new File(config.emptyImage),
                     ucon64,
-                    mtools
+                    mtools,
+                    config.format
                 );
                 successCount++;
             } catch (Exception e) {
@@ -206,7 +215,24 @@ public class App {
     }
 
     private static void printUsage() {
-        System.out.println("Usage: java -jar floppyconvert.jar --input-dir <dir> --output-dir <dir> --empty-image <file> [--ucon64-path <path>] [--mtools-path <path>]");
+        System.out.println("Usage: java -jar floppyconvert.jar [options]");
+        System.out.println();
+        System.out.println("Required:");
+        System.out.println("  --input-dir <path>      Directory containing ROM files (.sfc)");
+        System.out.println("  --output-dir <path>     Output directory for floppy images");
+        System.out.println("  --empty-image <path>    Pre-formatted 1.6MB FAT12 floppy image template");
+        System.out.println();
+        System.out.println("Optional:");
+        System.out.println("  --ucon64-path <path>    Path to ucon64 binary (default: ucon64)");
+        System.out.println("  --mtools-path <path>    Path to mcopy binary (default: mcopy)");
+        System.out.println("  --format <fig|swc|ufo|gd3>  Backup unit format (default: fig)");
+        System.out.println();
+        System.out.println("Example:");
+        System.out.println("  java -jar floppy-convert.jar \\");
+        System.out.println("    --input-dir ./roms \\");
+        System.out.println("    --output-dir ./output \\");
+        System.out.println("    --empty-image ./template.img \\");
+        System.out.println("    --format gd3");
     }
 
     /**
@@ -215,5 +241,5 @@ public class App {
      * Immutable value object for parsed CLI arguments.
      */
     private record Config(String inputDir, String outputDir, String emptyImage,
-                         String ucon64Path, String mtoolsPath) {}
+                         String ucon64Path, String mtoolsPath, CopierFormat format) {}
 }

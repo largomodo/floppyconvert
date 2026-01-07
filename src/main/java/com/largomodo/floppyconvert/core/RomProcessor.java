@@ -1,5 +1,6 @@
 package com.largomodo.floppyconvert.core;
 
+import com.largomodo.floppyconvert.core.CopierFormat;
 import com.largomodo.floppyconvert.service.Ucon64Driver;
 import com.largomodo.floppyconvert.service.MtoolsDriver;
 import com.largomodo.floppyconvert.util.DosNameUtil;
@@ -11,6 +12,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * ROM to floppy disk image conversion pipeline orchestrator.
@@ -40,6 +43,7 @@ public class RomProcessor {
      * Multi-disk naming: GameName_1.img, GameName_2.img (explicit numbering for manual sorting).
      * Single-disk naming: GameName.img (no suffix needed).
      *
+     * @param format Backup unit format for ucon64 splitting
      * @param romFile Source ROM file (.sfc format)
      * @param outputBaseDir Base output directory (per-ROM subdirectory created inside)
      * @param emptyImageTemplate Pre-formatted FAT12 floppy template (1.6MB)
@@ -52,7 +56,8 @@ public class RomProcessor {
         Path outputBaseDir,
         File emptyImageTemplate,
         Ucon64Driver ucon64,
-        MtoolsDriver mtools
+        MtoolsDriver mtools,
+        CopierFormat format
     ) throws IOException {
 
         // Isolated temp directory prevents filename collisions across concurrent invocations
@@ -63,7 +68,7 @@ public class RomProcessor {
             System.out.println("Processing: " + romFile.getName());
 
             // ucon64 splits ROM into sequentially numbered parts (.1, .2, .3, ...)
-            List<File> parts = ucon64.splitRom(romFile, tempDir);
+            List<File> parts = ucon64.splitRom(romFile, tempDir, format);
 
             if (parts.isEmpty()) {
                 throw new IOException("ucon64 produced no split parts for " + romFile.getName());
@@ -107,8 +112,16 @@ public class RomProcessor {
                 List<File> diskParts = parts.subList(startIdx, endIdx);
 
                 // Inject each part into floppy image with DOS-compliant name
+                // Track DOS names to detect 8.3 truncation collisions (e.g., SF32CHRA.078 vs SF32CHRAEXTRA.078)
+                Map<String, File> dosNameMap = new LinkedHashMap<>();
                 for (File part : diskParts) {
                     String dosName = DosNameUtil.sanitize(part.getName());
+                    if (dosNameMap.containsKey(dosName)) {
+                        throw new IOException("DOS name collision on disk " + (diskIdx + 1) + ": " + dosName +
+                            " would overwrite " + dosNameMap.get(dosName).getName() +
+                            " with " + part.getName() + " (8.3 truncation conflict)");
+                    }
+                    dosNameMap.put(dosName, part);
                     mtools.copyToImage(targetImage, part, dosName);
                 }
 
@@ -123,7 +136,8 @@ public class RomProcessor {
             }
 
             System.out.println("Success: " + romFile.getName() +
-                             " -> " + totalDisks + " disk(s)");
+                             " -> " + totalDisks + " disk(s) [" + format.name() + "]");
+            // Format in log output enables tracing which backup unit format was used for each ROM
 
         } finally {
             // Cleanup temp directory even on failure to prevent disk space leaks
