@@ -2,13 +2,14 @@ package com.largomodo.floppyconvert;
 
 import com.largomodo.floppyconvert.core.CopierFormat;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
 
 import java.lang.reflect.Method;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 /**
  * Test suite for App CLI argument parsing.
- *
+ * <p>
  * Focus: Format flag validation, default behavior, and error cases.
  * Does not test full batch processing (covered by integration tests).
  */
@@ -21,10 +22,10 @@ class AppTest {
     @Test
     void testParseArgs_ValidFormat_GD3() throws Exception {
         String[] args = {
-            "--input-dir", "/test/input",
-            "--output-dir", "/test/output",
-            "--empty-image", "/test/empty.img",
-            "--format", "gd3"
+                "--input-dir", "/test/input",
+                "--output-dir", "/test/output",
+                "--empty-image", "/test/empty.img",
+                "--format", "gd3"
         };
 
         Object config = invokeParseArgs(args);
@@ -40,10 +41,10 @@ class AppTest {
     @Test
     void testParseArgs_ValidFormat_FIG() throws Exception {
         String[] args = {
-            "--input-dir", "/test/input",
-            "--output-dir", "/test/output",
-            "--empty-image", "/test/empty.img",
-            "--format", "fig"
+                "--input-dir", "/test/input",
+                "--output-dir", "/test/output",
+                "--empty-image", "/test/empty.img",
+                "--format", "fig"
         };
 
         Object config = invokeParseArgs(args);
@@ -59,10 +60,10 @@ class AppTest {
     @Test
     void testParseArgs_ValidFormat_SWC() throws Exception {
         String[] args = {
-            "--input-dir", "/test/input",
-            "--output-dir", "/test/output",
-            "--empty-image", "/test/empty.img",
-            "--format", "SWC"
+                "--input-dir", "/test/input",
+                "--output-dir", "/test/output",
+                "--empty-image", "/test/empty.img",
+                "--format", "SWC"
         };
 
         Object config = invokeParseArgs(args);
@@ -78,10 +79,10 @@ class AppTest {
     @Test
     void testParseArgs_ValidFormat_UFO() throws Exception {
         String[] args = {
-            "--input-dir", "/test/input",
-            "--output-dir", "/test/output",
-            "--empty-image", "/test/empty.img",
-            "--format", "UfO"
+                "--input-dir", "/test/input",
+                "--output-dir", "/test/output",
+                "--empty-image", "/test/empty.img",
+                "--format", "UfO"
         };
 
         Object config = invokeParseArgs(args);
@@ -97,9 +98,9 @@ class AppTest {
     @Test
     void testParseArgs_DefaultFormat() throws Exception {
         String[] args = {
-            "--input-dir", "/test/input",
-            "--output-dir", "/test/output",
-            "--empty-image", "/test/empty.img"
+                "--input-dir", "/test/input",
+                "--output-dir", "/test/output",
+                "--empty-image", "/test/empty.img"
         };
 
         Object config = invokeParseArgs(args);
@@ -115,23 +116,23 @@ class AppTest {
     @Test
     void testParseArgs_InvalidFormat() {
         String[] args = {
-            "--input-dir", "/test/input",
-            "--output-dir", "/test/output",
-            "--empty-image", "/test/empty.img",
-            "--format", "invalid"
+                "--input-dir", "/test/input",
+                "--output-dir", "/test/output",
+                "--empty-image", "/test/empty.img",
+                "--format", "invalid"
         };
 
         IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> invokeParseArgs(args),
-            "Should throw IllegalArgumentException for invalid format"
+                IllegalArgumentException.class,
+                () -> invokeParseArgs(args),
+                "Should throw IllegalArgumentException for invalid format"
         );
 
         String message = exception.getMessage();
         assertTrue(message.contains("Invalid format: invalid"),
-            "Error message should mention 'Invalid format: invalid', got: " + message);
+                "Error message should mention 'Invalid format: invalid', got: " + message);
         assertTrue(message.contains("Supported: FIG, SWC, UFO, GD3"),
-            "Error message should list supported formats, got: " + message);
+                "Error message should list supported formats, got: " + message);
     }
 
     /**
@@ -141,20 +142,20 @@ class AppTest {
     @Test
     void testParseArgs_MissingFormatValue() {
         String[] args = {
-            "--input-dir", "/test/input",
-            "--output-dir", "/test/output",
-            "--empty-image", "/test/empty.img",
-            "--format"
+                "--input-dir", "/test/input",
+                "--output-dir", "/test/output",
+                "--empty-image", "/test/empty.img",
+                "--format"
         };
 
         IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> invokeParseArgs(args),
-            "Should throw IllegalArgumentException when --format lacks value"
+                IllegalArgumentException.class,
+                () -> invokeParseArgs(args),
+                "Should throw IllegalArgumentException when --format lacks value"
         );
 
         assertEquals("--format requires a value", exception.getMessage(),
-            "Error message should indicate missing value");
+                "Error message should indicate missing value");
     }
 
     /**
@@ -164,18 +165,18 @@ class AppTest {
     @Test
     void testParseArgs_MissingRequiredArgs_WithFormat() {
         String[] args = {
-            "--input-dir", "/test/input",
-            "--format", "gd3"
+                "--input-dir", "/test/input",
+                "--format", "gd3"
         };
 
         IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> invokeParseArgs(args),
-            "Should throw IllegalArgumentException when required args missing"
+                IllegalArgumentException.class,
+                () -> invokeParseArgs(args),
+                "Should throw IllegalArgumentException when required args missing"
         );
 
         assertTrue(exception.getMessage().contains("Batch mode") || exception.getMessage().contains("Missing required argument"),
-            "Error message should indicate missing required arguments");
+                "Error message should indicate missing required arguments");
     }
 
     /**
@@ -185,10 +186,10 @@ class AppTest {
     @Test
     void testParseArgs_FormatBeforeRequiredArgs() throws Exception {
         String[] args = {
-            "--format", "swc",
-            "--input-dir", "/test/input",
-            "--output-dir", "/test/output",
-            "--empty-image", "/test/empty.img"
+                "--format", "swc",
+                "--input-dir", "/test/input",
+                "--output-dir", "/test/output",
+                "--empty-image", "/test/empty.img"
         };
 
         Object config = invokeParseArgs(args);
@@ -204,12 +205,12 @@ class AppTest {
     @Test
     void testParseArgs_FormatWithOtherOptionalFlags() throws Exception {
         String[] args = {
-            "--input-dir", "/test/input",
-            "--output-dir", "/test/output",
-            "--empty-image", "/test/empty.img",
-            "--ucon64-path", "/custom/ucon64",
-            "--format", "ufo",
-            "--mtools-path", "/custom/mcopy"
+                "--input-dir", "/test/input",
+                "--output-dir", "/test/output",
+                "--empty-image", "/test/empty.img",
+                "--ucon64-path", "/custom/ucon64",
+                "--format", "ufo",
+                "--mtools-path", "/custom/mcopy"
         };
 
         Object config = invokeParseArgs(args);
@@ -217,9 +218,9 @@ class AppTest {
 
         assertEquals("UFO", format.toString(), "Format should be UFO");
         assertEquals("/custom/ucon64", getConfigField(config, "ucon64Path"),
-            "ucon64Path should be preserved");
+                "ucon64Path should be preserved");
         assertEquals("/custom/mcopy", getConfigField(config, "mtoolsPath"),
-            "mtoolsPath should be preserved");
+                "mtoolsPath should be preserved");
     }
 
     @Test
@@ -236,14 +237,14 @@ class AppTest {
     @Test
     void testParseArgs_MutualExclusivity() {
         String[] args = {
-            "--input-dir", "./roms",
-            "--input-file", "test.sfc",
-            "--output-dir", "./output",
-            "--empty-image", "template.img"
+                "--input-dir", "./roms",
+                "--input-file", "test.sfc",
+                "--output-dir", "./output",
+                "--empty-image", "template.img"
         };
 
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-            () -> invokeParseArgs(args));
+                () -> invokeParseArgs(args));
         assertTrue(e.getMessage().contains("Both --input-dir and --input-file"));
     }
 
@@ -252,16 +253,16 @@ class AppTest {
         String[] args = {"--empty-image", "template.img"};
 
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-            () -> invokeParseArgs(args));
+                () -> invokeParseArgs(args));
         assertTrue(e.getMessage().contains("Must provide either"));
     }
 
     @Test
     void testParseArgs_OutputDirOptionalForInputFile() throws Exception {
         String[] args = {
-            "--input-file", "test.sfc",
-            "--empty-image", "template.img",
-            "--format", "gd3"
+                "--input-file", "test.sfc",
+                "--empty-image", "template.img",
+                "--format", "gd3"
         };
 
         Object config = invokeParseArgs(args);
@@ -273,13 +274,13 @@ class AppTest {
     @Test
     void testParseArgs_InputFileWithOutputDir() {
         String[] args = {
-            "--input-file", "test.sfc",
-            "--output-dir", "./output",
-            "--empty-image", "template.img"
+                "--input-file", "test.sfc",
+                "--output-dir", "./output",
+                "--empty-image", "template.img"
         };
 
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-            () -> invokeParseArgs(args));
+                () -> invokeParseArgs(args));
         assertTrue(e.getMessage().contains("Single-file mode"));
         assertTrue(e.getMessage().contains("does not support --output-dir"));
     }

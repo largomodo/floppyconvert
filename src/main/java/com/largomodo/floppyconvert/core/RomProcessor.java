@@ -1,8 +1,7 @@
 package com.largomodo.floppyconvert.core;
 
-import com.largomodo.floppyconvert.core.CopierFormat;
-import com.largomodo.floppyconvert.service.Ucon64Driver;
 import com.largomodo.floppyconvert.service.MtoolsDriver;
+import com.largomodo.floppyconvert.service.Ucon64Driver;
 import com.largomodo.floppyconvert.util.DosNameUtil;
 
 import java.io.File;
@@ -10,20 +9,20 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.List;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
  * ROM to floppy disk image conversion pipeline orchestrator.
- *
+ * <p>
  * Coordinates multi-step workflow:
- *   1. Split ROM into parts (ucon64)
- *   2. Pack parts onto floppy disks by actual size (not fixed count)
- *   3. For each disk: copy template, inject parts with DOS names, move to output
- *   4. Cleanup temp directory
- *
+ * 1. Split ROM into parts (ucon64)
+ * 2. Pack parts onto floppy disks by actual size (not fixed count)
+ * 3. For each disk: copy template, inject parts with DOS names, move to output
+ * 4. Cleanup temp directory
+ * <p>
  * Isolated temp directories prevent filename collisions.
  * Cleanup in finally block ensures no disk space leaks on failure.
  */
@@ -37,28 +36,28 @@ public class RomProcessor {
 
     /**
      * Process single ROM file through full conversion pipeline.
-     *
+     * <p>
      * Strategy: Create isolated temp dir, split ROM, pack parts onto disks
      * by actual file size, inject into floppy images, move to output, cleanup.
-     *
+     * <p>
      * Multi-disk naming: GameName_1.img, GameName_2.img (explicit numbering for manual sorting).
      * Single-disk naming: GameName.img (no suffix needed).
      *
-     * @param format Backup unit format for ucon64 splitting
-     * @param romFile Source ROM file (.sfc format)
-     * @param outputBaseDir Base output directory (per-ROM subdirectory created inside)
+     * @param format             Backup unit format for ucon64 splitting
+     * @param romFile            Source ROM file (.sfc format)
+     * @param outputBaseDir      Base output directory (per-ROM subdirectory created inside)
      * @param emptyImageTemplate Pre-formatted FAT12 floppy template (1.6MB)
-     * @param ucon64 ucon64 driver for ROM splitting
-     * @param mtools mtools driver for floppy injection
+     * @param ucon64             ucon64 driver for ROM splitting
+     * @param mtools             mtools driver for floppy injection
      * @throws IOException if any pipeline step fails
      */
     public void processRom(
-        File romFile,
-        Path outputBaseDir,
-        File emptyImageTemplate,
-        Ucon64Driver ucon64,
-        MtoolsDriver mtools,
-        CopierFormat format
+            File romFile,
+            Path outputBaseDir,
+            File emptyImageTemplate,
+            Ucon64Driver ucon64,
+            MtoolsDriver mtools,
+            CopierFormat format
     ) throws IOException {
 
         // Isolated temp directory prevents filename collisions across concurrent invocations
@@ -122,7 +121,7 @@ public class RomProcessor {
 
                 // Copy empty FAT12 template as base for this disk
                 Files.copy(emptyImageTemplate.toPath(), targetImage.toPath(),
-                          StandardCopyOption.REPLACE_EXISTING);
+                        StandardCopyOption.REPLACE_EXISTING);
 
                 // Inject each part into floppy image with DOS-compliant name
                 Map<String, File> dosNameMap = new LinkedHashMap<>();
@@ -130,8 +129,8 @@ public class RomProcessor {
                     String dosName = DosNameUtil.sanitize(part.getName());
                     if (dosNameMap.containsKey(dosName)) {
                         throw new IOException("DOS name collision on disk " + diskNumber + ": " + dosName +
-                            " would overwrite " + dosNameMap.get(dosName).getName() +
-                            " with " + part.getName() + " (8.3 truncation conflict)");
+                                " would overwrite " + dosNameMap.get(dosName).getName() +
+                                " with " + part.getName() + " (8.3 truncation conflict)");
                     }
                     dosNameMap.put(dosName, part);
                     mtools.copyToImage(targetImage, part, dosName);
@@ -140,23 +139,23 @@ public class RomProcessor {
                 // Move completed disk image to final output directory
                 Path finalPath = gameOutputDir.resolve(diskName);
                 Files.move(targetImage.toPath(), finalPath,
-                          StandardCopyOption.REPLACE_EXISTING);
+                        StandardCopyOption.REPLACE_EXISTING);
 
                 System.out.println("  Created: " + diskName +
-                                 " (" + diskParts.size() + " parts)");
+                        " (" + diskParts.size() + " parts)");
                 diskNumber++;
             }
 
             System.out.println("Success: " + romFile.getName() +
-                             " -> " + (diskNumber - 1) + " disk(s) [" + format.name() + "]");
+                    " -> " + (diskNumber - 1) + " disk(s) [" + format.name() + "]");
 
         } finally {
             // Cleanup temp directory even on failure to prevent disk space leaks
             if (Files.exists(tempDir)) {
                 try (var stream = Files.walk(tempDir)) {
                     stream.sorted(Comparator.reverseOrder())
-                        .map(Path::toFile)
-                        .forEach(File::delete);
+                            .map(Path::toFile)
+                            .forEach(File::delete);
                 }
             }
         }

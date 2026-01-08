@@ -1,17 +1,18 @@
 package com.largomodo.floppyconvert.service;
 
 import org.apache.commons.exec.*;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 
 /**
  * Base class for external process execution with timeout and exit code enforcement.
- *
+ * <p>
  * Provides watchdog-based timeout protection (prevents hung ucon64/mtools from stalling
  * batch jobs) and automatic non-zero exit code detection (fails fast on tool errors
  * with stderr captured for diagnostics).
- *
+ * <p>
  * Subclasses: Ucon64Driver, MtoolsDriver
  */
 public abstract class ExternalProcessDriver {
@@ -23,7 +24,7 @@ public abstract class ExternalProcessDriver {
     /**
      * Execute external command with timeout and exit code validation.
      *
-     * @param cmdArray Command and arguments (cmdArray[0] = binary path)
+     * @param cmdArray  Command and arguments (cmdArray[0] = binary path)
      * @param timeoutMs Watchdog timeout in milliseconds
      * @return Exit code (always 0; non-zero throws exception)
      * @throws ProcessTimeoutException if watchdog kills process
@@ -36,8 +37,8 @@ public abstract class ExternalProcessDriver {
     /**
      * Execute external command with timeout, exit code validation, and custom working directory.
      *
-     * @param cmdArray Command and arguments (cmdArray[0] = binary path)
-     * @param timeoutMs Watchdog timeout in milliseconds
+     * @param cmdArray         Command and arguments (cmdArray[0] = binary path)
+     * @param timeoutMs        Watchdog timeout in milliseconds
      * @param workingDirectory Working directory for process execution (null = JVM default)
      * @return Exit code (always 0; non-zero throws exception)
      * @throws ProcessTimeoutException if watchdog kills process
@@ -80,7 +81,7 @@ public abstract class ExternalProcessDriver {
             // Fail fast with stderr for diagnostics rather than silently continuing
             if (exitCode != 0) {
                 throw new ProcessFailureException(
-                    "Process exited with code " + exitCode + ": " + stderr.toString()
+                        "Process exited with code " + exitCode + ": " + stderr
                 );
             }
 
@@ -91,11 +92,11 @@ public abstract class ExternalProcessDriver {
             // ExecuteException alone is ambiguous (could be exit code or timeout)
             if (watchdog.killedProcess()) {
                 throw new ProcessTimeoutException(
-                    "Process exceeded timeout of " + timeoutMs + "ms"
+                        "Process exceeded timeout of " + timeoutMs + "ms"
                 );
             }
             throw new ProcessFailureException(
-                "Process failed: " + e.getMessage() + "\nStderr: " + stderr.toString()
+                    "Process failed: " + e.getMessage() + "\nStderr: " + stderr
             );
         }
     }

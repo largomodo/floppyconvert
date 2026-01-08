@@ -2,8 +2,8 @@ package com.largomodo.floppyconvert;
 
 import com.largomodo.floppyconvert.core.CopierFormat;
 import com.largomodo.floppyconvert.core.RomProcessor;
-import com.largomodo.floppyconvert.service.Ucon64Driver;
 import com.largomodo.floppyconvert.service.MtoolsDriver;
+import com.largomodo.floppyconvert.service.Ucon64Driver;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -13,19 +13,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * CLI entry point for ROM to floppy disk conversion tool.
- *
+ * <p>
  * Parses arguments, validates environment (tool existence, path accessibility),
  * iterates ROM files, orchestrates batch processing with fail-soft error handling
  * (single ROM failure does not stop batch).
- *
+ * <p>
  * Usage:
- *   java -jar floppyconvert.jar --input-dir <dir> --output-dir <dir> --empty-image <file>
- *     [--ucon64-path <path>] [--mtools-path <path>]
+ * java -jar floppyconvert.jar --input-dir <dir> --output-dir <dir> --empty-image <file>
+ * [--ucon64-path <path>] [--mtools-path <path>]
  */
 public class App {
 
@@ -51,7 +49,7 @@ public class App {
 
     /**
      * Parse CLI arguments into configuration record.
-     *
+     * <p>
      * Uses switch expression pattern (Java 21 feature) for clean argument handling.
      * Defaults: ucon64Path="ucon64", mtoolsPath="mcopy" (assumes PATH availability).
      *
@@ -131,10 +129,10 @@ public class App {
 
     /**
      * Execute batch ROM processing with fail-soft error handling.
-     *
+     * <p>
      * Strategy: Fail-fast validation (environment issues affect all ROMs),
      * then fail-soft per-ROM processing (single failure logged, batch continues).
-     *
+     * <p>
      * Sequential processing avoids I/O contention (ucon64/mtools are I/O bound).
      */
     private static void runBatch(Config config) {
@@ -165,12 +163,12 @@ public class App {
         for (File romFile : romFiles) {
             try {
                 processor.processRom(
-                    romFile,
-                    Paths.get(config.outputDir),
-                    new File(config.emptyImage),
-                    ucon64,
-                    mtools,
-                    config.format
+                        romFile,
+                        Paths.get(config.outputDir),
+                        new File(config.emptyImage),
+                        ucon64,
+                        mtools,
+                        config.format
                 );
                 successCount++;
             } catch (Exception e) {
@@ -182,7 +180,7 @@ public class App {
         }
 
         System.out.println("\nBatch complete: " + successCount + " successful, " +
-                         failCount + " failed");
+                failCount + " failed");
         if (failCount > 0) {
             System.out.println("See " + failuresLog + " for failure details");
         }
@@ -190,14 +188,14 @@ public class App {
 
     /**
      * Execute single-file ROM processing with fail-fast error handling.
-     *
+     * <p>
      * Accepts outputBase as parameter for testability: production passes Paths.get("."),
      * tests pass tempDir to avoid filesystem pollution and enable parallel execution.
-     *
+     * <p>
      * Validates input file existence/type, then delegates to RomProcessor.
      * Exceptions propagate to main() (enables fail-fast with exit code 1).
      *
-     * @param config Configuration containing inputFile path and tool paths
+     * @param config     Configuration containing inputFile path and tool paths
      * @param outputBase Directory where output will be written (CWD in production, tempDir in tests)
      * @throws IOException if input file validation fails or processing encounters I/O error
      */
@@ -234,12 +232,12 @@ public class App {
 
         // Process ROM with provided outputBase (enables test isolation)
         processor.processRom(
-            inputPath.toFile(),
-            outputBase,
-            templatePath.toFile(),
-            ucon64,
-            mtools,
-            config.format
+                inputPath.toFile(),
+                outputBase,
+                templatePath.toFile(),
+                ucon64,
+                mtools,
+                config.format
         );
 
         System.out.println("Conversion complete: " + inputPath.getFileName());
@@ -247,7 +245,7 @@ public class App {
 
     /**
      * Validate environment prerequisites before batch processing starts.
-     *
+     * <p>
      * Fail-fast approach: discover missing tools/paths immediately with clear error,
      * prevents wasting time processing 50 ROMs before discovering mcopy is missing.
      *
@@ -284,13 +282,13 @@ public class App {
             return false;  // Fail-fast validation will catch missing tools
         }
         return Arrays.stream(pathEnv.split(File.pathSeparator))
-            .map(dir -> new File(dir, command))
-            .anyMatch(File::canExecute);
+                .map(dir -> new File(dir, command))
+                .anyMatch(File::canExecute);
     }
 
     /**
      * Append failure record to failures.txt log.
-     *
+     * <p>
      * Swallows IOException on log write failure (batch processing continues regardless).
      * Rationale: Logging failure should not halt batch job; console output provides
      * primary failure notification, file log is secondary convenience.
@@ -340,9 +338,10 @@ public class App {
 
     /**
      * Configuration record (Java 21 record feature).
-     *
+     * <p>
      * Immutable value object for parsed CLI arguments.
      */
     private record Config(String inputDir, String outputDir, String emptyImage,
-                         String ucon64Path, String mtoolsPath, CopierFormat format, String inputFile) {}
+                          String ucon64Path, String mtoolsPath, CopierFormat format, String inputFile) {
+    }
 }

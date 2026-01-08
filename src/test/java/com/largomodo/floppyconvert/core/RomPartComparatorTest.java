@@ -1,9 +1,11 @@
 package com.largomodo.floppyconvert.core;
 
 import org.junit.jupiter.api.Test;
+
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class RomPartComparatorTest {
@@ -53,7 +55,7 @@ class RomPartComparatorTest {
         List<File> files = Arrays.asList(gameB1, gameA2, gameA1);
         files.sort(comparator);
         assertEquals(Arrays.asList(gameA1, gameA2, gameB1), files,
-                     "Filename takes precedence over extension");
+                "Filename takes precedence over extension");
     }
 
     @Test
@@ -65,7 +67,7 @@ class RomPartComparatorTest {
 
         File withExt = new File("game.1");
         assertTrue(comparator.compare(noExt1, withExt) < 0,
-                   "File without extension should come before file with numeric extension");
+                "File without extension should come before file with numeric extension");
 
         // Single character names
         File a = new File("a.1");
@@ -76,13 +78,13 @@ class RomPartComparatorTest {
         File emptyExt1 = new File("game.");
         File emptyExt2 = new File("game.");
         assertEquals(0, comparator.compare(emptyExt1, emptyExt2),
-                     "Files with empty extensions should be equal");
+                "Files with empty extensions should be equal");
 
         // Different basenames with empty extensions
         File gameEmpty = new File("game.");
         File testEmpty = new File("test.");
         assertTrue(comparator.compare(gameEmpty, testEmpty) < 0,
-                   "Should compare by basename when extensions are empty");
+                "Should compare by basename when extensions are empty");
     }
 
     @Test
@@ -98,13 +100,13 @@ class RomPartComparatorTest {
 
         // Invalid input
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                                                   () -> CopierFormat.fromCliArgument("invalid"));
+                () -> CopierFormat.fromCliArgument("invalid"));
         assertTrue(ex.getMessage().contains("Invalid format: invalid"));
         assertTrue(ex.getMessage().contains("Supported: FIG, SWC, UFO, GD3"));
 
         // Null input
         IllegalArgumentException nullEx = assertThrows(IllegalArgumentException.class,
-                                                       () -> CopierFormat.fromCliArgument(null));
+                () -> CopierFormat.fromCliArgument(null));
         assertTrue(nullEx.getMessage().contains("cannot be null"));
         assertTrue(nullEx.getMessage().contains("Supported: FIG, SWC, UFO, GD3"));
     }

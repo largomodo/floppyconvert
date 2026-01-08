@@ -24,8 +24,8 @@ class Ucon64DriverTest {
         File nonExistentFile = new File("/tmp/nonexistent.sfc");
 
         IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> driver.splitRom(nonExistentFile, tempDir, CopierFormat.FIG)
+                IllegalArgumentException.class,
+                () -> driver.splitRom(nonExistentFile, tempDir, CopierFormat.FIG)
         );
 
         assertTrue(exception.getMessage().contains("ROM file does not exist"));
@@ -55,7 +55,7 @@ class Ucon64DriverTest {
         } catch (ExternalProcessDriver.ProcessFailureException e) {
             // Expected if ucon64 is not installed
             assertTrue(e.getMessage().contains("Process failed") ||
-                      e.getMessage().contains("Process exited"));
+                    e.getMessage().contains("Process exited"));
         }
     }
 

@@ -6,12 +6,12 @@ import java.util.Comparator;
 /**
  * Comparator for ROM part files that handles both numeric extensions (FIG/SWC/UFO)
  * and alphanumeric filenames (GD3).
- *
+ * <p>
  * Sorting strategy:
  * 1. Compare base filenames (without extension) case-insensitively
  * 2. If filenames differ, sort lexicographically (handles GD3: ...A < ...B)
  * 3. If filenames are same, parse extensions as integers (handles FIG: .1 < .10)
- *
+ * <p>
  * Why universal approach: Format-specific comparators would duplicate logic across
  * 4 classes (120+ lines). This single implementation handles all formats with
  * filename-first, extension-second algorithm.

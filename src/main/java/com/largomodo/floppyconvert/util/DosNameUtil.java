@@ -2,11 +2,11 @@ package com.largomodo.floppyconvert.util;
 
 /**
  * DOS 8.3 filename sanitization for FAT12 filesystem compatibility.
- *
+ * <p>
  * Enforces strict FAT12 naming constraints: 8 character name + 3 character extension,
  * uppercase alphanumeric only. Preserves numeric extensions (.1, .2, .3) exactly to
  * maintain ROM part ordering for reassembly.
- *
+ * <p>
  * Pure function with no state or dependencies. Safe for concurrent use.
  */
 public class DosNameUtil {
@@ -17,7 +17,7 @@ public class DosNameUtil {
 
     /**
      * Convert filename to DOS 8.3 format.
-     *
+     * <p>
      * Strategy: Split on last dot (preserves "game.v1.0.sfc" → extension "sfc"),
      * strip non-alphanumeric from both parts, truncate to limits, uppercase.
      *
@@ -57,7 +57,7 @@ public class DosNameUtil {
         // Prevents cryptic mcopy "Cannot initialize" errors later in pipeline
         if (cleanName.isEmpty()) {
             throw new IllegalArgumentException(
-                "Filename cannot be sanitized to valid DOS 8.3 format (name portion would be empty): " + filename
+                    "Filename cannot be sanitized to valid DOS 8.3 format (name portion would be empty): " + filename
             );
         }
 

@@ -3,22 +3,15 @@ package com.largomodo.floppyconvert.service;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 /**
  * Verifies that ExternalProcessDriver handles paths with spaces correctly.
  */
 class ExternalProcessDriverQuotingTest {
-
-    private static class TestDriver extends ExternalProcessDriver {
-        public int runCommand(String[] cmd, long timeout) throws IOException {
-            return executeCommand(cmd, timeout);
-        }
-    }
 
     @Test
     void testPathWithSpaces(@TempDir Path tempDir) throws IOException {
@@ -36,6 +29,12 @@ class ExternalProcessDriverQuotingTest {
 
         // This should succeed if quoting is handled correctly
         assertDoesNotThrow(() -> driver.runCommand(cmd, 5000),
-            "ls command should succeed with path containing spaces");
+                "ls command should succeed with path containing spaces");
+    }
+
+    private static class TestDriver extends ExternalProcessDriver {
+        public int runCommand(String[] cmd, long timeout) throws IOException {
+            return executeCommand(cmd, timeout);
+        }
     }
 }
