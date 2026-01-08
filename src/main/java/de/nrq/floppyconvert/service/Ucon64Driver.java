@@ -12,10 +12,10 @@ import java.util.stream.Collectors;
 
 /**
  * Wrapper for ucon64 ROM splitting tool.
- *
+ * <p>
  * Executes ucon64 with FIG format flags to split ROM into parts (.1, .2, .3, ...),
  * discovers generated part files via filesystem scan, and returns sorted list.
- *
+ * <p>
  * Timeout protection prevents hung processes on corrupted ROMs (60s default).
  */
 public class Ucon64Driver extends ExternalProcessDriver {
@@ -28,12 +28,12 @@ public class Ucon64Driver extends ExternalProcessDriver {
 
     /**
      * Split ROM file into parts using ucon64.
-     *
+     * <p>
      * Strategy: Two-step process to ensure correct format handling:
      * 1. Convert .sfc to target format (--fig/--swc/--ufo/--gd3)
      * 2. Split the converted file into parts
      *
-     * @param format Backup unit format (determines ucon64 flag and output naming)
+     * @param format  Backup unit format (determines ucon64 flag and output naming)
      * @param romFile Source ROM file (.sfc format expected)
      * @param tempDir Isolated temp directory for split output
      * @return Sorted list of part files (ordered by numeric extension: .1, .2, .3)
@@ -51,11 +51,11 @@ public class Ucon64Driver extends ExternalProcessDriver {
 
         // Step 1: Convert .sfc to target format
         String[] convertCmd = {
-            ucon64Path,
-            format.getCmdFlag(),
-            "--nbak",
-            "--ncol",
-            tempRom.toString()
+                ucon64Path,
+                format.getCmdFlag(),
+                "--nbak",
+                "--ncol",
+                tempRom.toString()
         };
 
         executeCommand(convertCmd, DEFAULT_TIMEOUT_MS, tempDir.toFile());
@@ -65,10 +65,10 @@ public class Ucon64Driver extends ExternalProcessDriver {
         if (format == CopierFormat.GD3) {
             try (var stream = Files.list(tempDir)) {
                 convertedFile = stream
-                    .filter(p -> !p.equals(tempRom))
-                    .filter(p -> !p.getFileName().toString().startsWith("."))
-                    .findFirst()
-                    .orElseThrow(() -> new IOException("Conversion failed: no GD3 file created"));
+                        .filter(p -> !p.equals(tempRom))
+                        .filter(p -> !p.getFileName().toString().startsWith("."))
+                        .findFirst()
+                        .orElseThrow(() -> new IOException("Conversion failed: no GD3 file created"));
             }
         } else {
             String baseName = tempRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
@@ -80,12 +80,12 @@ public class Ucon64Driver extends ExternalProcessDriver {
         }
 
         String[] splitCmd = {
-            ucon64Path,
-            "--nbak",
-            "--ncol",
-            "-s",
-            "--ssize=4",
-            convertedFile.toString()
+                ucon64Path,
+                "--nbak",
+                "--ncol",
+                "-s",
+                "--ssize=4",
+                convertedFile.toString()
         };
 
         executeCommand(splitCmd, DEFAULT_TIMEOUT_MS, tempDir.toFile());
@@ -94,13 +94,13 @@ public class Ucon64Driver extends ExternalProcessDriver {
         List<File> parts;
         try (var stream = Files.list(tempDir)) {
             parts = stream
-                .map(Path::toFile)
-                .filter(format.getSplitPartFilter())
-                .map(File::getAbsolutePath)
-                .distinct()
-                .map(File::new)
-                .sorted(new RomPartComparator())
-                .collect(Collectors.toList());
+                    .map(Path::toFile)
+                    .filter(format.getSplitPartFilter())
+                    .map(File::getAbsolutePath)
+                    .distinct()
+                    .map(File::new)
+                    .sorted(new RomPartComparator())
+                    .collect(Collectors.toList());
         }
 
         if (parts.isEmpty()) {

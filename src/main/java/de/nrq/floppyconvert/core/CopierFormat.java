@@ -19,6 +19,17 @@ public enum CopierFormat {
         this.cmdFlag = cmdFlag;
     }
 
+    public static CopierFormat fromCliArgument(String arg) {
+        if (arg == null) {
+            throw new IllegalArgumentException("Format argument cannot be null. Supported: FIG, SWC, UFO, GD3");
+        }
+        try {
+            return valueOf(arg.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid format: " + arg + ". Supported: FIG, SWC, UFO, GD3");
+        }
+    }
+
     public String getCmdFlag() {
         return cmdFlag;
     }
@@ -30,17 +41,6 @@ public enum CopierFormat {
             case UFO -> "ufo";
             case GD3 -> "078";
         };
-    }
-
-    public static CopierFormat fromCliArgument(String arg) {
-        if (arg == null) {
-            throw new IllegalArgumentException("Format argument cannot be null. Supported: FIG, SWC, UFO, GD3");
-        }
-        try {
-            return valueOf(arg.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid format: " + arg + ". Supported: FIG, SWC, UFO, GD3");
-        }
     }
 
     public Predicate<File> getSplitPartFilter() {
