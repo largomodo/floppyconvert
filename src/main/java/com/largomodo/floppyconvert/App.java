@@ -9,10 +9,13 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 /**
  * CLI entry point for ROM to floppy disk conversion tool.
@@ -140,48 +143,108 @@ public class App {
         // Check paths, create output dir, validate template accessibility
         validatePaths(config);
 
-        File inputDirFile = new File(config.inputDir);
-        File[] romFiles = inputDirFile.listFiles((dir, name) -> name.endsWith(".sfc"));
-
-        if (romFiles == null || romFiles.length == 0) {
-            System.out.println("No .sfc files found in " + config.inputDir);
-            return;
-        }
-
-        System.out.println("Found " + romFiles.length + " ROM file(s)");
+        Path inputRoot = Paths.get(config.inputDir);
+        Path outputRoot = Paths.get(config.outputDir);
 
         Ucon64Driver ucon64 = new Ucon64Driver(config.ucon64Path);
         MtoolsDriver mtools = new MtoolsDriver(config.mtoolsPath);
         RomProcessor processor = new RomProcessor();
 
-        int successCount = 0;
-        int failCount = 0;
+        // Counters must be effectively final for lambda capture
+        // AtomicInteger enables mutation within forEach while maintaining thread-safety
+        final AtomicInteger successCount = new AtomicInteger(0);
+        final AtomicInteger failCount = new AtomicInteger(0);
         Path failuresLog = Paths.get(config.outputDir, "failures.txt");
 
-        // Process each ROM sequentially to avoid I/O contention (Decision Log: Sequential vs Parallel)
-        // ucon64/mtools perform heavy disk I/O; parallelism would cause file system contention
-        for (File romFile : romFiles) {
-            try {
-                processor.processRom(
-                        romFile,
-                        Paths.get(config.outputDir),
-                        new File(config.emptyImage),
-                        ucon64,
-                        mtools,
-                        config.format
-                );
-                successCount++;
-            } catch (Exception e) {
-                // Fail-soft: log error, continue batch (good for large ROM libraries with mixed quality)
-                failCount++;
-                logFailure(failuresLog, romFile.getName(), e);
-                System.err.println("FAILED: " + romFile.getName() + " - " + e.getMessage());
-            }
+        /*
+         * Recursive directory traversal with lazy evaluation.
+         *
+         * Files.walk() streams one path at a time → constant memory usage regardless
+         * of directory tree depth → avoids OOM for large ROM libraries (10k+ files).
+         *
+         * Sequential forEach (not parallel stream) required: ucon64 and mtools are
+         * I/O bound → parallel execution causes file system contention → degrades
+         * performance and risks file corruption from concurrent writes.
+         */
+        try (Stream<Path> stream = Files.walk(inputRoot)) {
+            stream.filter(path -> {
+                      try {
+                          return Files.isRegularFile(path);
+                      } catch (UncheckedIOException e) {
+                          // File attributes unreadable (broken symlink, permission denied on file)
+                          // Skip this file, continue batch with remaining files
+                          System.err.println("WARNING: Cannot access " + inputRoot.relativize(path) + " - skipping");
+                          return false;
+                      }
+                  })
+                  .filter(path -> path.toString().toLowerCase().endsWith(".sfc"))
+                  .forEach(romPath -> {
+                      try {
+                          /*
+                           * Path relativization mirrors source structure in output.
+                           *
+                           * inputRoot.relativize(romPath.getParent()) calculates
+                           * subdirectory path from input root. For root-level ROMs,
+                           * returns empty path → outputRoot.resolve(emptyPath) returns
+                           * outputRoot unchanged → root-level ROMs correctly output
+                           * to base directory without intermediate nesting.
+                           */
+                          Path relativePath = inputRoot.relativize(romPath.getParent());
+                          Path targetBaseDir = outputRoot.resolve(relativePath);
+
+                          // Files.createDirectories() is idempotent (safe for repeated calls)
+                          Files.createDirectories(targetBaseDir);
+
+                          processor.processRom(
+                                  romPath.toFile(),
+                                  targetBaseDir,
+                                  new File(config.emptyImage),
+                                  ucon64,
+                                  mtools,
+                                  config.format
+                          );
+                          successCount.incrementAndGet();
+                      } catch (Exception e) {
+                          /*
+                           * Fail-soft per-ROM error handling.
+                           *
+                           * try-catch scoped to individual ROM: exception logged to failures.txt,
+                           * counters updated, batch continues with remaining ROMs. Prevents single
+                           * corrupted file from blocking entire library conversion.
+                           */
+                          failCount.incrementAndGet();
+                          logFailure(failuresLog, inputRoot.relativize(romPath).toString(), e);
+                          System.err.println("FAILED: " + inputRoot.relativize(romPath) + " - " + e.getMessage());
+                      }
+                  });
+        } catch (UncheckedIOException e) {
+            /*
+             * IOException during directory traversal (mid-traversal).
+             *
+             * Occurs when nested subdirectory becomes inaccessible during stream traversal
+             * (e.g., permission denied on subdirectory prevents listing contents).
+             * Successfully processed ROMs counted, error logged with specific path from exception.
+             * Fail-soft: partial batch completion better than aborting already-completed work.
+             * Note: File-level access errors (broken symlinks) caught in filter lambda above.
+             */
+            System.err.println("WARNING: Directory traversal interrupted - " + e.getCause().getMessage());
+            System.err.println("Batch incomplete: " + successCount.get() + " successful, " +
+                    failCount.get() + " failed, some directories skipped");
+            return;
+        } catch (IOException e) {
+            /*
+             * IOException during walk() initialization is fail-fast.
+             *
+             * Indicates fundamental access problem (input directory unreadable).
+             * Fails before any ROM processing begins.
+             */
+            System.err.println("ERROR: Cannot traverse input directory: " + e.getMessage());
+            return;
         }
 
-        System.out.println("\nBatch complete: " + successCount + " successful, " +
-                failCount + " failed");
-        if (failCount > 0) {
+        System.out.println("\nBatch complete: " + successCount.get() + " successful, " +
+                failCount.get() + " failed");
+        if (failCount.get() > 0) {
             System.out.println("See " + failuresLog + " for failure details");
         }
     }
