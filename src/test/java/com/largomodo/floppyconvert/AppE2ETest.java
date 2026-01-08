@@ -5,6 +5,7 @@ import com.largomodo.floppyconvert.core.RomProcessor;
 import com.largomodo.floppyconvert.service.MtoolsDriver;
 import com.largomodo.floppyconvert.service.Ucon64Driver;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -12,10 +13,15 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -146,6 +152,54 @@ class AppE2ETest {
         } catch (IOException e) {
             fail("Failed to verify output files: " + e.getMessage(), e);
         }
+    }
+
+    @Test
+    void testSingleFileMode(@TempDir Path tempDir) throws Exception {
+        assumeTrue(toolsAvailable, "Skipping: ucon64 and/or mcopy not available");
+
+        Path testRom = tempDir.resolve("ChronoTrigger.sfc");
+        Files.copy(getClass().getResourceAsStream(CHRONO_TRIGGER_RESOURCE), testRom);
+
+        Path emptyImage = tempDir.resolve("empty.img");
+        Files.copy(getClass().getResourceAsStream(EMPTY_IMG_RESOURCE), emptyImage);
+
+        Path ucon64Binary = tempDir.resolve("ucon64");
+        try (InputStream is = getClass().getResourceAsStream("/ucon64")) {
+            Files.copy(is, ucon64Binary);
+        }
+        ucon64Binary.toFile().setExecutable(true);
+
+        Class<?> configClass = Class.forName("com.largomodo.floppyconvert.App$Config");
+        Constructor<?> configConstructor = configClass.getDeclaredConstructor(
+            String.class, String.class, String.class, String.class, String.class,
+            CopierFormat.class, String.class);
+        configConstructor.setAccessible(true);
+        Object config = configConstructor.newInstance(
+            null,
+            null,
+            emptyImage.toString(),
+            ucon64Binary.toString(),
+            "mcopy",
+            CopierFormat.FIG,
+            testRom.toString()
+        );
+
+        Method runSingleFile = App.class.getDeclaredMethod("runSingleFile",
+            configClass, Path.class);
+        runSingleFile.setAccessible(true);
+        runSingleFile.invoke(null, config, tempDir);
+
+        Path outputDir = tempDir.resolve("ChronoTrigger");
+        assertTrue(Files.exists(outputDir), "Output directory should exist in tempDir");
+        assertTrue(Files.isDirectory(outputDir), "Output should be a directory");
+
+        List<Path> imgFiles = Files.list(outputDir)
+            .filter(p -> p.toString().endsWith(".img"))
+            .collect(Collectors.toList());
+        assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
+
+        assertTrue(imgFiles.size() >= 1, "Should have at least one disk image");
     }
 
 }

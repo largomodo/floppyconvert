@@ -32,10 +32,19 @@ public class App {
     public static void main(String[] args) {
         try {
             Config config = parseArgs(args);
-            runBatch(config);
+
+            // Route based on input mode (mutually exclusive by validation invariant)
+            if (config.inputFile != null) {
+                runSingleFile(config, Paths.get("."));  // CWD output for single-file mode
+            } else {
+                runBatch(config);  // config.inputDir guaranteed non-null here
+            }
         } catch (IllegalArgumentException e) {
             System.err.println("Error: " + e.getMessage());
             printUsage();
+            System.exit(1);
+        } catch (IOException e) {
+            System.err.println("Error: " + e.getMessage());
             System.exit(1);
         }
     }
@@ -51,6 +60,7 @@ public class App {
     private static Config parseArgs(String[] args) {
         String inputDir = null;
         String outputDir = null;
+        String inputFile = null;
         String emptyImage = null;
         String ucon64Path = "ucon64";   // Default assumes binary in PATH
         String mtoolsPath = "mcopy";    // Default assumes binary in PATH
@@ -62,6 +72,10 @@ public class App {
                 case "--input-dir" -> {
                     if (i + 1 >= args.length) throw new IllegalArgumentException("--input-dir requires a value");
                     inputDir = args[++i];
+                }
+                case "--input-file" -> {
+                    if (i + 1 >= args.length) throw new IllegalArgumentException("--input-file requires a value");
+                    inputFile = args[++i];
                 }
                 case "--output-dir" -> {
                     if (i + 1 >= args.length) throw new IllegalArgumentException("--output-dir requires a value");
@@ -89,11 +103,30 @@ public class App {
             }
         }
 
-        if (inputDir == null || outputDir == null || emptyImage == null) {
-            throw new IllegalArgumentException("Missing required arguments");
+        // Enforces Config validity invariant: (inputDir XOR inputFile) AND emptyImage AND (inputFile OR outputDir)
+        if (inputDir != null && inputFile != null) {
+            throw new IllegalArgumentException("Both --input-dir and --input-file provided. Use only one.");
         }
 
-        return new Config(inputDir, outputDir, emptyImage, ucon64Path, mtoolsPath, format);
+        if (inputDir == null && inputFile == null) {
+            throw new IllegalArgumentException("Must provide either --input-dir or --input-file");
+        }
+
+        if (emptyImage == null) {
+            throw new IllegalArgumentException("Missing required argument: --empty-image");
+        }
+
+        // Batch mode needs explicit output to prevent CWD clutter; single-file mode defaults to CWD
+        if (inputDir != null && outputDir == null) {
+            throw new IllegalArgumentException("Batch mode (--input-dir) requires --output-dir");
+        }
+
+        // Single-file mode always outputs to CWD; explicit outputDir defeats UX goal and causes confusion
+        if (inputFile != null && outputDir != null) {
+            throw new IllegalArgumentException("Single-file mode (--input-file) does not support --output-dir. Output is always placed in current directory.");
+        }
+
+        return new Config(inputDir, outputDir, emptyImage, ucon64Path, mtoolsPath, format, inputFile);
     }
 
     /**
@@ -153,6 +186,63 @@ public class App {
         if (failCount > 0) {
             System.out.println("See " + failuresLog + " for failure details");
         }
+    }
+
+    /**
+     * Execute single-file ROM processing with fail-fast error handling.
+     *
+     * Accepts outputBase as parameter for testability: production passes Paths.get("."),
+     * tests pass tempDir to avoid filesystem pollution and enable parallel execution.
+     *
+     * Validates input file existence/type, then delegates to RomProcessor.
+     * Exceptions propagate to main() (enables fail-fast with exit code 1).
+     *
+     * @param config Configuration containing inputFile path and tool paths
+     * @param outputBase Directory where output will be written (CWD in production, tempDir in tests)
+     * @throws IOException if input file validation fails or processing encounters I/O error
+     */
+    private static void runSingleFile(Config config, Path outputBase) throws IOException {
+        Path inputPath = Paths.get(config.inputFile);
+
+        // Fail-fast validation with clear error messages
+        // Validation order: existence before type check (prevents confusing "not a file" for missing paths)
+        if (!Files.exists(inputPath)) {
+            throw new IOException("Input file does not exist: " + inputPath);
+        }
+
+        if (!Files.isRegularFile(inputPath)) {
+            throw new IOException("Input path is not a file: " + inputPath);
+        }
+
+        // Validate template accessibility (fail-fast before attempting processing)
+        Path templatePath = Paths.get(config.emptyImage);
+        if (!Files.isRegularFile(templatePath)) {
+            throw new IOException("Empty image template not found: " + templatePath);
+        }
+
+        // Validate external tools (reuse batch mode validation logic)
+        if (!new File(config.ucon64Path).canExecute() && !commandExistsInPath(config.ucon64Path)) {
+            throw new IOException("ucon64 not found: install via package manager or specify --ucon64-path");
+        }
+        if (!new File(config.mtoolsPath).canExecute() && !commandExistsInPath(config.mtoolsPath)) {
+            throw new IOException("mcopy not found: install mtools package or specify --mtools-path");
+        }
+
+        Ucon64Driver ucon64 = new Ucon64Driver(config.ucon64Path);
+        MtoolsDriver mtools = new MtoolsDriver(config.mtoolsPath);
+        RomProcessor processor = new RomProcessor();
+
+        // Process ROM with provided outputBase (enables test isolation)
+        processor.processRom(
+            inputPath.toFile(),
+            outputBase,
+            templatePath.toFile(),
+            ucon64,
+            mtools,
+            config.format
+        );
+
+        System.out.println("Conversion complete: " + inputPath.getFileName());
     }
 
     /**
@@ -217,9 +307,15 @@ public class App {
     private static void printUsage() {
         System.out.println("Usage: java -jar floppyconvert.jar [options]");
         System.out.println();
-        System.out.println("Required:");
-        System.out.println("  --input-dir <path>      Directory containing ROM files (.sfc)");
-        System.out.println("  --output-dir <path>     Output directory for floppy images");
+        System.out.println("Modes (choose one):");
+        System.out.println("  BATCH MODE:");
+        System.out.println("    --input-dir <path>      Directory containing ROM files (.sfc)");
+        System.out.println("    --output-dir <path>     Output directory for floppy images (required for batch)");
+        System.out.println();
+        System.out.println("  SINGLE FILE MODE:");
+        System.out.println("    --input-file <path>     Single ROM file (output to current directory; --output-dir not supported)");
+        System.out.println();
+        System.out.println("Required (both modes):");
         System.out.println("  --empty-image <path>    Pre-formatted 1.6MB FAT12 floppy image template");
         System.out.println();
         System.out.println("Optional:");
@@ -227,10 +323,17 @@ public class App {
         System.out.println("  --mtools-path <path>    Path to mcopy binary (default: mcopy)");
         System.out.println("  --format <fig|swc|ufo|gd3>  Backup unit format (default: fig)");
         System.out.println();
-        System.out.println("Example:");
-        System.out.println("  java -jar floppy-convert.jar \\");
+        System.out.println("Examples:");
+        System.out.println("  Batch mode:");
+        System.out.println("  java -jar floppyconvert.jar \\");
         System.out.println("    --input-dir ./roms \\");
         System.out.println("    --output-dir ./output \\");
+        System.out.println("    --empty-image ./template.img \\");
+        System.out.println("    --format gd3");
+        System.out.println();
+        System.out.println("  Single file mode:");
+        System.out.println("  java -jar floppyconvert.jar \\");
+        System.out.println("    --input-file ./roms/ChronoTrigger.sfc \\");
         System.out.println("    --empty-image ./template.img \\");
         System.out.println("    --format gd3");
     }
@@ -241,5 +344,5 @@ public class App {
      * Immutable value object for parsed CLI arguments.
      */
     private record Config(String inputDir, String outputDir, String emptyImage,
-                         String ucon64Path, String mtoolsPath, CopierFormat format) {}
+                         String ucon64Path, String mtoolsPath, CopierFormat format, String inputFile) {}
 }

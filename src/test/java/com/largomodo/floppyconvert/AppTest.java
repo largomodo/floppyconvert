@@ -1,5 +1,6 @@
 package com.largomodo.floppyconvert;
 
+import com.largomodo.floppyconvert.core.CopierFormat;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -173,7 +174,7 @@ class AppTest {
             "Should throw IllegalArgumentException when required args missing"
         );
 
-        assertEquals("Missing required arguments", exception.getMessage(),
+        assertTrue(exception.getMessage().contains("Batch mode") || exception.getMessage().contains("Missing required argument"),
             "Error message should indicate missing required arguments");
     }
 
@@ -219,6 +220,68 @@ class AppTest {
             "ucon64Path should be preserved");
         assertEquals("/custom/mcopy", getConfigField(config, "mtoolsPath"),
             "mtoolsPath should be preserved");
+    }
+
+    @Test
+    void testParseArgs_InputFile_Success() throws Exception {
+        String[] args = {"--input-file", "test.sfc", "--empty-image", "template.img"};
+        Object config = invokeParseArgs(args);
+
+        assertEquals("test.sfc", getConfigField(config, "inputFile"));
+        assertNull(getConfigField(config, "inputDir"));
+        assertNull(getConfigField(config, "outputDir"));
+        assertEquals("template.img", getConfigField(config, "emptyImage"));
+    }
+
+    @Test
+    void testParseArgs_MutualExclusivity() {
+        String[] args = {
+            "--input-dir", "./roms",
+            "--input-file", "test.sfc",
+            "--output-dir", "./output",
+            "--empty-image", "template.img"
+        };
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+            () -> invokeParseArgs(args));
+        assertTrue(e.getMessage().contains("Both --input-dir and --input-file"));
+    }
+
+    @Test
+    void testParseArgs_MissingInputStrategy() {
+        String[] args = {"--empty-image", "template.img"};
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+            () -> invokeParseArgs(args));
+        assertTrue(e.getMessage().contains("Must provide either"));
+    }
+
+    @Test
+    void testParseArgs_OutputDirOptionalForInputFile() throws Exception {
+        String[] args = {
+            "--input-file", "test.sfc",
+            "--empty-image", "template.img",
+            "--format", "gd3"
+        };
+
+        Object config = invokeParseArgs(args);
+        assertEquals("test.sfc", getConfigField(config, "inputFile"));
+        assertNull(getConfigField(config, "outputDir"));
+        assertEquals(CopierFormat.GD3, getConfigField(config, "format"));
+    }
+
+    @Test
+    void testParseArgs_InputFileWithOutputDir() {
+        String[] args = {
+            "--input-file", "test.sfc",
+            "--output-dir", "./output",
+            "--empty-image", "template.img"
+        };
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+            () -> invokeParseArgs(args));
+        assertTrue(e.getMessage().contains("Single-file mode"));
+        assertTrue(e.getMessage().contains("does not support --output-dir"));
     }
 
     // === Reflection Helpers (Access Private Members) ===
