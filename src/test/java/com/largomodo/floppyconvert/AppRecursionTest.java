@@ -4,6 +4,7 @@ import com.largomodo.floppyconvert.core.CopierFormat;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import picocli.CommandLine;
 
 import java.io.File;
 import java.io.IOException;
@@ -83,14 +84,17 @@ class AppRecursionTest {
         Path emptyImage = tempDir.resolve("empty.img");
         Files.copy(getClass().getResourceAsStream(EMPTY_IMG_RESOURCE), emptyImage);
 
-        App.main(new String[]{
-            "--input-dir", inputRoot.toString(),
-            "--output-dir", outputRoot.toString(),
-            "--empty-image", emptyImage.toString(),
-            "--ucon64-path", ucon64Path,
-            "--mtools-path", "mcopy",
-            "--format", "fig"
-        });
+        int exitCode = new CommandLine(new App())
+            .setCaseInsensitiveEnumValuesAllowed(true)
+            .execute(
+                inputRoot.toString(),
+                "--output-dir", outputRoot.toString(),
+                "--empty-image", emptyImage.toString(),
+                "--ucon64-path", ucon64Path,
+                "--mtools-path", "mcopy",
+                "--format", "fig"
+            );
+        assertEquals(0, exitCode, "Conversion should succeed");
 
         Path expectedCategoryDir = outputRoot.resolve("Category");
         Path expectedSubCategoryDir = expectedCategoryDir.resolve("SubCategory");
@@ -127,14 +131,17 @@ class AppRecursionTest {
         Path emptyImage = tempDir.resolve("empty.img");
         Files.copy(getClass().getResourceAsStream(EMPTY_IMG_RESOURCE), emptyImage);
 
-        App.main(new String[]{
-            "--input-dir", inputRoot.toString(),
-            "--output-dir", outputRoot.toString(),
-            "--empty-image", emptyImage.toString(),
-            "--ucon64-path", ucon64Path,
-            "--mtools-path", "mcopy",
-            "--format", "fig"
-        });
+        int exitCode = new CommandLine(new App())
+            .setCaseInsensitiveEnumValuesAllowed(true)
+            .execute(
+                inputRoot.toString(),
+                "--output-dir", outputRoot.toString(),
+                "--empty-image", emptyImage.toString(),
+                "--ucon64-path", ucon64Path,
+                "--mtools-path", "mcopy",
+                "--format", "fig"
+            );
+        assertEquals(0, exitCode, "Conversion should succeed");
 
         Path outputA = outputRoot.resolve("A");
         Path outputB = outputRoot.resolve("B");
@@ -170,14 +177,17 @@ class AppRecursionTest {
         Path emptyImage = tempDir.resolve("empty.img");
         Files.copy(getClass().getResourceAsStream(EMPTY_IMG_RESOURCE), emptyImage);
 
-        App.main(new String[]{
-            "--input-dir", inputRoot.toString(),
-            "--output-dir", outputRoot.toString(),
-            "--empty-image", emptyImage.toString(),
-            "--ucon64-path", ucon64Path,
-            "--mtools-path", "mcopy",
-            "--format", "fig"
-        });
+        int exitCode = new CommandLine(new App())
+            .setCaseInsensitiveEnumValuesAllowed(true)
+            .execute(
+                inputRoot.toString(),
+                "--output-dir", outputRoot.toString(),
+                "--empty-image", emptyImage.toString(),
+                "--ucon64-path", ucon64Path,
+                "--mtools-path", "mcopy",
+                "--format", "fig"
+            );
+        assertEquals(0, exitCode, "Conversion should succeed");
 
         Path expectedGameDir = outputRoot.resolve("game");
         Path expectedImg = expectedGameDir.resolve("game.img");
@@ -216,14 +226,17 @@ class AppRecursionTest {
         Path emptyImage = tempDir.resolve("empty.img");
         Files.copy(getClass().getResourceAsStream(EMPTY_IMG_RESOURCE), emptyImage);
 
-        App.main(new String[]{
-            "--input-dir", inputRoot.toString(),
-            "--output-dir", outputRoot.toString(),
-            "--empty-image", emptyImage.toString(),
-            "--ucon64-path", ucon64Path,
-            "--mtools-path", "mcopy",
-            "--format", "fig"
-        });
+        int exitCode = new CommandLine(new App())
+            .setCaseInsensitiveEnumValuesAllowed(true)
+            .execute(
+                inputRoot.toString(),
+                "--output-dir", outputRoot.toString(),
+                "--empty-image", emptyImage.toString(),
+                "--ucon64-path", ucon64Path,
+                "--mtools-path", "mcopy",
+                "--format", "fig"
+            );
+        assertEquals(0, exitCode, "Conversion should succeed");
 
         Path symlinkOutputDir = outputRoot.resolve("symlinked");
         assertFalse(Files.exists(symlinkOutputDir), "Symlinked directory should not be traversed");

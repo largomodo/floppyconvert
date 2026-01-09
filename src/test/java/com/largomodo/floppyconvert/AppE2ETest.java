@@ -1,21 +1,17 @@
 package com.largomodo.floppyconvert;
 
 import com.largomodo.floppyconvert.core.CopierFormat;
-import com.largomodo.floppyconvert.core.RomProcessor;
-import com.largomodo.floppyconvert.service.MtoolsDriver;
-import com.largomodo.floppyconvert.service.Ucon64Driver;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.api.io.TempDir;
+import picocli.CommandLine;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -96,48 +92,52 @@ class AppE2ETest {
 
     @ParameterizedTest(name = "{0} - {1}")
     @MethodSource("formatAndRomProvider")
-    void testFullConversionPipeline(CopierFormat format, String romResourcePath, @TempDir Path outputDir) {
+    void testFullConversionPipeline(CopierFormat format, String romResourcePath, @TempDir Path tempDir) throws Exception {
 
         assumeTrue(toolsAvailable, "Skipping: ucon64 and/or mcopy not available");
 
-        File romFile;
-        File emptyImg;
-        try {
-            var romResource = getClass().getResource(romResourcePath);
-            if (romResource == null) {
+        // Copy ROM file to temp directory
+        Path inputRom = tempDir.resolve("input.sfc");
+        try (InputStream is = getClass().getResourceAsStream(romResourcePath)) {
+            if (is == null) {
                 fail("Test resource not found: " + romResourcePath + " (ensure ROM files are in src/test/resources/)");
             }
-            romFile = new File(romResource.toURI());
+            Files.copy(is, inputRom);
+        }
 
-            var imgResource = getClass().getResource(EMPTY_IMG_RESOURCE);
-            if (imgResource == null) {
+        // Copy empty image template to temp directory
+        Path emptyImage = tempDir.resolve("empty.img");
+        try (InputStream is = getClass().getResourceAsStream(EMPTY_IMG_RESOURCE)) {
+            if (is == null) {
                 fail("Test resource not found: " + EMPTY_IMG_RESOURCE + " (ensure empty.img is in src/test/resources/)");
             }
-            emptyImg = new File(imgResource.toURI());
-        } catch (URISyntaxException e) {
-            fail("Invalid test resource URI: " + e.getMessage());
-            return;
+            Files.copy(is, emptyImage);
         }
 
-        assertTrue(romFile.exists(), "ROM file missing from filesystem: " + romResourcePath);
-        assertTrue(emptyImg.exists(), "Empty image template missing from filesystem");
+        Path outputDir = tempDir.resolve("output");
 
-        Ucon64Driver ucon64 = new Ucon64Driver(ucon64Path);
-        MtoolsDriver mtools = new MtoolsDriver("/usr/bin/mcopy");
-        RomProcessor processor = new RomProcessor();
+        // Invoke CLI via CommandLine.execute() with positional input parameter
+        int exitCode = new CommandLine(new App())
+            .setCaseInsensitiveEnumValuesAllowed(true)
+            .execute(
+                inputRom.toString(),
+                "--output-dir", outputDir.toString(),
+                "--empty-image", emptyImage.toString(),
+                "--ucon64-path", ucon64Path,
+                "--mtools-path", "mcopy",
+                "--format", format.name().toLowerCase()
+            );
 
-        try {
-            processor.processRom(romFile, outputDir, emptyImg, ucon64, mtools, format);
-        } catch (IOException e) {
-            fail("RomProcessor.processRom() failed: " + e.getMessage(), e);
-        }
+        assertEquals(0, exitCode, "Conversion should succeed");
 
-        String baseName = romFile.getName().replaceFirst("\\.[^.]+$", "");
+        // Verify output structure
+        String baseName = inputRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
         Path gameOutputDir = outputDir.resolve(baseName);
 
         assertTrue(Files.exists(gameOutputDir), "Game output directory not created: " + baseName);
         assertTrue(Files.isDirectory(gameOutputDir), "Expected directory: " + gameOutputDir);
 
+        // Verify .img files were created and are non-empty
         try (var imgFiles = Files.list(gameOutputDir)) {
             var images = imgFiles
                 .filter(p -> p.toString().endsWith(".img"))
@@ -149,8 +149,6 @@ class AppE2ETest {
                 long size = Files.size(img);
                 assertTrue(size > 0, "Empty floppy image: " + img.getFileName());
             }
-        } catch (IOException e) {
-            fail("Failed to verify output files: " + e.getMessage(), e);
         }
     }
 
@@ -158,43 +156,47 @@ class AppE2ETest {
     void testSingleFileMode(@TempDir Path tempDir) throws Exception {
         assumeTrue(toolsAvailable, "Skipping: ucon64 and/or mcopy not available");
 
+        // Copy Chrono Trigger ROM to temp directory
         Path testRom = tempDir.resolve("ChronoTrigger.sfc");
-        Files.copy(getClass().getResourceAsStream(CHRONO_TRIGGER_RESOURCE), testRom);
-
-        Path emptyImage = tempDir.resolve("empty.img");
-        Files.copy(getClass().getResourceAsStream(EMPTY_IMG_RESOURCE), emptyImage);
-
-        Path ucon64Binary = tempDir.resolve("ucon64");
-        try (InputStream is = getClass().getResourceAsStream("/ucon64")) {
-            Files.copy(is, ucon64Binary);
+        try (InputStream is = getClass().getResourceAsStream(CHRONO_TRIGGER_RESOURCE)) {
+            if (is == null) {
+                fail("Test resource not found: " + CHRONO_TRIGGER_RESOURCE);
+            }
+            Files.copy(is, testRom);
         }
-        ucon64Binary.toFile().setExecutable(true);
 
-        Class<?> configClass = Class.forName("com.largomodo.floppyconvert.App$Config");
-        Constructor<?> configConstructor = configClass.getDeclaredConstructor(
-            String.class, String.class, String.class, String.class, String.class,
-            CopierFormat.class, String.class);
-        configConstructor.setAccessible(true);
-        Object config = configConstructor.newInstance(
-            null,
-            null,
-            emptyImage.toString(),
-            ucon64Binary.toString(),
-            "mcopy",
-            CopierFormat.FIG,
-            testRom.toString()
-        );
+        // Copy empty image template to temp directory
+        Path emptyImage = tempDir.resolve("empty.img");
+        try (InputStream is = getClass().getResourceAsStream(EMPTY_IMG_RESOURCE)) {
+            if (is == null) {
+                fail("Test resource not found: " + EMPTY_IMG_RESOURCE);
+            }
+            Files.copy(is, emptyImage);
+        }
 
-        Method runSingleFile = App.class.getDeclaredMethod("runSingleFile",
-            configClass, Path.class);
-        runSingleFile.setAccessible(true);
-        runSingleFile.invoke(null, config, tempDir);
+        Path outputDir = tempDir.resolve("output");
 
-        Path outputDir = tempDir.resolve("ChronoTrigger");
-        assertTrue(Files.exists(outputDir), "Output directory should exist in tempDir");
-        assertTrue(Files.isDirectory(outputDir), "Output should be a directory");
+        // Invoke CLI via CommandLine.execute() with positional input parameter (single file mode)
+        int exitCode = new CommandLine(new App())
+            .setCaseInsensitiveEnumValuesAllowed(true)
+            .execute(
+                testRom.toString(),
+                "--output-dir", outputDir.toString(),
+                "--empty-image", emptyImage.toString(),
+                "--ucon64-path", ucon64Path,
+                "--mtools-path", "mcopy",
+                "--format", "fig"
+            );
 
-        List<Path> imgFiles = Files.list(outputDir)
+        assertEquals(0, exitCode, "Conversion should succeed");
+
+        // Verify output structure
+        Path gameOutputDir = outputDir.resolve("ChronoTrigger");
+        assertTrue(Files.exists(gameOutputDir), "Output directory should exist");
+        assertTrue(Files.isDirectory(gameOutputDir), "Output should be a directory");
+
+        // Verify .img files were created
+        List<Path> imgFiles = Files.list(gameOutputDir)
             .filter(p -> p.toString().endsWith(".img"))
             .collect(Collectors.toList());
         assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
