@@ -79,7 +79,7 @@ public abstract class ExternalProcessDriver {
 
             // Non-zero exit = tool failure (corrupted ROM, invalid arguments, disk full, etc.)
             // Fail fast with stderr for diagnostics rather than silently continuing
-            if (exitCode != 0) {
+            if (exitCode != 0 || stderr.size() > 0) {
                 throw new ProcessFailureException(
                         "Process exited with code " + exitCode + ": " + stderr
                 );

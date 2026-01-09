@@ -79,16 +79,8 @@ public class Ucon64Driver extends ExternalProcessDriver {
             }
         }
 
-        String[] splitCmd = {
-                ucon64Path,
-                "--nbak",
-                "--ncol",
-                "-s",
-                "--ssize=4",
-                convertedFile.toString()
-        };
-
-        executeCommand(splitCmd, DEFAULT_TIMEOUT_MS, tempDir.toFile());
+        // Step 3: Split converted file with retry mechanism for large ROMs
+        executeSplitWithRetry(convertedFile, tempDir, format);
 
         // Discover split parts using format-specific filter
         List<File> parts;
@@ -113,5 +105,60 @@ public class Ucon64Driver extends ExternalProcessDriver {
         }
 
         return parts;
+    }
+
+    /**
+     * Execute ROM split with automatic retry for large ROMs.
+     * <p>
+     * Retry strategy: Linear escalation (4 Mbit → 12 Mbit).
+     * Try 4 Mbit split first (optimal for normal ROMs ≤48 Mbit).
+     * If ucon64 fails with "maximum number of parts" error,
+     * retry with 12 Mbit split (fits ROMs up to 144 Mbit).
+     *
+     * @param convertedFile Path to converted ROM file
+     * @param tempDir       Temp directory for split output
+     * @param format        Backup unit format (for identifying split part files during cleanup)
+     * @throws IOException if split fails with non-recoverable error
+     */
+    private void executeSplitWithRetry(Path convertedFile, Path tempDir, CopierFormat format) throws IOException {
+        try {
+            executeSplit(convertedFile, tempDir, 4);
+        } catch (ProcessFailureException e) {
+            if (e.getMessage().contains("more than the maximum number")) {
+                System.err.println("WARNING: Large ROM detected, retrying with 12Mbit split...");
+                // Clean up partial files from failed 4Mbit attempt
+                try (var stream = Files.list(tempDir)) {
+                    stream.map(Path::toFile)
+                          .filter(format.getSplitPartFilter())
+                          .forEach(f -> { try { Files.deleteIfExists(f.toPath()); } catch (IOException ignored) {} });
+                }
+                executeSplit(convertedFile, tempDir, 12);
+            } else if (e.getMessage().contains("ROM size is smaller than or equal to 4 Mbit -- will not be split")) {
+                // This is okay, do nothing
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    /**
+     * Execute ucon64 split command with specified size.
+     *
+     * @param convertedFile Path to converted ROM file
+     * @param tempDir       Temp directory for split output
+     * @param size          Split size in Mbit (4 or 12)
+     * @throws IOException if split command fails
+     */
+    private void executeSplit(Path convertedFile, Path tempDir, int size) throws IOException {
+        String[] splitCmd = {
+                ucon64Path,
+                "--nbak",
+                "--ncol",
+                "-s",
+                "--ssize=" + size,
+                convertedFile.toString()
+        };
+
+        executeCommand(splitCmd, DEFAULT_TIMEOUT_MS, tempDir.toFile());
     }
 }
