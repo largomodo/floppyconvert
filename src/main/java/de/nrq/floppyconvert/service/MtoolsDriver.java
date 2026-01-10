@@ -50,7 +50,7 @@ public class MtoolsDriver extends ExternalProcessDriver {
                 mcopyPath,
                 "-i", imageFile.getAbsolutePath(),    // Image file to modify
                 sourceFile.getAbsolutePath(),         // Source file on host filesystem
-                "::" + dosName                        // Target name on floppy (:: = root of image)
+                dosName                        // Target name on floppy (:: = root of image)
         };
 
         executeCommand(cmd, DEFAULT_TIMEOUT_MS);
