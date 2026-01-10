@@ -1,6 +1,8 @@
 package com.largomodo.floppyconvert.service;
 
 import com.largomodo.floppyconvert.core.CopierFormat;
+import com.largomodo.floppyconvert.util.TestUcon64PathResolver;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -12,15 +14,30 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Tests for Ucon64Driver command-line argument construction and error handling.
  */
 class Ucon64DriverTest {
 
+    private static String ucon64Path;
+
+    /**
+     * Resolve ucon64 path once before all tests.
+     *
+     * Single resolution in @BeforeAll reduces overhead (avoids N PATH checks
+     * for N tests) and ensures consistent binary used across test methods.
+     */
+    @BeforeAll
+    static void resolveUcon64Path() {
+        ucon64Path = TestUcon64PathResolver.resolveUcon64Path().orElse(null);
+    }
+
     @Test
     void testSplitRomWithNonExistentFile(@TempDir Path tempDir) {
-        Ucon64Driver driver = new Ucon64Driver("/usr/local/bin/ucon64");
+        assumeTrue(ucon64Path != null, "ucon64 binary not available");
+        Ucon64Driver driver = new Ucon64Driver(ucon64Path);
         File nonExistentFile = new File("/tmp/nonexistent.sfc");
 
         IllegalArgumentException exception = assertThrows(
@@ -32,15 +49,15 @@ class Ucon64DriverTest {
     }
 
     @Test
-    @Disabled("Requires ucon64 binary - integration test for manual execution only")
     void testSplitRomCommandLineArguments(@TempDir Path tempDir) throws IOException {
+        assumeTrue(ucon64Path != null, "ucon64 binary not available");
         // Create a minimal ROM file for testing
         Path romFile = tempDir.resolve("test.sfc");
         Files.write(romFile, new byte[1024]);
 
         // This test verifies the command-line structure but will fail without actual ucon64
         // In production, this would be replaced with a mock-based test
-        Ucon64Driver driver = new Ucon64Driver("/usr/local/bin/ucon64");
+        Ucon64Driver driver = new Ucon64Driver(ucon64Path);
 
         // The actual command executed should be:
         // ucon64 --fig --nbak --ncol -s --ssize=4 <tempRom>
@@ -163,7 +180,7 @@ class Ucon64DriverTest {
                         }
                         
                         throw new ExternalProcessDriver.ProcessFailureException(
-                            "Process exited with code 1: ucon64: error: maximum number of parts reached"
+                            "Process exited with code 1: ucon64: error: more than the maximum number"
                         );
                     } else if (splitCallCount == 2) {
                         // Step 3: Retry with --ssize=12 succeeds

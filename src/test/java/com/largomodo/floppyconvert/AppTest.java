@@ -30,7 +30,7 @@ class AppTest {
 
         App app = new App();
         CommandLine cmd = new CommandLine(app);
-        cmd.parseArgs(testFile.getAbsolutePath(), "--empty-image", "empty.img");
+        cmd.parseArgs(testFile.getAbsolutePath());
 
         assertEquals(testFile.getAbsolutePath(), app.inputPath.getAbsolutePath());
     }
@@ -42,7 +42,7 @@ class AppTest {
 
         App app = new App();
         CommandLine cmd = new CommandLine(app);
-        cmd.parseArgs(testDir.getAbsolutePath(), "--empty-image", "empty.img");
+        cmd.parseArgs(testDir.getAbsolutePath());
 
         assertEquals(testDir.getAbsolutePath(), app.inputPath.getAbsolutePath());
     }
@@ -51,33 +51,29 @@ class AppTest {
     void testSmartDefaultOutputForFile() throws Exception {
         File testFile = tempDir.resolve("test.sfc").toFile();
         testFile.createNewFile();
-        
-        File emptyImage = tempDir.resolve("empty.img").toFile();
-        emptyImage.createNewFile();
-        
+
         File mockUcon64 = tempDir.resolve("ucon64").toFile();
         mockUcon64.createNewFile();
         mockUcon64.setExecutable(true);
-        
+
         File mockMtools = tempDir.resolve("mcopy").toFile();
         mockMtools.createNewFile();
         mockMtools.setExecutable(true);
 
         App app = new App();
         CommandLine cmd = new CommandLine(app);
-        cmd.parseArgs(testFile.getAbsolutePath(), 
-                      "--empty-image", emptyImage.getAbsolutePath(),
+        cmd.parseArgs(testFile.getAbsolutePath(),
                       "--ucon64-path", mockUcon64.getAbsolutePath(),
                       "--mtools-path", mockMtools.getAbsolutePath());
 
         assertNull(app.outputDir, "outputDir should be null until call() computes smart defaults");
-        
+
         try {
             app.call();
         } catch (Exception e) {
             // Expected to fail during actual execution, but outputDir should be set
         }
-        
+
         assertEquals(new File(".").getCanonicalPath(), app.outputDir.getCanonicalPath(),
                      "File input should default outputDir to current directory");
     }
@@ -86,36 +82,32 @@ class AppTest {
     void testSmartDefaultOutputForDirectory() throws Exception {
         File testDir = tempDir.resolve("roms").toFile();
         testDir.mkdir();
-        
+
         File testFile = new File(testDir, "test.sfc");
         testFile.createNewFile();
-        
-        File emptyImage = tempDir.resolve("empty.img").toFile();
-        emptyImage.createNewFile();
-        
+
         File mockUcon64 = tempDir.resolve("ucon64").toFile();
         mockUcon64.createNewFile();
         mockUcon64.setExecutable(true);
-        
+
         File mockMtools = tempDir.resolve("mcopy").toFile();
         mockMtools.createNewFile();
         mockMtools.setExecutable(true);
 
         App app = new App();
         CommandLine cmd = new CommandLine(app);
-        cmd.parseArgs(testDir.getAbsolutePath(), 
-                      "--empty-image", emptyImage.getAbsolutePath(),
+        cmd.parseArgs(testDir.getAbsolutePath(),
                       "--ucon64-path", mockUcon64.getAbsolutePath(),
                       "--mtools-path", mockMtools.getAbsolutePath());
 
         assertNull(app.outputDir, "outputDir should be null until call() computes smart defaults");
-        
+
         try {
             app.call();
         } catch (Exception e) {
             // Expected to fail during actual execution, but outputDir should be set
         }
-        
+
         assertEquals(new File(testDir, "output").getCanonicalPath(), app.outputDir.getCanonicalPath(),
                      "Directory input should default outputDir to input/output");
     }
@@ -129,7 +121,6 @@ class AppTest {
         App app = new App();
         CommandLine cmd = new CommandLine(app);
         cmd.parseArgs(testFile.getAbsolutePath(),
-                      "--empty-image", "empty.img",
                       "-o", explicitOutput.getAbsolutePath());
 
         assertEquals(explicitOutput.getAbsolutePath(), app.outputDir.getAbsolutePath(),
@@ -145,7 +136,6 @@ class AppTest {
         CommandLine cmd = new CommandLine(app);
         cmd.setCaseInsensitiveEnumValuesAllowed(true);
         cmd.parseArgs(testFile.getAbsolutePath(),
-                      "--empty-image", "empty.img",
                       "--format", "gd3");
 
         assertEquals(CopierFormat.GD3, app.format, "Lowercase 'gd3' should parse to CopierFormat.GD3");
@@ -157,7 +147,7 @@ class AppTest {
 
         App app = new App();
         CommandLine cmd = new CommandLine(app);
-        cmd.parseArgs(nonExistentFile.getAbsolutePath(), "--empty-image", "empty.img");
+        cmd.parseArgs(nonExistentFile.getAbsolutePath());
 
         ParameterException exception = assertThrows(ParameterException.class, app::call,
                 "Should throw ParameterException for non-existent input path");

@@ -50,10 +50,6 @@ public class App implements Callable<Integer> {
             description = "Output directory for floppy images (default: . for files, <input>/output for directories)")
     File outputDir;
 
-    @Option(names = "--empty-image", required = true,
-            description = "Pre-formatted 1.6MB FAT12 floppy image template")
-    File emptyImage;
-
     @Option(names = "--format", defaultValue = "FIG",
             description = "Backup unit format (default: FIG). Valid values: ${COMPLETION-CANDIDATES}")
     CopierFormat format;
@@ -81,16 +77,6 @@ public class App implements Callable<Integer> {
                 "Input path is not readable (check permissions): " + inputPath.getAbsolutePath());
         }
 
-        Path emptyImagePath = emptyImage.toPath();
-        if (!Files.isRegularFile(emptyImagePath)) {
-            throw new ParameterException(spec.commandLine(),
-                "Empty image template not found: " + emptyImage.getAbsolutePath());
-        }
-        if (!Files.isReadable(emptyImagePath)) {
-            throw new ParameterException(spec.commandLine(),
-                "Empty image template is not readable (check permissions): " + emptyImage.getAbsolutePath());
-        }
-
         if (outputDir == null) {
             if (inputPath.isFile()) {
                 outputDir = new File(".");
@@ -112,14 +98,14 @@ public class App implements Callable<Integer> {
 
         if (inputPath.isFile()) {
             runSingleFile(
-                new Config(null, outputDir.getAbsolutePath(), emptyImage.getAbsolutePath(),
+                new Config(null, outputDir.getAbsolutePath(),
                            ucon64Path, mtoolsPath, format, inputPath.getAbsolutePath()),
                 outputDir.toPath()
             );
         } else {
             runBatch(
                 new Config(inputPath.getAbsolutePath(), outputDir.getAbsolutePath(),
-                           emptyImage.getAbsolutePath(), ucon64Path, mtoolsPath, format, null)
+                           ucon64Path, mtoolsPath, format, null)
             );
         }
 
@@ -200,7 +186,6 @@ public class App implements Callable<Integer> {
                           processor.processRom(
                                   romPath.toFile(),
                                   targetBaseDir,
-                                  new File(config.emptyImage),
                                   ucon64,
                                   mtools,
                                   config.format
@@ -277,12 +262,6 @@ public class App implements Callable<Integer> {
             throw new IOException("Input path is not a file: " + inputPath);
         }
 
-        // Validate template accessibility (fail-fast before attempting processing)
-        Path templatePath = Paths.get(config.emptyImage);
-        if (!Files.isRegularFile(templatePath)) {
-            throw new IOException("Empty image template not found: " + templatePath);
-        }
-
         validateExternalTools(config);
 
         Ucon64Driver ucon64 = new Ucon64Driver(config.ucon64Path);
@@ -293,7 +272,6 @@ public class App implements Callable<Integer> {
         processor.processRom(
                 inputPath.toFile(),
                 outputBase,
-                templatePath.toFile(),
                 ucon64,
                 mtools,
                 config.format
@@ -352,7 +330,7 @@ public class App implements Callable<Integer> {
      * Bridges Picocli field-based arguments to runBatch/runSingleFile method
      * signatures (avoids cascading changes to RomProcessor integration points).
      */
-    private record Config(String inputDir, String outputDir, String emptyImage,
+    private record Config(String inputDir, String outputDir,
                           String ucon64Path, String mtoolsPath, CopierFormat format, String inputFile) {
     }
 }

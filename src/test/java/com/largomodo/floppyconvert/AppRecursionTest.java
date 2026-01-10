@@ -1,6 +1,5 @@
 package com.largomodo.floppyconvert;
 
-import com.largomodo.floppyconvert.core.CopierFormat;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -8,7 +7,6 @@ import picocli.CommandLine;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,7 +25,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 class AppRecursionTest {
 
-    private static final String EMPTY_IMG_RESOURCE = "/empty.img";
     private static final String SUPER_MARIO_WORLD_RESOURCE = "/snes/Super Mario World (USA).sfc";
 
     private static boolean toolsAvailable = false;
@@ -81,15 +78,11 @@ class AppRecursionTest {
         Path testRom = subCategoryDir.resolve("game.sfc");
         Files.copy(getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE), testRom);
 
-        Path emptyImage = tempDir.resolve("empty.img");
-        Files.copy(getClass().getResourceAsStream(EMPTY_IMG_RESOURCE), emptyImage);
-
         int exitCode = new CommandLine(new App())
             .setCaseInsensitiveEnumValuesAllowed(true)
             .execute(
                 inputRoot.toString(),
                 "--output-dir", outputRoot.toString(),
-                "--empty-image", emptyImage.toString(),
                 "--ucon64-path", ucon64Path,
                 "--mtools-path", "mcopy",
                 "--format", "fig"
@@ -128,15 +121,11 @@ class AppRecursionTest {
         Files.copy(getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE), testRom1);
         Files.copy(getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE), testRom2);
 
-        Path emptyImage = tempDir.resolve("empty.img");
-        Files.copy(getClass().getResourceAsStream(EMPTY_IMG_RESOURCE), emptyImage);
-
         int exitCode = new CommandLine(new App())
             .setCaseInsensitiveEnumValuesAllowed(true)
             .execute(
                 inputRoot.toString(),
                 "--output-dir", outputRoot.toString(),
-                "--empty-image", emptyImage.toString(),
                 "--ucon64-path", ucon64Path,
                 "--mtools-path", "mcopy",
                 "--format", "fig"
@@ -174,15 +163,11 @@ class AppRecursionTest {
         Path testRom = inputRoot.resolve("game.sfc");
         Files.copy(getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE), testRom);
 
-        Path emptyImage = tempDir.resolve("empty.img");
-        Files.copy(getClass().getResourceAsStream(EMPTY_IMG_RESOURCE), emptyImage);
-
         int exitCode = new CommandLine(new App())
             .setCaseInsensitiveEnumValuesAllowed(true)
             .execute(
                 inputRoot.toString(),
                 "--output-dir", outputRoot.toString(),
-                "--empty-image", emptyImage.toString(),
                 "--ucon64-path", ucon64Path,
                 "--mtools-path", "mcopy",
                 "--format", "fig"
@@ -223,15 +208,11 @@ class AppRecursionTest {
             assumeTrue(false, "Skipping: filesystem does not support symlinks");
         }
 
-        Path emptyImage = tempDir.resolve("empty.img");
-        Files.copy(getClass().getResourceAsStream(EMPTY_IMG_RESOURCE), emptyImage);
-
         int exitCode = new CommandLine(new App())
             .setCaseInsensitiveEnumValuesAllowed(true)
             .execute(
                 inputRoot.toString(),
                 "--output-dir", outputRoot.toString(),
-                "--empty-image", emptyImage.toString(),
                 "--ucon64-path", ucon64Path,
                 "--mtools-path", "mcopy",
                 "--format", "fig"

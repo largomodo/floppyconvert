@@ -1,5 +1,7 @@
 package com.largomodo.floppyconvert;
 
+import com.largomodo.floppyconvert.util.TestUcon64PathResolver;
+
 import com.largomodo.floppyconvert.core.CopierFormat;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -12,11 +14,9 @@ import picocli.CommandLine;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -32,7 +32,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 class AppE2ETest {
 
-    private static final String EMPTY_IMG_RESOURCE = "/empty.img";
     // Chrono Trigger is 32 Mbit - large enough for split testing (produces multiple parts)
     private static final String CHRONO_TRIGGER_RESOURCE = "/snes/Chrono Trigger (USA).sfc";
     // Super Mario World is 4 Mbit - too small to split, tests single-file-per-disk path
@@ -41,38 +40,25 @@ class AppE2ETest {
     private static boolean toolsAvailable = false;
     private static String ucon64Path;
 
+    /**
+     * Verify both ucon64 and mcopy are available before running E2E tests.
+     *
+     * Delegates ucon64 resolution to TestUcon64PathResolver (eliminates
+     * code duplication with Ucon64DriverTest). mcopy check remains local
+     * (no other tests require mcopy, so no shared utility needed).
+     */
     @BeforeAll
     static void checkExternalToolsAvailable() {
-        var ucon64Resource = AppE2ETest.class.getResource("/ucon64");
-        if (ucon64Resource == null) {
+        // Use shared resolver for ucon64 (PATH-first, then classpath fallback)
+        var resolvedPath = TestUcon64PathResolver.resolveUcon64Path();
+        if (resolvedPath.isEmpty()) {
             toolsAvailable = false;
             return;
         }
-        try {
-            File ucon64File = new File(ucon64Resource.toURI());
-            if (!ucon64File.canExecute()) {
-                toolsAvailable = false;
-                return;
-            }
-            ucon64Path = ucon64File.getAbsolutePath();
-        } catch (URISyntaxException e) {
-            toolsAvailable = false;
-            return;
-        }
+        ucon64Path = resolvedPath.get();
 
-        toolsAvailable = isCommandAvailable("mcopy");
-    }
-
-    private static boolean isCommandAvailable(String command) {
-        try {
-            Process process = new ProcessBuilder("which", command)
-                .redirectErrorStream(true)
-                .start();
-            boolean completed = process.waitFor(5, TimeUnit.SECONDS);
-            return completed && process.exitValue() == 0;
-        } catch (IOException | InterruptedException e) {
-            return false;
-        }
+        // mcopy check independent of ucon64 resolution
+        toolsAvailable = TestUcon64PathResolver.isCommandAvailable("mcopy");
     }
 
     static Stream<Arguments> formatAndRomProvider() {
@@ -105,15 +91,6 @@ class AppE2ETest {
             Files.copy(is, inputRom);
         }
 
-        // Copy empty image template to temp directory
-        Path emptyImage = tempDir.resolve("empty.img");
-        try (InputStream is = getClass().getResourceAsStream(EMPTY_IMG_RESOURCE)) {
-            if (is == null) {
-                fail("Test resource not found: " + EMPTY_IMG_RESOURCE + " (ensure empty.img is in src/test/resources/)");
-            }
-            Files.copy(is, emptyImage);
-        }
-
         Path outputDir = tempDir.resolve("output");
 
         // Invoke CLI via CommandLine.execute() with positional input parameter
@@ -122,7 +99,6 @@ class AppE2ETest {
             .execute(
                 inputRom.toString(),
                 "--output-dir", outputDir.toString(),
-                "--empty-image", emptyImage.toString(),
                 "--ucon64-path", ucon64Path,
                 "--mtools-path", "mcopy",
                 "--format", format.name().toLowerCase()
@@ -165,15 +141,6 @@ class AppE2ETest {
             Files.copy(is, testRom);
         }
 
-        // Copy empty image template to temp directory
-        Path emptyImage = tempDir.resolve("empty.img");
-        try (InputStream is = getClass().getResourceAsStream(EMPTY_IMG_RESOURCE)) {
-            if (is == null) {
-                fail("Test resource not found: " + EMPTY_IMG_RESOURCE);
-            }
-            Files.copy(is, emptyImage);
-        }
-
         Path outputDir = tempDir.resolve("output");
 
         // Invoke CLI via CommandLine.execute() with positional input parameter (single file mode)
@@ -182,7 +149,6 @@ class AppE2ETest {
             .execute(
                 testRom.toString(),
                 "--output-dir", outputDir.toString(),
-                "--empty-image", emptyImage.toString(),
                 "--ucon64-path", ucon64Path,
                 "--mtools-path", "mcopy",
                 "--format", "fig"

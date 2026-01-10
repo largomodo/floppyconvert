@@ -6,6 +6,7 @@ import com.largomodo.floppyconvert.util.DosNameUtil;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -46,7 +47,6 @@ public class RomProcessor {
      * @param format             Backup unit format for ucon64 splitting
      * @param romFile            Source ROM file (.sfc format)
      * @param outputBaseDir      Base output directory (per-ROM subdirectory created inside)
-     * @param emptyImageTemplate Pre-formatted FAT12 floppy template (1.6MB)
      * @param ucon64             ucon64 driver for ROM splitting
      * @param mtools             mtools driver for floppy injection
      * @throws IOException if any pipeline step fails
@@ -54,7 +54,6 @@ public class RomProcessor {
     public void processRom(
             File romFile,
             Path outputBaseDir,
-            File emptyImageTemplate,
             Ucon64Driver ucon64,
             MtoolsDriver mtools,
             CopierFormat format
@@ -119,9 +118,26 @@ public class RomProcessor {
 
                 File targetImage = tempDir.resolve(diskName).toFile();
 
-                // Copy empty FAT12 template as base for this disk
-                Files.copy(emptyImageTemplate.toPath(), targetImage.toPath(),
-                        StandardCopyOption.REPLACE_EXISTING);
+                // Load bundled FAT12 template from JAR classpath
+                // Per-disk stream allocation chosen over single shared stream for thread-safety:
+                // - Multiple concurrent processRom calls would require stream synchronization
+                // - InputStream is stateful (position cursor) - shared instance = race condition
+                // - Performance impact negligible: disk creation is I/O-bound (mcopy dominates)
+                // - Simplicity wins: stateless method design, no locking required
+                //
+                // Resource path /empty.img is absolute classpath reference (leading slash required)
+                // Template bundled at build time via maven-resources-plugin (see pom.xml)
+                //
+                // Null check placement: verify resource exists BEFORE creating target file
+                // Avoids orphaned empty files in temp dir if resource missing
+                try (InputStream templateStream = getClass().getResourceAsStream("/empty.img")) {
+                    if (templateStream == null) {
+                        throw new IOException("Internal resource /empty.img not found. " +
+                                "Ensure application is built correctly.");
+                    }
+                    Files.copy(templateStream, targetImage.toPath(),
+                            StandardCopyOption.REPLACE_EXISTING);
+                }
 
                 // Inject each part into floppy image with DOS-compliant name
                 Map<String, File> dosNameMap = new LinkedHashMap<>();
