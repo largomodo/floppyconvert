@@ -124,21 +124,37 @@ public class Ucon64Driver extends ExternalProcessDriver {
         try {
             executeSplit(convertedFile, tempDir, 4);
         } catch (ProcessFailureException e) {
-            if (e.getMessage().contains("more than the maximum number")) {
+            if (isTooManyPartsError(e)) {
                 System.err.println("WARNING: Large ROM detected, retrying with 12Mbit split...");
                 // Clean up partial files from failed 4Mbit attempt
                 try (var stream = Files.list(tempDir)) {
-                    stream.map(Path::toFile)
-                          .filter(format.getSplitPartFilter())
-                          .forEach(f -> { try { Files.deleteIfExists(f.toPath()); } catch (IOException ignored) {} });
+                    stream.map(Path::toFile).filter(format.getSplitPartFilter()).forEach(f -> {
+                        try {
+                            Files.deleteIfExists(f.toPath());
+                        } catch (IOException ignored) {
+                        }
+                    });
                 }
                 executeSplit(convertedFile, tempDir, 12);
-            } else if (e.getMessage().contains("ROM size is smaller than or equal to 4 Mbit -- will not be split")) {
-                // This is okay, do nothing
-            } else {
-                throw e;
+                return;
             }
+
+            if (isNoSplitNeeded(e)) {
+                return; // Expected outcome
+            }
+
+            throw e;
         }
+    }
+
+    private boolean isTooManyPartsError(ProcessFailureException e) {
+        return e.getMessage().contains("more than the maximum number");
+    }
+
+    private boolean isNoSplitNeeded(ProcessFailureException e) {
+        return e.getMessage().contains(
+                "ROM size is smaller than or equal to 4 Mbit -- will not be split"
+        );
     }
 
     /**
