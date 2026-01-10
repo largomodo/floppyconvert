@@ -125,14 +125,14 @@ public class RomProcessor {
                 // - Performance impact negligible: disk creation is I/O-bound (mcopy dominates)
                 // - Simplicity wins: stateless method design, no locking required
                 //
-                // Resource path /empty.img is absolute classpath reference (leading slash required)
+                // Resource path /1m6.img is absolute classpath reference (leading slash required)
                 // Template bundled at build time via maven-resources-plugin (see pom.xml)
                 //
                 // Null check placement: verify resource exists BEFORE creating target file
                 // Avoids orphaned empty files in temp dir if resource missing
-                try (InputStream templateStream = getClass().getResourceAsStream("/empty.img")) {
+                try (InputStream templateStream = getClass().getResourceAsStream("/1m6.img")) {
                     if (templateStream == null) {
-                        throw new IOException("Internal resource /empty.img not found. " +
+                        throw new IOException("Internal resource /1m6.img not found. " +
                                 "Ensure application is built correctly.");
                     }
                     Files.copy(templateStream, targetImage.toPath(),
