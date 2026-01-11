@@ -177,4 +177,108 @@ class AppE2ETest {
             "Should use 720K template (~737KB) for 512KB ROM, got " + imageSize + " bytes");
     }
 
+    @Test
+    void testSpecialCharactersInFilename(@TempDir Path tempDir) throws Exception {
+        assumeTrue(toolsAvailable, "Skipping: ucon64 and/or mcopy not available");
+
+        // Copy ROM file with special characters in the filename
+        // This tests the mcopy sanitization fix for characters like #, [, ], (, ), and space
+        String problematicFilename = "VLDC10 [#053] - ERROR CODE #1D4 (Update) by Sayuri [2017-04-02] (SMW Hack).sfc";
+        Path testRom = tempDir.resolve(problematicFilename);
+
+        // Use the actual problematic ROM file from workspace root
+        Path sourceRom = Path.of("/workspace", problematicFilename);
+        if (!Files.exists(sourceRom)) {
+            // Fallback: copy Super Mario World with the problematic filename
+            try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
+                if (is == null) {
+                    fail("Test resource not found: " + SUPER_MARIO_WORLD_RESOURCE);
+                }
+                Files.copy(is, testRom);
+            }
+        } else {
+            Files.copy(sourceRom, testRom);
+        }
+
+        Path outputDir = tempDir.resolve("output");
+
+        // Invoke CLI - should handle special characters without truncation
+        int exitCode = new CommandLine(new App())
+            .setCaseInsensitiveEnumValuesAllowed(true)
+            .execute(
+                testRom.toString(),
+                "--output-dir", outputDir.toString(),
+                "--ucon64-path", ucon64Path,
+                "--mtools-path", "mcopy",
+                "--format", "fig"
+            );
+
+        assertEquals(0, exitCode, "Conversion should succeed even with special characters in filename");
+
+        // Verify output structure - base name is sanitized for filesystem safety
+        // Special characters #, [, ], (, ), and space are replaced with underscores
+        String expectedBaseName = "VLDC10___053__-_ERROR_CODE__1D4__Update__by_Sayuri__2017-04-02___SMW_Hack_";
+        Path gameOutputDir = outputDir.resolve(expectedBaseName);
+        assertTrue(Files.exists(gameOutputDir), "Output directory should exist");
+        assertTrue(Files.isDirectory(gameOutputDir), "Output should be a directory");
+
+        // Verify .img files were created
+        List<Path> imgFiles = Files.list(gameOutputDir)
+            .filter(p -> p.toString().endsWith(".img"))
+            .collect(Collectors.toList());
+        assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
+    }
+
+    @Test
+    void testShellSensitiveCharactersInFilename(@TempDir Path tempDir) throws Exception {
+        assumeTrue(toolsAvailable, "Skipping: ucon64 and/or mcopy not available");
+
+        // Test file with shell-sensitive characters: &, $, !, and space
+        // These characters cause mcopy's argument parser to truncate paths
+        String problematicFilename = "Ren & Stimpy Show, The - Buckeroo$! (USA).sfc";
+        Path testRom = tempDir.resolve(problematicFilename);
+
+        // Use the actual problematic ROM file from workspace root
+        Path sourceRom = Path.of("/workspace", problematicFilename);
+        if (!Files.exists(sourceRom)) {
+            // Fallback: copy Super Mario World with the problematic filename
+            try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
+                if (is == null) {
+                    fail("Test resource not found: " + SUPER_MARIO_WORLD_RESOURCE);
+                }
+                Files.copy(is, testRom);
+            }
+        } else {
+            Files.copy(sourceRom, testRom);
+        }
+
+        Path outputDir = tempDir.resolve("output");
+
+        // Invoke CLI - should handle shell-sensitive characters without truncation
+        int exitCode = new CommandLine(new App())
+            .setCaseInsensitiveEnumValuesAllowed(true)
+            .execute(
+                testRom.toString(),
+                "--output-dir", outputDir.toString(),
+                "--ucon64-path", ucon64Path,
+                "--mtools-path", "mcopy",
+                "--format", "fig"
+            );
+
+        assertEquals(0, exitCode, "Conversion should succeed with shell-sensitive characters (&, $, !, space)");
+
+        // Verify output structure - shell-sensitive characters replaced with underscores
+        // &, $, !, space, (, and ) are all sanitized to underscores
+        String expectedBaseName = "Ren___Stimpy_Show,_The_-_Buckeroo____USA_";
+        Path gameOutputDir = outputDir.resolve(expectedBaseName);
+        assertTrue(Files.exists(gameOutputDir), "Output directory should exist");
+        assertTrue(Files.isDirectory(gameOutputDir), "Output should be a directory");
+
+        // Verify .img files were created
+        List<Path> imgFiles = Files.list(gameOutputDir)
+            .filter(p -> p.toString().endsWith(".img"))
+            .collect(Collectors.toList());
+        assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
+    }
+
 }

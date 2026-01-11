@@ -68,13 +68,30 @@ public class RomProcessor {
                 throw new IOException("ucon64 produced no split parts for " + romFile.getName());
             }
 
+            // Sanitize filenames for mcopy compatibility
+            // mcopy's argument parser truncates paths at special characters like #, [, ], (, )
+            // Rename parts to temporary sanitized names before passing to mcopy
+            List<File> sanitizedParts = new java.util.ArrayList<>();
+            for (File part : parts) {
+                String sanitizedName = sanitizeForMcopy(part.getName());
+                Path sanitizedPath = tempDir.resolve(sanitizedName);
+                Files.move(part.toPath(), sanitizedPath, StandardCopyOption.REPLACE_EXISTING);
+                sanitizedParts.add(sanitizedPath.toFile());
+            }
+            parts = sanitizedParts;
+
             // Extract base name by removing extension: "SuperMario.sfc" → "SuperMario"
             // Regex removes everything from last dot onward
             String baseName = romFile.getName().replaceFirst("\\.[^.]+$", "");
             if (baseName.isEmpty()) {
                 throw new IOException("Cannot extract base name from ROM file: " + romFile.getName());
             }
-            Path gameOutputDir = outputBaseDir.resolve(baseName);
+
+            // Sanitize baseName for use in disk image filenames
+            // mcopy's -i argument also needs sanitized paths to avoid truncation
+            String sanitizedBaseName = sanitizeForMcopy(baseName);
+
+            Path gameOutputDir = outputBaseDir.resolve(sanitizedBaseName);
             Files.createDirectories(gameOutputDir);
 
             // Pack parts onto disks by actual size (not fixed count)
@@ -105,10 +122,10 @@ public class RomProcessor {
                 String diskName;
                 if (totalDisks > 1) {
                     // Multi-disk: explicit numbering (_1, _2) for manual sorting clarity
-                    diskName = baseName + "_" + diskNumber + ".img";
+                    diskName = sanitizedBaseName + "_" + diskNumber + ".img";
                 } else {
                     // Single disk: no suffix needed (cleaner naming)
-                    diskName = baseName + ".img";
+                    diskName = sanitizedBaseName + ".img";
                 }
 
                 File targetImage = tempDir.resolve(diskName).toFile();
@@ -199,5 +216,42 @@ public class RomProcessor {
             disks++;
         }
         return disks;
+    }
+
+    /**
+     * Sanitize filename for mcopy compatibility by removing problematic characters.
+     * <p>
+     * mcopy's argument parser treats certain characters as special, causing path truncation.
+     * This method creates a safe temporary filename that mcopy can process correctly.
+     * The sanitized name is only used for the source path passed to mcopy; the DOS name
+     * inside the floppy image is controlled separately via DosNameUtil.
+     * <p>
+     * Sanitized characters:
+     * <ul>
+     *   <li>{@code #} - Comment/hash character</li>
+     *   <li>{@code [, ]} - Bracket characters</li>
+     *   <li>{@code (, )} - Parenthesis characters</li>
+     *   <li>{@code &} - Ampersand (shell background operator)</li>
+     *   <li>{@code $} - Dollar sign (shell variable expansion)</li>
+     *   <li>{@code !} - Exclamation mark (shell history expansion)</li>
+     *   <li>Space - Argument separator</li>
+     * </ul>
+     *
+     * @param originalName Original filename (e.g., "game[#1].sfc.1" or "Ren & Stimpy$! (USA).sfc")
+     * @return Sanitized filename safe for mcopy (e.g., "game_1.sfc.1" or "Ren___Stimpy___USA_.sfc")
+     */
+    private String sanitizeForMcopy(String originalName) {
+        // Replace problematic characters that mcopy treats as special
+        // These include shell-sensitive characters that cause truncation or parsing issues
+        return originalName
+                .replace("#", "_")
+                .replace("[", "_")
+                .replace("]", "_")
+                .replace("(", "_")
+                .replace(")", "_")
+                .replace("&", "_")
+                .replace("$", "_")
+                .replace("!", "_")
+                .replace(" ", "_");
     }
 }
