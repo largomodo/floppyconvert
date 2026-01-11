@@ -3,6 +3,7 @@ package com.largomodo.floppyconvert.core;
 import com.largomodo.floppyconvert.service.MtoolsDriver;
 import com.largomodo.floppyconvert.service.Ucon64Driver;
 import com.largomodo.floppyconvert.util.DosNameUtil;
+import com.largomodo.floppyconvert.core.FloppyType;
 
 import java.io.File;
 import java.io.IOException;
@@ -28,12 +29,6 @@ import java.util.Map;
  * Cleanup in finally block ensures no disk space leaks on failure.
  */
 public class RomProcessor {
-
-    // 1.6MB floppy = 1,638,400 bytes (80 tracks * 2 heads * 20 sectors * 512 bytes)
-    // FAT12 overhead: ~18KB (boot sector + 2 FATs + root directory)
-    // Usable data area: ~1,620,000 bytes
-    // Using 1,600,000 as safe threshold (allows 3 x 512KB parts = 1,536,000 bytes)
-    private static final long DISK_CAPACITY_BYTES = 1_600_000;
 
     /**
      * Process single ROM file through full conversion pipeline.
@@ -99,7 +94,7 @@ public class RomProcessor {
 
                     // If disk is empty, always add the part (even if oversized - will fail-fast at mcopy)
                     // Otherwise, check if part fits within remaining capacity
-                    if (diskUsed + partSize <= DISK_CAPACITY_BYTES || diskParts.isEmpty()) {
+                    if (diskUsed + partSize <= FloppyType.FLOPPY_160M.getUsableBytes() || diskParts.isEmpty()) {
                         diskParts.add(part);
                         diskUsed += partSize;
                         partIdx++;
@@ -118,6 +113,9 @@ public class RomProcessor {
 
                 File targetImage = tempDir.resolve(diskName).toFile();
 
+                // Select smallest floppy template that fits actual payload
+                FloppyType floppyType = FloppyType.bestFit(diskUsed);
+
                 // Load bundled FAT12 template from JAR classpath
                 // Per-disk stream allocation chosen over single shared stream for thread-safety:
                 // - Multiple concurrent processRom calls would require stream synchronization
@@ -125,14 +123,14 @@ public class RomProcessor {
                 // - Performance impact negligible: disk creation is I/O-bound (mcopy dominates)
                 // - Simplicity wins: stateless method design, no locking required
                 //
-                // Resource path /1m6.img is absolute classpath reference (leading slash required)
+                // Resource path is absolute classpath reference (leading slash required)
                 // Template bundled at build time via maven-resources-plugin (see pom.xml)
                 //
                 // Null check placement: verify resource exists BEFORE creating target file
                 // Avoids orphaned empty files in temp dir if resource missing
-                try (InputStream templateStream = getClass().getResourceAsStream("/1m6.img")) {
+                try (InputStream templateStream = getClass().getResourceAsStream(floppyType.getResourcePath())) {
                     if (templateStream == null) {
-                        throw new IOException("Internal resource /1m6.img not found. " +
+                        throw new IOException("Internal resource " + floppyType.getResourcePath() + " not found. " +
                                 "Ensure application is built correctly.");
                     }
                     Files.copy(templateStream, targetImage.toPath(),
@@ -190,7 +188,7 @@ public class RomProcessor {
 
             while (partIdx < parts.size()) {
                 long partSize = parts.get(partIdx).length();
-                if (diskUsed + partSize <= DISK_CAPACITY_BYTES || !diskHasPart) {
+                if (diskUsed + partSize <= FloppyType.FLOPPY_160M.getUsableBytes() || !diskHasPart) {
                     diskUsed += partSize;
                     diskHasPart = true;
                     partIdx++;

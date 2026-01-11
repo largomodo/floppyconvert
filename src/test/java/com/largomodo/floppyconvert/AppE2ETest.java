@@ -132,11 +132,11 @@ class AppE2ETest {
     void testSingleFileMode(@TempDir Path tempDir) throws Exception {
         assumeTrue(toolsAvailable, "Skipping: ucon64 and/or mcopy not available");
 
-        // Copy Chrono Trigger ROM to temp directory
-        Path testRom = tempDir.resolve("ChronoTrigger.sfc");
-        try (InputStream is = getClass().getResourceAsStream(CHRONO_TRIGGER_RESOURCE)) {
+        // Copy Super Mario World ROM to temp directory
+        Path testRom = tempDir.resolve("SuperMarioWorld.sfc");
+        try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
             if (is == null) {
-                fail("Test resource not found: " + CHRONO_TRIGGER_RESOURCE);
+                fail("Test resource not found: " + SUPER_MARIO_WORLD_RESOURCE);
             }
             Files.copy(is, testRom);
         }
@@ -157,7 +157,7 @@ class AppE2ETest {
         assertEquals(0, exitCode, "Conversion should succeed");
 
         // Verify output structure
-        Path gameOutputDir = outputDir.resolve("ChronoTrigger");
+        Path gameOutputDir = outputDir.resolve("SuperMarioWorld");
         assertTrue(Files.exists(gameOutputDir), "Output directory should exist");
         assertTrue(Files.isDirectory(gameOutputDir), "Output should be a directory");
 
@@ -167,7 +167,14 @@ class AppE2ETest {
             .collect(Collectors.toList());
         assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
 
-        assertTrue(imgFiles.size() >= 1, "Should have at least one disk image");
+        assertEquals(1, imgFiles.size(), "Should produce single disk for 4Mbit ROM");
+        assertTrue(imgFiles.get(0).getFileName().toString().matches(".*\\.img"),
+            "Output should be .img file");
+
+        // Super Mario World is 4Mbit (512KB) - should fit on 720K disk
+        long imageSize = Files.size(imgFiles.get(0));
+        assertTrue(imageSize < 800_000,
+            "Should use 720K template (~737KB) for 512KB ROM, got " + imageSize + " bytes");
     }
 
 }
