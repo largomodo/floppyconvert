@@ -126,6 +126,31 @@ class AppE2ETest {
                 assertTrue(size > 0, "Empty floppy image: " + img.getFileName());
             }
         }
+
+        // Verify cleanup: no split parts (.1, .2, .3, etc) should remain
+        try (var stream = Files.list(gameOutputDir)) {
+            long partFileCount = stream
+                .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
+                .count();
+            assertEquals(0, partFileCount,
+                "Split parts (.1, .2, .3) must not remain in output for " + format + " / " + baseName);
+        }
+
+        // Verify cleanup removed intermediate format files (only for large ROMs that were split)
+        // Small ROMs (≤4 Mbit) don't get split, so the intermediate file IS the part - don't check cleanup
+        boolean isLargeRom = romResourcePath.contains("Chrono Trigger");
+        if (isLargeRom) {
+            try (var files = Files.list(gameOutputDir)) {
+                long intermediateCount = files
+                    .filter(p -> p.toString().endsWith(".fig") ||
+                                 p.toString().endsWith(".swc") ||
+                                 p.toString().endsWith(".ufo") ||
+                                 p.toString().endsWith(".gd3"))
+                    .count();
+                assertEquals(0, intermediateCount,
+                    "Intermediate format files must be cleaned up for large ROMs: " + format);
+            }
+        }
     }
 
     @Test
@@ -175,6 +200,25 @@ class AppE2ETest {
         long imageSize = Files.size(imgFiles.get(0));
         assertTrue(imageSize < 800_000,
             "Should use 720K template (~737KB) for 512KB ROM, got " + imageSize + " bytes");
+
+        // Verify cleanup: no split parts (.1, .2, .3) should remain (small ROM doesn't split)
+        try (var stream = Files.list(gameOutputDir)) {
+            long partFileCount = stream
+                .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
+                .count();
+            assertEquals(0, partFileCount, "No split parts should exist for small ROM");
+        }
+
+        // Verify cleanup: no intermediate format files remain (converted to .img)
+        try (var files = Files.list(gameOutputDir)) {
+            long intermediateCount = files
+                .filter(p -> p.toString().endsWith(".fig") ||
+                             p.toString().endsWith(".swc") ||
+                             p.toString().endsWith(".ufo") ||
+                             p.toString().endsWith(".gd3"))
+                .count();
+            assertEquals(0, intermediateCount, "Intermediate format files should be converted to .img");
+        }
     }
 
     @Test
@@ -227,6 +271,24 @@ class AppE2ETest {
             .filter(p -> p.toString().endsWith(".img"))
             .collect(Collectors.toList());
         assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
+
+        // Verify cleanup: no split parts or intermediate files remain
+        try (var stream = Files.list(gameOutputDir)) {
+            long partFileCount = stream
+                .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
+                .count();
+            assertEquals(0, partFileCount, "No split parts should remain after processing");
+        }
+
+        try (var files = Files.list(gameOutputDir)) {
+            long intermediateCount = files
+                .filter(p -> p.toString().endsWith(".fig") ||
+                             p.toString().endsWith(".swc") ||
+                             p.toString().endsWith(".ufo") ||
+                             p.toString().endsWith(".gd3"))
+                .count();
+            assertEquals(0, intermediateCount, "No intermediate format files should remain");
+        }
     }
 
     @Test
@@ -279,6 +341,24 @@ class AppE2ETest {
             .filter(p -> p.toString().endsWith(".img"))
             .collect(Collectors.toList());
         assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
+
+        // Verify cleanup: no split parts or intermediate files remain
+        try (var stream = Files.list(gameOutputDir)) {
+            long partFileCount = stream
+                .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
+                .count();
+            assertEquals(0, partFileCount, "No split parts should remain after processing");
+        }
+
+        try (var files = Files.list(gameOutputDir)) {
+            long intermediateCount = files
+                .filter(p -> p.toString().endsWith(".fig") ||
+                             p.toString().endsWith(".swc") ||
+                             p.toString().endsWith(".ufo") ||
+                             p.toString().endsWith(".gd3"))
+                .count();
+            assertEquals(0, intermediateCount, "No intermediate format files should remain");
+        }
     }
 
 }
