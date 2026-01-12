@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
  * <p>
  * Timeout protection prevents hung processes on corrupted ROMs (60s default).
  */
-public class Ucon64Driver extends ExternalProcessDriver {
+public class Ucon64Driver extends ExternalProcessDriver implements RomSplitter {
 
     private final String ucon64Path;
 
@@ -33,59 +33,60 @@ public class Ucon64Driver extends ExternalProcessDriver {
      * 1. Convert .sfc to target format (--fig/--swc/--ufo/--gd3)
      * 2. Split the converted file into parts
      * <p>
-     * Uses absolute path for input ROM. ucon64 writes output to working directory (outputDir).
-     * ROM remains at original location (romFile.getAbsolutePath()), split parts go directly to final destination.
+     * Uses absolute path for input ROM. ucon64 writes output to working directory (workDir).
+     * ROM remains at original location (inputRom.getAbsolutePath()), split parts go directly to final destination.
      *
+     * @param inputRom Source ROM file (.sfc format expected)
+     * @param workDir Final output directory for split parts (ucon64 working directory)
      * @param format  Backup unit format (determines ucon64 flag and output naming)
-     * @param romFile Source ROM file (.sfc format expected)
-     * @param outputDir Final output directory for split parts (ucon64 working directory)
      * @return Sorted list of part files (ordered by numeric extension: .1, .2, .3)
      * @throws IOException if ucon64 fails or no parts generated
      */
-    public List<File> splitRom(File romFile, Path outputDir, CopierFormat format) throws IOException {
-        if (!romFile.exists()) {
-            throw new IllegalArgumentException("ROM file does not exist: " + romFile);
+    @Override
+    public List<File> split(File inputRom, Path workDir, CopierFormat format) throws IOException {
+        if (!inputRom.exists()) {
+            throw new IllegalArgumentException("ROM file does not exist: " + inputRom);
         }
 
         // Step 1: Convert .sfc to target format
-        // romFile.getAbsolutePath() references original ROM location (read-only access)
-        // ucon64 writes output to workingDirectory (outputDir), not to input file's directory
+        // inputRom.getAbsolutePath() references original ROM location (read-only access)
+        // ucon64 writes output to workingDirectory (workDir), not to input file's directory
         String[] convertCmd = {
                 ucon64Path,
                 format.getCmdFlag(),
                 "--nbak",
                 "--ncol",
-                romFile.getAbsolutePath()
+                inputRom.getAbsolutePath()
         };
 
         // Working directory parameter directs ucon64 output to final destination
-        executeCommand(convertCmd, DEFAULT_TIMEOUT_MS, outputDir.toFile());
+        executeCommand(convertCmd, DEFAULT_TIMEOUT_MS, workDir.toFile());
 
         // Step 2: Find the converted file (GD3 uses special naming, others use .ext)
         Path convertedFile;
         if (format == CopierFormat.GD3) {
-            try (var stream = Files.list(outputDir)) {
+            try (var stream = Files.list(workDir)) {
                 convertedFile = stream
                         .filter(p -> !p.getFileName().toString().startsWith("."))
-                        .filter(p -> !p.equals(outputDir.resolve(romFile.getName())))
+                        .filter(p -> !p.equals(workDir.resolve(inputRom.getName())))
                         .findFirst()
                         .orElseThrow(() -> new IOException("Conversion failed: no GD3 file created"));
             }
         } else {
-            String baseName = romFile.getName().replaceFirst("\\.[^.]+$", "");
+            String baseName = inputRom.getName().replaceFirst("\\.[^.]+$", "");
             String formatExt = format.getFileExtension();
-            convertedFile = outputDir.resolve(baseName + "." + formatExt);
+            convertedFile = workDir.resolve(baseName + "." + formatExt);
             if (!Files.exists(convertedFile)) {
                 throw new IOException("Conversion failed: expected file not created: " + convertedFile);
             }
         }
 
         // Step 3: Split converted file with retry mechanism for large ROMs
-        executeSplitWithRetry(convertedFile, outputDir, format);
+        executeSplitWithRetry(convertedFile, workDir, format);
 
         // Discover split parts using format-specific filter
         List<File> parts;
-        try (var stream = Files.list(outputDir)) {
+        try (var stream = Files.list(workDir)) {
             parts = stream
                     .map(Path::toFile)
                     .filter(format.getSplitPartFilter())
@@ -129,18 +130,18 @@ public class Ucon64Driver extends ExternalProcessDriver {
      * retry with 12 Mbit split (fits ROMs up to 144 Mbit).
      *
      * @param convertedFile Path to converted ROM file
-     * @param outputDir     Output directory for split parts
+     * @param workDir     Output directory for split parts
      * @param format        Backup unit format (for identifying split part files during cleanup)
      * @throws IOException if split fails with non-recoverable error
      */
-    private void executeSplitWithRetry(Path convertedFile, Path outputDir, CopierFormat format) throws IOException {
+    private void executeSplitWithRetry(Path convertedFile, Path workDir, CopierFormat format) throws IOException {
         try {
-            executeSplit(convertedFile, outputDir, 4);
+            executeSplit(convertedFile, workDir, 4);
         } catch (ProcessFailureException e) {
             if (isTooManyPartsError(e)) {
                 System.err.println("WARNING: Large ROM detected, retrying with 12Mbit split...");
                 // Clean up partial files from failed 4Mbit attempt
-                try (var stream = Files.list(outputDir)) {
+                try (var stream = Files.list(workDir)) {
                     stream.map(Path::toFile).filter(format.getSplitPartFilter()).forEach(f -> {
                         try {
                             Files.deleteIfExists(f.toPath());
@@ -148,7 +149,7 @@ public class Ucon64Driver extends ExternalProcessDriver {
                         }
                     });
                 }
-                executeSplit(convertedFile, outputDir, 12);
+                executeSplit(convertedFile, workDir, 12);
                 return;
             }
 
@@ -174,11 +175,11 @@ public class Ucon64Driver extends ExternalProcessDriver {
      * Execute ucon64 split command with specified size.
      *
      * @param convertedFile Path to converted ROM file
-     * @param outputDir     Output directory for split parts
+     * @param workDir     Output directory for split parts
      * @param size          Split size in Mbit (4 or 12)
      * @throws IOException if split command fails
      */
-    private void executeSplit(Path convertedFile, Path outputDir, int size) throws IOException {
+    private void executeSplit(Path convertedFile, Path workDir, int size) throws IOException {
         String[] splitCmd = {
                 ucon64Path,
                 "--nbak",
@@ -188,6 +189,6 @@ public class Ucon64Driver extends ExternalProcessDriver {
                 convertedFile.toString()
         };
 
-        executeCommand(splitCmd, DEFAULT_TIMEOUT_MS, outputDir.toFile());
+        executeCommand(splitCmd, DEFAULT_TIMEOUT_MS, workDir.toFile());
     }
 }

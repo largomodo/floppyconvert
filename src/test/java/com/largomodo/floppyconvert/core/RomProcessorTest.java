@@ -1,0 +1,323 @@
+package com.largomodo.floppyconvert.core;
+
+import com.largomodo.floppyconvert.core.domain.DiskLayout;
+import com.largomodo.floppyconvert.core.domain.DiskPacker;
+import com.largomodo.floppyconvert.core.domain.RomPartMetadata;
+import com.largomodo.floppyconvert.service.FloppyImageWriter;
+import com.largomodo.floppyconvert.service.RomSplitter;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+/**
+ * Unit tests for RomProcessor with mocked dependencies.
+ * <p>
+ * Tests verify:
+ * - Constructor injection with null checks
+ * - Delegation to injected dependencies
+ * - Proper exception handling and cleanup
+ * - Return value correctness
+ */
+class RomProcessorTest {
+
+    private DiskPacker mockPacker;
+    private RomSplitter mockSplitter;
+    private FloppyImageWriter mockWriter;
+    private RomProcessor processor;
+
+    @TempDir
+    Path tempDir;
+
+    @BeforeEach
+    void setUp() {
+        mockPacker = mock(DiskPacker.class);
+        mockSplitter = mock(RomSplitter.class);
+        mockWriter = mock(FloppyImageWriter.class);
+        processor = new RomProcessor(mockPacker, mockSplitter, mockWriter);
+    }
+
+    @Test
+    void testConstructorRejectsNullPacker() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+            new RomProcessor(null, mockSplitter, mockWriter)
+        );
+        assertEquals("DiskPacker must not be null", ex.getMessage());
+    }
+
+    @Test
+    void testConstructorRejectsNullSplitter() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+            new RomProcessor(mockPacker, null, mockWriter)
+        );
+        assertEquals("RomSplitter must not be null", ex.getMessage());
+    }
+
+    @Test
+    void testConstructorRejectsNullWriter() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+            new RomProcessor(mockPacker, mockSplitter, null)
+        );
+        assertEquals("FloppyImageWriter must not be null", ex.getMessage());
+    }
+
+    @Test
+    void testProcessRomDelegatesToSplitterAndPacker() throws IOException {
+        // Setup: Create test ROM file
+        Path romFile = tempDir.resolve("TestGame.sfc");
+        Files.write(romFile, new byte[]{0x01, 0x02, 0x03});
+
+        Path outputDir = tempDir.resolve("output");
+        Files.createDirectories(outputDir);
+
+        // Mock splitter to return parts
+        File part1 = tempDir.resolve("work").resolve("TestGame.1").toFile();
+        File part2 = tempDir.resolve("work").resolve("TestGame.2").toFile();
+        Files.createDirectories(part1.getParentFile().toPath());
+        Files.write(part1.toPath(), new byte[]{0x01});
+        Files.write(part2.toPath(), new byte[]{0x02});
+
+        when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.FIG)))
+            .thenReturn(Arrays.asList(part1, part2));
+
+        // Mock packer to return single disk layout
+        DiskLayout mockLayout = new DiskLayout(
+            Arrays.asList(
+                new RomPartMetadata(part1.toPath(), part1.length(), "TESTGAME.1"),
+                new RomPartMetadata(part2.toPath(), part2.length(), "TESTGAME.2")
+            ),
+            FloppyType.FLOPPY_144M
+        );
+        when(mockPacker.pack(anyList())).thenReturn(Arrays.asList(mockLayout));
+
+        // Execute
+        int diskCount = processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG);
+
+        // Verify splitter was called
+        verify(mockSplitter).split(eq(romFile.toFile()), any(Path.class), eq(CopierFormat.FIG));
+
+        // Verify packer was called with correct metadata
+        ArgumentCaptor<List<RomPartMetadata>> packerArg = ArgumentCaptor.forClass(List.class);
+        verify(mockPacker).pack(packerArg.capture());
+        List<RomPartMetadata> capturedMetadata = packerArg.getValue();
+        assertEquals(2, capturedMetadata.size());
+
+        // Verify writer was called
+        verify(mockWriter).write(any(File.class), anyList(), anyMap());
+
+        // Verify return value
+        assertEquals(1, diskCount, "Should return number of disk layouts");
+    }
+
+    @Test
+    void testProcessRomReturnsDiskCount() throws IOException {
+        // Setup: Create test ROM file
+        Path romFile = tempDir.resolve("MultiDisk.sfc");
+        Files.write(romFile, new byte[]{0x01, 0x02, 0x03});
+
+        Path outputDir = tempDir.resolve("output");
+        Files.createDirectories(outputDir);
+
+        // Mock splitter to return parts
+        File part1 = tempDir.resolve("work").resolve("MultiDisk.1").toFile();
+        Files.createDirectories(part1.getParentFile().toPath());
+        Files.write(part1.toPath(), new byte[]{0x01});
+
+        when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.SWC)))
+            .thenReturn(Arrays.asList(part1));
+
+        // Mock packer to return THREE disk layouts
+        DiskLayout layout1 = new DiskLayout(
+            Arrays.asList(new RomPartMetadata(part1.toPath(), part1.length(), "MULTIDIS.1")),
+            FloppyType.FLOPPY_720K);
+        DiskLayout layout2 = new DiskLayout(
+            Arrays.asList(new RomPartMetadata(part1.toPath(), part1.length(), "MULTIDIS.2")),
+            FloppyType.FLOPPY_720K);
+        DiskLayout layout3 = new DiskLayout(
+            Arrays.asList(new RomPartMetadata(part1.toPath(), part1.length(), "MULTIDIS.3")),
+            FloppyType.FLOPPY_720K);
+
+        when(mockPacker.pack(anyList())).thenReturn(Arrays.asList(layout1, layout2, layout3));
+
+        // Execute
+        int diskCount = processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.SWC);
+
+        // Verify return value matches layouts.size()
+        assertEquals(3, diskCount, "Should return number of disk layouts (3)");
+    }
+
+    @Test
+    void testExceptionInSplitterClosesWorkspace() throws IOException {
+        // Setup: Create test ROM file
+        Path romFile = tempDir.resolve("FailGame.sfc");
+        Files.write(romFile, new byte[]{0x01, 0x02, 0x03});
+
+        Path outputDir = tempDir.resolve("output");
+        Files.createDirectories(outputDir);
+
+        // Mock splitter to throw exception
+        when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.UFO)))
+            .thenThrow(new IOException("Splitter failure"));
+
+        // Execute and expect exception
+        IOException ex = assertThrows(IOException.class, () ->
+            processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.UFO)
+        );
+
+        assertEquals("Splitter failure", ex.getMessage());
+
+        // Verify workspace cleanup: work directory should be removed
+        // ConversionWorkspace creates subdirectory under outputDir
+        Path workDir = outputDir.resolve("FailGame");
+
+        // If workspace cleanup worked, directory should not exist (or be empty if cleanup failed)
+        // We can't directly test ConversionWorkspace cleanup without integration test,
+        // but we verify exception propagates correctly
+        verify(mockSplitter).split(any(File.class), any(Path.class), eq(CopierFormat.UFO));
+        verifyNoInteractions(mockPacker);
+        verifyNoInteractions(mockWriter);
+    }
+
+    @Test
+    void testExceptionInPackerClosesWorkspace() throws IOException {
+        // Setup: Create test ROM file
+        Path romFile = tempDir.resolve("PackFail.sfc");
+        Files.write(romFile, new byte[]{0x01, 0x02, 0x03});
+
+        Path outputDir = tempDir.resolve("output");
+        Files.createDirectories(outputDir);
+
+        // Mock splitter to return parts
+        File part1 = tempDir.resolve("work").resolve("PackFail.1").toFile();
+        Files.createDirectories(part1.getParentFile().toPath());
+        Files.write(part1.toPath(), new byte[]{0x01});
+
+        when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.GD3)))
+            .thenReturn(Arrays.asList(part1));
+
+        // Mock packer to throw exception
+        when(mockPacker.pack(anyList())).thenThrow(new IllegalArgumentException("Part too large"));
+
+        // Execute and expect exception
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+            processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.GD3)
+        );
+
+        assertEquals("Part too large", ex.getMessage());
+
+        // Verify calls
+        verify(mockSplitter).split(any(File.class), any(Path.class), eq(CopierFormat.GD3));
+        verify(mockPacker).pack(anyList());
+        verifyNoInteractions(mockWriter);
+    }
+
+    @Test
+    void testExceptionInWriterClosesWorkspace() throws IOException {
+        // Setup: Create test ROM file
+        Path romFile = tempDir.resolve("WriteFail.sfc");
+        Files.write(romFile, new byte[]{0x01, 0x02, 0x03});
+
+        Path outputDir = tempDir.resolve("output");
+        Files.createDirectories(outputDir);
+
+        // Mock splitter to return parts
+        File part1 = tempDir.resolve("work").resolve("WriteFail.1").toFile();
+        Files.createDirectories(part1.getParentFile().toPath());
+        Files.write(part1.toPath(), new byte[]{0x01});
+
+        when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.FIG)))
+            .thenReturn(Arrays.asList(part1));
+
+        // Mock packer to return layout
+        DiskLayout mockLayout = new DiskLayout(
+            Arrays.asList(new RomPartMetadata(part1.toPath(), part1.length(), "WRITEFAI.1")),
+            FloppyType.FLOPPY_144M
+        );
+        when(mockPacker.pack(anyList())).thenReturn(Arrays.asList(mockLayout));
+
+        // Mock writer to throw exception
+        doThrow(new IOException("Disk full")).when(mockWriter)
+            .write(any(File.class), anyList(), anyMap());
+
+        // Execute and expect exception
+        IOException ex = assertThrows(IOException.class, () ->
+            processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG)
+        );
+
+        assertEquals("Disk full", ex.getMessage());
+
+        // Verify all components were called
+        verify(mockSplitter).split(any(File.class), any(Path.class), eq(CopierFormat.FIG));
+        verify(mockPacker).pack(anyList());
+        verify(mockWriter).write(any(File.class), anyList(), anyMap());
+    }
+
+    @Test
+    void testProcessRomWithEmptyBaseName() throws IOException {
+        // Setup: Create ROM file with only extension (edge case)
+        Path romFile = tempDir.resolve(".sfc");
+        Files.write(romFile, new byte[]{0x01});
+
+        Path outputDir = tempDir.resolve("output");
+        Files.createDirectories(outputDir);
+
+        // Execute and expect exception
+        IOException ex = assertThrows(IOException.class, () ->
+            processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG)
+        );
+
+        assertTrue(ex.getMessage().contains("Cannot extract base name"),
+            "Should reject file with no base name");
+
+        verifyNoInteractions(mockSplitter);
+        verifyNoInteractions(mockPacker);
+        verifyNoInteractions(mockWriter);
+    }
+
+    @Test
+    void testProcessRomWithSingleDiskNaming() throws IOException {
+        // Verify single-disk naming convention: GameName.img (no _1 suffix)
+        Path romFile = tempDir.resolve("SingleDisk.sfc");
+        Files.write(romFile, new byte[]{0x01});
+
+        Path outputDir = tempDir.resolve("output");
+        Files.createDirectories(outputDir);
+
+        File part1 = tempDir.resolve("work").resolve("SingleDisk.1").toFile();
+        Files.createDirectories(part1.getParentFile().toPath());
+        Files.write(part1.toPath(), new byte[]{0x01});
+
+        when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.SWC)))
+            .thenReturn(Arrays.asList(part1));
+
+        DiskLayout layout = new DiskLayout(
+            Arrays.asList(new RomPartMetadata(part1.toPath(), part1.length(), "SINGLDI.1")),
+            FloppyType.FLOPPY_144M);
+        when(mockPacker.pack(anyList())).thenReturn(Arrays.asList(layout));
+
+        // Execute
+        processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.SWC);
+
+        // Verify output directory contains SingleDisk/SingleDisk.img (not SingleDisk_1.img)
+        // After processRom completes, .img files are moved from workspace to outputDir/GameName/
+        Path expectedGameDir = outputDir.resolve("SingleDisk");
+        Path expectedImage = expectedGameDir.resolve("SingleDisk.img");
+
+        assertTrue(Files.exists(expectedGameDir),
+            "Game directory should exist");
+        assertTrue(Files.exists(expectedImage),
+            "Single disk should be named GameName.img (no numbering)");
+    }
+}

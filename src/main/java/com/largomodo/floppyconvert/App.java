@@ -7,9 +7,14 @@ import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParameterException;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
+import com.largomodo.floppyconvert.core.ConversionObserver;
 import com.largomodo.floppyconvert.core.CopierFormat;
 import com.largomodo.floppyconvert.core.RomProcessor;
+import com.largomodo.floppyconvert.core.domain.DiskPacker;
+import com.largomodo.floppyconvert.core.domain.GreedyDiskPacker;
+import com.largomodo.floppyconvert.service.FloppyImageWriter;
 import com.largomodo.floppyconvert.service.MtoolsDriver;
+import com.largomodo.floppyconvert.service.RomSplitter;
 import com.largomodo.floppyconvert.service.Ucon64Driver;
 
 import java.io.File;
@@ -21,7 +26,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
@@ -121,12 +131,15 @@ public class App implements Callable<Integer> {
 
 
     /**
-     * Execute batch ROM processing with fail-soft error handling.
+     * Execute batch ROM processing with concurrent execution and fail-soft error handling.
      * <p>
-     * Strategy: Fail-fast validation (environment issues affect all ROMs),
-     * then fail-soft per-ROM processing (single failure logged, batch continues).
+     * Strategy: Fixed thread pool sized to CPU cores prevents oversubscription.
+     * Bounded queue provides backpressure. CallerRunsPolicy throttles submission.
+     * Each ROM processed in isolated workspace directory (UUID suffix prevents collisions).
      * <p>
-     * Sequential processing avoids I/O contention (ucon64/mtools are I/O bound).
+     * Thread pool sizing: coreCount threads prevents CPU oversubscription (ucon64/mtools are CPU-bound).
+     * Bounded queue (2 * coreCount) limits memory footprint on large ROM libraries (prevents OOM).
+     * CallerRunsPolicy throttles submission when queue full (main thread processes ROM).
      */
     private static void runBatch(Config config) throws IOException {
         Path inputRoot = Paths.get(config.inputDir);
@@ -134,75 +147,92 @@ public class App implements Callable<Integer> {
 
         validateExternalTools(config);
 
-        Ucon64Driver ucon64 = new Ucon64Driver(config.ucon64Path);
-        MtoolsDriver mtools = new MtoolsDriver(config.mtoolsPath);
-        RomProcessor processor = new RomProcessor();
+        // Dependency injection: instantiate service implementations
+        DiskPacker packer = new GreedyDiskPacker();
+        RomSplitter splitter = new Ucon64Driver(config.ucon64Path);
+        FloppyImageWriter writer = new MtoolsDriver(config.mtoolsPath);
+        RomProcessor processor = new RomProcessor(packer, splitter, writer);
 
-        // Counters must be effectively final for lambda capture
-        // AtomicInteger enables mutation within forEach while maintaining thread-safety
-        final AtomicInteger successCount = new AtomicInteger(0);
-        final AtomicInteger failCount = new AtomicInteger(0);
         Path failuresLog = Paths.get(config.outputDir, "failures.txt");
 
-        /*
-         * Recursive directory traversal with lazy evaluation.
-         *
-         * Files.walk() streams one path at a time → constant memory usage regardless
-         * of directory tree depth → avoids OOM for large ROM libraries (10k+ files).
-         *
-         * Sequential forEach (not parallel stream) required: ucon64 and mtools are
-         * I/O bound → parallel execution causes file system contention → degrades
-         * performance and risks file corruption from concurrent writes.
-         */
+        // Fixed thread pool: one thread per CPU core (no context switching overhead)
+        int coreCount = Runtime.getRuntime().availableProcessors();
+        ExecutorService executor = new ThreadPoolExecutor(
+            coreCount,              // Core pool size: one thread per CPU core
+            coreCount,              // Max pool size: fixed (no elasticity needed)
+            0L,                     // Keep-alive: 0 (threads never time out)
+            TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue<>(2 * coreCount),  // Bounded queue: limits memory for queued tasks
+            new ThreadPoolExecutor.CallerRunsPolicy()  // Overflow policy: main thread provides backpressure
+        );
+
+        // AtomicInteger for thread-safe counters (multiple workers increment concurrently)
+        final AtomicInteger successCount = new AtomicInteger(0);
+        final AtomicInteger failCount = new AtomicInteger(0);
+        
+        ConversionObserver observer = new ConversionObserver() {
+            @Override
+            public void onSuccess(Path rom, int diskCount) {
+                successCount.incrementAndGet();  // Thread-safe increment
+            }
+
+            @Override
+            public void onFailure(Path rom, Exception e) {
+                failCount.incrementAndGet();  // Thread-safe increment
+                logFailure(failuresLog, inputRoot.relativize(rom).toString(), e);
+                System.err.println("FAILED: " + inputRoot.relativize(rom) + " - " + e.getMessage());
+            }
+        };
+
+        // Shutdown hook for graceful SIGINT handling
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (!executor.isShutdown()) {
+                System.err.println("Interrupt received, shutting down gracefully...");
+                executor.shutdown();
+                try {
+                    if (!executor.awaitTermination(5, TimeUnit.MINUTES)) {
+                        executor.shutdownNow();
+                    }
+                } catch (InterruptedException e) {
+                    executor.shutdownNow();
+                }
+            }
+        }));
+
         try (Stream<Path> stream = Files.walk(inputRoot)) {
             stream.filter(path -> {
                       try {
                           return Files.isRegularFile(path);
                       } catch (UncheckedIOException e) {
                           // File attributes unreadable (broken symlink, permission denied on file)
-                          // Skip this file, continue batch with remaining files
                           System.err.println("WARNING: Cannot access " + inputRoot.relativize(path) + " - skipping");
                           return false;
                       }
                   })
                   .filter(path -> path.toString().toLowerCase().endsWith(".sfc"))
                   .forEach(romPath -> {
-                      try {
-                          /*
-                           * Path relativization mirrors source structure in output.
-                           *
-                           * inputRoot.relativize(romPath.getParent()) calculates
-                           * subdirectory path from input root. For root-level ROMs,
-                           * returns empty path → outputRoot.resolve(emptyPath) returns
-                           * outputRoot unchanged → root-level ROMs correctly output
-                           * to base directory without intermediate nesting.
-                           */
-                          Path relativePath = inputRoot.relativize(romPath.getParent());
-                          Path targetBaseDir = outputRoot.resolve(relativePath);
+                      executor.submit(() -> {
+                          try {
+                              // UUID suffix creates thread-unique workspace (prevents ucon64 .1/.2/.3 collisions)
+                              String uniqueSuffix = UUID.randomUUID().toString();
+                              Path relativePath = inputRoot.relativize(romPath.getParent());
+                              Path targetBaseDir = outputRoot.resolve(relativePath);
+                              Files.createDirectories(targetBaseDir);
 
-                          // Files.createDirectories() is idempotent (safe for repeated calls)
-                          Files.createDirectories(targetBaseDir);
-
-                          processor.processRom(
-                                  romPath.toFile(),
-                                  targetBaseDir,
-                                  ucon64,
-                                  mtools,
-                                  config.format
-                          );
-                          successCount.incrementAndGet();
-                      } catch (Exception e) {
-                          /*
-                           * Fail-soft per-ROM error handling.
-                           *
-                           * try-catch scoped to individual ROM: exception logged to failures.txt,
-                           * counters updated, batch continues with remaining ROMs. Prevents single
-                           * corrupted file from blocking entire library conversion.
-                           */
-                          failCount.incrementAndGet();
-                          logFailure(failuresLog, inputRoot.relativize(romPath).toString(), e);
-                          System.err.println("FAILED: " + inputRoot.relativize(romPath) + " - " + e.getMessage());
-                      }
+                              observer.onStart(romPath);
+                              int diskCount = processor.processRom(
+                                      romPath.toFile(),
+                                      targetBaseDir,
+                                      uniqueSuffix,
+                                      config.format
+                              );
+                              observer.onSuccess(romPath, diskCount);
+                          } catch (Exception e) {
+                              // Catch all exceptions to prevent worker thread death (batch continues)
+                              observer.onFailure(romPath, e);
+                          }
+                          return null;
+                      });
                   });
         } catch (UncheckedIOException e) {
             /*
@@ -212,7 +242,6 @@ public class App implements Callable<Integer> {
              * (e.g., permission denied on subdirectory prevents listing contents).
              * Successfully processed ROMs counted, error logged with specific path from exception.
              * Fail-soft: partial batch completion better than aborting already-completed work.
-             * Note: File-level access errors (broken symlinks) caught in filter lambda above.
              */
             System.err.println("WARNING: Directory traversal interrupted - " + e.getCause().getMessage());
             System.err.println("Batch incomplete: " + successCount.get() + " successful, " +
@@ -227,6 +256,17 @@ public class App implements Callable<Integer> {
              */
             System.err.println("ERROR: Cannot traverse input directory: " + e.getMessage());
             return;
+        } finally {
+            // Standard two-phase shutdown: graceful (5 min) then forceful
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(5, TimeUnit.MINUTES)) {
+                    executor.shutdownNow();  // Interrupt in-flight tasks if timeout exceeded
+                }
+            } catch (InterruptedException e) {
+                executor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
         }
 
         System.out.println("\nBatch complete: " + successCount.get() + " successful, " +
@@ -264,16 +304,18 @@ public class App implements Callable<Integer> {
 
         validateExternalTools(config);
 
-        Ucon64Driver ucon64 = new Ucon64Driver(config.ucon64Path);
-        MtoolsDriver mtools = new MtoolsDriver(config.mtoolsPath);
-        RomProcessor processor = new RomProcessor();
+        // Dependency injection: instantiate service implementations
+        DiskPacker packer = new GreedyDiskPacker();
+        RomSplitter splitter = new Ucon64Driver(config.ucon64Path);
+        FloppyImageWriter writer = new MtoolsDriver(config.mtoolsPath);
+        RomProcessor processor = new RomProcessor(packer, splitter, writer);
 
         // Process ROM with provided outputBase (enables test isolation)
+        // Single file processing uses static suffix (no concurrent workspace collisions)
         processor.processRom(
                 inputPath.toFile(),
                 outputBase,
-                ucon64,
-                mtools,
+                "single",
                 config.format
         );
 
