@@ -42,7 +42,7 @@ class Ucon64DriverSpacesTest {
 
         // Split the ROM
         Ucon64Driver driver = new Ucon64Driver(ucon64File.getAbsolutePath());
-        List<File> parts = driver.splitRom(romFile, splitDir, CopierFormat.FIG);
+        List<File> parts = driver.split(romFile, splitDir, CopierFormat.FIG);
 
         // Verify parts were created
         assertFalse(parts.isEmpty(), "Should have created split parts");

@@ -42,7 +42,7 @@ class Ucon64DriverTest {
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> driver.splitRom(nonExistentFile, tempDir, CopierFormat.FIG)
+                () -> driver.split(nonExistentFile, tempDir, CopierFormat.FIG)
         );
 
         assertTrue(exception.getMessage().contains("ROM file does not exist"));
@@ -66,7 +66,7 @@ class Ucon64DriverTest {
         // This will throw ProcessFailureException if ucon64 is not installed,
         // which is acceptable for a unit test environment
         try {
-            List<File> parts = driver.splitRom(romFile.toFile(), tempDir, CopierFormat.FIG);
+            List<File> parts = driver.split(romFile.toFile(), tempDir, CopierFormat.FIG);
             // If ucon64 is available and the file is valid, parts should be returned
             assertNotNull(parts);
         } catch (ExternalProcessDriver.ProcessFailureException e) {
@@ -103,7 +103,7 @@ class Ucon64DriverTest {
             }
         };
 
-        List<File> parts = driver.splitRom(romFile.toFile(), workDir, CopierFormat.FIG);
+        List<File> parts = driver.split(romFile.toFile(), workDir, CopierFormat.FIG);
 
         assertEquals(2, parts.size());
         assertTrue(parts.stream().noneMatch(f -> f.getName().equals("game.sfc")));
@@ -136,7 +136,7 @@ class Ucon64DriverTest {
             }
         };
 
-        List<File> parts = driver.splitRom(romFile.toFile(), workDir, CopierFormat.GD3);
+        List<File> parts = driver.split(romFile.toFile(), workDir, CopierFormat.GD3);
 
         assertEquals(2, parts.size());
         assertEquals("SF32CHRA.078", parts.get(0).getName());
@@ -206,7 +206,7 @@ class Ucon64DriverTest {
             }
         };
 
-        List<File> parts = driver.splitRom(romFile.toFile(), workDir, CopierFormat.FIG);
+        List<File> parts = driver.split(romFile.toFile(), workDir, CopierFormat.FIG);
 
         assertEquals(2, parts.size());
         assertEquals("largegame.1", parts.get(0).getName());
@@ -242,7 +242,7 @@ class Ucon64DriverTest {
 
         ExternalProcessDriver.ProcessFailureException exception = assertThrows(
                 ExternalProcessDriver.ProcessFailureException.class,
-                () -> driver.splitRom(romFile.toFile(), workDir, CopierFormat.FIG)
+                () -> driver.split(romFile.toFile(), workDir, CopierFormat.FIG)
         );
 
         assertTrue(exception.getMessage().contains("disk full"));
