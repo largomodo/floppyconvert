@@ -5,6 +5,8 @@ import com.largomodo.floppyconvert.core.domain.DiskPacker;
 import com.largomodo.floppyconvert.core.domain.RomPartMetadata;
 import com.largomodo.floppyconvert.service.FloppyImageWriter;
 import com.largomodo.floppyconvert.service.RomSplitter;
+import com.largomodo.floppyconvert.core.DiskTemplateFactory;
+import com.largomodo.floppyconvert.core.RomPartNormalizer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,6 +38,8 @@ class RomProcessorTest {
     private DiskPacker mockPacker;
     private RomSplitter mockSplitter;
     private FloppyImageWriter mockWriter;
+    private DiskTemplateFactory mockTemplateFactory;
+    private RomPartNormalizer normalizer;  // Real instance (stateless utility)
     private RomProcessor processor;
 
     @TempDir
@@ -46,31 +50,49 @@ class RomProcessorTest {
         mockPacker = mock(DiskPacker.class);
         mockSplitter = mock(RomSplitter.class);
         mockWriter = mock(FloppyImageWriter.class);
-        processor = new RomProcessor(mockPacker, mockSplitter, mockWriter);
+        mockTemplateFactory = mock(DiskTemplateFactory.class);
+        normalizer = new RomPartNormalizer();  // Use real instance
+        processor = new RomProcessor(mockPacker, mockSplitter, mockWriter, mockTemplateFactory, normalizer);
     }
 
     @Test
     void testConstructorRejectsNullPacker() {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
-            new RomProcessor(null, mockSplitter, mockWriter)
+            new RomProcessor(null, mockSplitter, mockWriter, mockTemplateFactory, normalizer)
         );
-        assertEquals("DiskPacker must not be null", ex.getMessage());
+        assertEquals("All dependencies must not be null", ex.getMessage());
     }
 
     @Test
     void testConstructorRejectsNullSplitter() {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
-            new RomProcessor(mockPacker, null, mockWriter)
+            new RomProcessor(mockPacker, null, mockWriter, mockTemplateFactory, normalizer)
         );
-        assertEquals("RomSplitter must not be null", ex.getMessage());
+        assertEquals("All dependencies must not be null", ex.getMessage());
     }
 
     @Test
     void testConstructorRejectsNullWriter() {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
-            new RomProcessor(mockPacker, mockSplitter, null)
+            new RomProcessor(mockPacker, mockSplitter, null, mockTemplateFactory, normalizer)
         );
-        assertEquals("FloppyImageWriter must not be null", ex.getMessage());
+        assertEquals("All dependencies must not be null", ex.getMessage());
+    }
+
+    @Test
+    void testConstructorRejectsNullTemplateFactory() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+            new RomProcessor(mockPacker, mockSplitter, mockWriter, null, normalizer)
+        );
+        assertEquals("All dependencies must not be null", ex.getMessage());
+    }
+
+    @Test
+    void testConstructorRejectsNullNormalizer() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+            new RomProcessor(mockPacker, mockSplitter, mockWriter, mockTemplateFactory, null)
+        );
+        assertEquals("All dependencies must not be null", ex.getMessage());
     }
 
     @Test
@@ -92,15 +114,18 @@ class RomProcessorTest {
         when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.FIG)))
             .thenReturn(Arrays.asList(part1, part2));
 
-        // Mock packer to return single disk layout
-        DiskLayout mockLayout = new DiskLayout(
-            Arrays.asList(
-                new RomPartMetadata(part1.toPath(), part1.length(), "TESTGAME.1"),
-                new RomPartMetadata(part2.toPath(), part2.length(), "TESTGAME.2")
-            ),
-            FloppyType.FLOPPY_144M
-        );
-        when(mockPacker.pack(anyList())).thenReturn(Arrays.asList(mockLayout));
+        // Mock templateFactory to create actual .img files
+        doAnswer(invocation -> {
+            Path targetPath = invocation.getArgument(1);
+            Files.write(targetPath, new byte[]{0x00});  // Create empty file
+            return null;
+        }).when(mockTemplateFactory).createBlankDisk(any(FloppyType.class), any(Path.class));
+
+        // Mock packer to return single disk layout (normalizer will run in real code)
+        when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
+            List<RomPartMetadata> metadata = invocation.getArgument(0);
+            return Arrays.asList(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
+        });
 
         // Execute
         int diskCount = processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG);
@@ -108,11 +133,14 @@ class RomProcessorTest {
         // Verify splitter was called
         verify(mockSplitter).split(eq(romFile.toFile()), any(Path.class), eq(CopierFormat.FIG));
 
-        // Verify packer was called with correct metadata
+        // Verify packer was called with correct metadata (after normalization)
         ArgumentCaptor<List<RomPartMetadata>> packerArg = ArgumentCaptor.forClass(List.class);
         verify(mockPacker).pack(packerArg.capture());
         List<RomPartMetadata> capturedMetadata = packerArg.getValue();
         assertEquals(2, capturedMetadata.size());
+
+        // Verify templateFactory was called
+        verify(mockTemplateFactory).createBlankDisk(eq(FloppyType.FLOPPY_144M), any(Path.class));
 
         // Verify writer was called
         verify(mockWriter).write(any(File.class), anyList(), anyMap());
@@ -138,18 +166,22 @@ class RomProcessorTest {
         when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.SWC)))
             .thenReturn(Arrays.asList(part1));
 
-        // Mock packer to return THREE disk layouts
-        DiskLayout layout1 = new DiskLayout(
-            Arrays.asList(new RomPartMetadata(part1.toPath(), part1.length(), "MULTIDIS.1")),
-            FloppyType.FLOPPY_720K);
-        DiskLayout layout2 = new DiskLayout(
-            Arrays.asList(new RomPartMetadata(part1.toPath(), part1.length(), "MULTIDIS.2")),
-            FloppyType.FLOPPY_720K);
-        DiskLayout layout3 = new DiskLayout(
-            Arrays.asList(new RomPartMetadata(part1.toPath(), part1.length(), "MULTIDIS.3")),
-            FloppyType.FLOPPY_720K);
+        // Mock templateFactory to create actual .img files
+        doAnswer(invocation -> {
+            Path targetPath = invocation.getArgument(1);
+            Files.write(targetPath, new byte[]{0x00});  // Create empty file
+            return null;
+        }).when(mockTemplateFactory).createBlankDisk(any(FloppyType.class), any(Path.class));
 
-        when(mockPacker.pack(anyList())).thenReturn(Arrays.asList(layout1, layout2, layout3));
+        // Mock packer to return THREE disk layouts (normalizer will run in real code)
+        when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
+            List<RomPartMetadata> metadata = invocation.getArgument(0);
+            return Arrays.asList(
+                new DiskLayout(metadata, FloppyType.FLOPPY_720K),
+                new DiskLayout(metadata, FloppyType.FLOPPY_720K),
+                new DiskLayout(metadata, FloppyType.FLOPPY_720K)
+            );
+        });
 
         // Execute
         int diskCount = processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.SWC);
@@ -207,7 +239,7 @@ class RomProcessorTest {
         when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.GD3)))
             .thenReturn(Arrays.asList(part1));
 
-        // Mock packer to throw exception
+        // Mock packer to throw exception (normalizer will run in real code)
         when(mockPacker.pack(anyList())).thenThrow(new IllegalArgumentException("Part too large"));
 
         // Execute and expect exception
@@ -240,12 +272,18 @@ class RomProcessorTest {
         when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.FIG)))
             .thenReturn(Arrays.asList(part1));
 
-        // Mock packer to return layout
-        DiskLayout mockLayout = new DiskLayout(
-            Arrays.asList(new RomPartMetadata(part1.toPath(), part1.length(), "WRITEFAI.1")),
-            FloppyType.FLOPPY_144M
-        );
-        when(mockPacker.pack(anyList())).thenReturn(Arrays.asList(mockLayout));
+        // Mock templateFactory to create actual .img files
+        doAnswer(invocation -> {
+            Path targetPath = invocation.getArgument(1);
+            Files.write(targetPath, new byte[]{0x00});  // Create empty file
+            return null;
+        }).when(mockTemplateFactory).createBlankDisk(any(FloppyType.class), any(Path.class));
+
+        // Mock packer to return layout (normalizer will run in real code)
+        when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
+            List<RomPartMetadata> metadata = invocation.getArgument(0);
+            return Arrays.asList(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
+        });
 
         // Mock writer to throw exception
         doThrow(new IOException("Disk full")).when(mockWriter)
@@ -302,10 +340,18 @@ class RomProcessorTest {
         when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.SWC)))
             .thenReturn(Arrays.asList(part1));
 
-        DiskLayout layout = new DiskLayout(
-            Arrays.asList(new RomPartMetadata(part1.toPath(), part1.length(), "SINGLDI.1")),
-            FloppyType.FLOPPY_144M);
-        when(mockPacker.pack(anyList())).thenReturn(Arrays.asList(layout));
+        // Mock templateFactory to create actual .img files
+        doAnswer(invocation -> {
+            Path targetPath = invocation.getArgument(1);
+            Files.write(targetPath, new byte[]{0x00});  // Create empty file
+            return null;
+        }).when(mockTemplateFactory).createBlankDisk(any(FloppyType.class), any(Path.class));
+
+        // Mock packer to return layout (normalizer will run in real code)
+        when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
+            List<RomPartMetadata> metadata = invocation.getArgument(0);
+            return Arrays.asList(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
+        });
 
         // Execute
         processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.SWC);

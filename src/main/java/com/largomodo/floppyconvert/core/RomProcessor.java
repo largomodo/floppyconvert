@@ -2,7 +2,6 @@ package com.largomodo.floppyconvert.core;
 
 import com.largomodo.floppyconvert.service.FloppyImageWriter;
 import com.largomodo.floppyconvert.service.RomSplitter;
-import com.largomodo.floppyconvert.util.DosNameUtil;
 import com.largomodo.floppyconvert.core.FloppyType;
 import com.largomodo.floppyconvert.core.domain.DiskLayout;
 import com.largomodo.floppyconvert.core.domain.DiskPacker;
@@ -11,11 +10,8 @@ import com.largomodo.floppyconvert.core.workspace.ConversionWorkspace;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -43,6 +39,8 @@ public class RomProcessor {
     private final DiskPacker packer;
     private final RomSplitter splitter;
     private final FloppyImageWriter writer;
+    private final DiskTemplateFactory templateFactory;
+    private final RomPartNormalizer normalizer;
 
     /**
      * Construct RomProcessor with required dependencies.
@@ -53,21 +51,21 @@ public class RomProcessor {
      * @param packer   Disk packing strategy (e.g., GreedyDiskPacker)
      * @param splitter ROM splitting service (e.g., Ucon64Driver)
      * @param writer   Floppy image writer (e.g., MtoolsDriver)
+     * @param templateFactory Floppy disk template provider (mockable for testing)
+     * @param normalizer ROM part filename normalizer (stateless utility)
      * @throws IllegalArgumentException if any dependency is null
      */
-    public RomProcessor(DiskPacker packer, RomSplitter splitter, FloppyImageWriter writer) {
-        if (packer == null) {
-            throw new IllegalArgumentException("DiskPacker must not be null");
-        }
-        if (splitter == null) {
-            throw new IllegalArgumentException("RomSplitter must not be null");
-        }
-        if (writer == null) {
-            throw new IllegalArgumentException("FloppyImageWriter must not be null");
+    public RomProcessor(DiskPacker packer, RomSplitter splitter, FloppyImageWriter writer,
+                        DiskTemplateFactory templateFactory, RomPartNormalizer normalizer) {
+        if (packer == null || splitter == null || writer == null ||
+            templateFactory == null || normalizer == null) {
+            throw new IllegalArgumentException("All dependencies must not be null");
         }
         this.packer = packer;
         this.splitter = splitter;
         this.writer = writer;
+        this.templateFactory = templateFactory;
+        this.normalizer = normalizer;
     }
 
     /**
@@ -100,7 +98,7 @@ public class RomProcessor {
         }
 
         // Sanitize baseName for use in disk image filenames and directory name
-        String sanitizedBaseName = sanitizeForMcopy(baseName);
+        String sanitizedBaseName = normalizer.sanitizeName(baseName);
         if (sanitizedBaseName.isEmpty()) {
             throw new IOException("Sanitized base name is empty for ROM file: " +
                                  romFile.getName() + " (original: " + baseName + ")");
@@ -158,32 +156,8 @@ public class RomProcessor {
                 ws.track(part.toPath());
             }
 
-            // Sanitize filenames for mcopy compatibility
-            List<File> sanitizedParts = new java.util.ArrayList<>();
-            for (File part : parts) {
-                String sanitizedName = sanitizeForMcopy(part.getName());
-                Path sanitizedPath = gameOutputDir.resolve(sanitizedName);
-                Files.move(part.toPath(), sanitizedPath, StandardCopyOption.REPLACE_EXISTING);
-
-                // Artifact list references must stay synchronized with filesystem state
-                // Rename changed the path - update tracking to reflect new location
-                ws.markAsOutput(part.toPath());
-                ws.track(sanitizedPath);
-
-                sanitizedParts.add(sanitizedPath.toFile());
-            }
-            parts = sanitizedParts;
-
-            // Build metadata for disk packing
-            List<RomPartMetadata> partMetadata = new java.util.ArrayList<>();
-            for (File part : parts) {
-                String dosName = DosNameUtil.sanitize(part.getName());
-                partMetadata.add(new RomPartMetadata(
-                    part.toPath(),
-                    part.length(),
-                    dosName
-                ));
-            }
+            // Sanitize filenames and generate metadata for disk packing
+            List<RomPartMetadata> partMetadata = normalizer.normalize(parts, ws);
 
             // Pack parts onto disks by actual size (not fixed count)
             List<DiskLayout> diskLayouts = packer.pack(partMetadata);
@@ -202,23 +176,8 @@ public class RomProcessor {
 
                 File targetImage = gameOutputDir.resolve(diskName).toFile();
 
-                // Load bundled FAT12 template from JAR classpath
-                // Per-disk stream allocation (not shared) for thread-safety: InputStream is stateful,
-                // shared instance would cause race conditions between concurrent processRom calls.
-                // Performance impact negligible - disk creation is I/O-bound (mcopy dominates).
-                //
-                // Resource path is absolute classpath reference (leading slash required).
-                // Template bundled at build time via maven-resources-plugin (see pom.xml).
-                //
-                // Null check before Files.copy: verify resource exists BEFORE creating target file.
-                try (InputStream templateStream = getClass().getResourceAsStream(layout.floppyType().getResourcePath())) {
-                    if (templateStream == null) {
-                        throw new IOException("Internal resource " + layout.floppyType().getResourcePath() + " not found. " +
-                                "Ensure application is built correctly.");
-                    }
-                    Files.copy(templateStream, targetImage.toPath(),
-                            StandardCopyOption.REPLACE_EXISTING);
-                }
+                // Create blank FAT12 floppy disk image from template
+                templateFactory.createBlankDisk(layout.floppyType(), targetImage.toPath());
 
                 // Track .img file for cleanup in case subsequent operations fail
                 ws.track(targetImage.toPath());
@@ -258,34 +217,12 @@ public class RomProcessor {
                 diskNumber++;
             }
 
-            // Move .img files from workspace to final game directory
-            // Last-writer-wins acceptable for duplicate base names
+            // Promote disk images from workspace to final output directory
             Path finalGameDir = outputBaseDir.resolve(baseName);
             Files.createDirectories(finalGameDir);
 
             for (Path imgFile : createdImages) {
-                Path targetPath = finalGameDir.resolve(imgFile.getFileName());
-                
-                // Check if file exists and log warning before overwriting
-                if (Files.exists(targetPath)) {
-                    System.err.println("WARNING: Overwriting existing file: " + targetPath);
-                }
-                
-                try {
-                    Files.move(imgFile, targetPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-                } catch (AtomicMoveNotSupportedException e) {
-                    // Fallback to copy-and-delete for cross-filesystem moves
-                    Files.copy(imgFile, targetPath, StandardCopyOption.REPLACE_EXISTING);
-                    try {
-                        Files.delete(imgFile);
-                    } catch (IOException deleteEx) {
-                        // Best-effort deletion failed - workspace cleanup will retry
-                        System.err.println("Warning: Could not delete workspace copy after move: " + imgFile + ": " + deleteEx.getMessage());
-                    }
-                }
-                
-                // Mark as output to prevent workspace cleanup from deleting
-                ws.markAsOutput(imgFile);
+                ws.promoteToFinal(imgFile, finalGameDir);
             }
 
             System.out.println("Success: " + romFile.getName() +
@@ -295,45 +232,4 @@ public class RomProcessor {
         }
     }
 
-    /**
-     * Sanitize filename for mcopy compatibility by removing problematic characters.
-     * <p>
-     * mcopy's argument parser treats certain characters as special, causing path truncation.
-     * This method creates a safe temporary filename that mcopy can process correctly.
-     * The sanitized name is only used for the source path passed to mcopy; the DOS name
-     * inside the floppy image is controlled separately via DosNameUtil.
-     * <p>
-     * Sanitized characters:
-     * <ul>
-     *   <li>{@code #} - Comment/hash character</li>
-     *   <li>{@code [, ]} - Bracket characters</li>
-     *   <li>{@code (, )} - Parenthesis characters</li>
-     *   <li>{@code &} - Ampersand (shell background operator)</li>
-     *   <li>{@code $} - Dollar sign (shell variable expansion)</li>
-     *   <li>{@code !} - Exclamation mark (shell history expansion)</li>
-     *   <li>Space - Argument separator</li>
-     * </ul>
-     *
-     * @param originalName Original filename (e.g., "game[#1].sfc.1" or "Ren & Stimpy$! (USA).sfc")
-     * @return Sanitized filename safe for mcopy (e.g., "game_1.sfc.1" or "Ren___Stimpy___USA_.sfc")
-     */
-    private String sanitizeForMcopy(String originalName) {
-        // Replace problematic characters that mcopy treats as special
-        // These include shell-sensitive characters that cause truncation or parsing issues
-        return originalName
-                .replace("#", "_")
-                .replace("[", "_")
-                .replace("]", "_")
-                .replace("(", "_")
-                .replace(")", "_")
-                .replace("&", "_")
-                .replace("$", "_")
-                .replace("!", "_")
-                .replace("~", "_")
-                .replace("'", "_")
-                .replace(",", "_")
-                .replace("+", "_")
-                .replace("'", "_")
-                .replace(" ", "_");
-    }
 }

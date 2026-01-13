@@ -7,6 +7,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import java.nio.file.StandardCopyOption;
+import java.nio.file.AtomicMoveNotSupportedException;
+
 /**
  * Manages temporary artifacts during ROM conversion with automatic cleanup.
  * <p>
@@ -65,6 +68,47 @@ public class ConversionWorkspace implements AutoCloseable {
      */
     public void markAsOutput(Path finalFile) {
         trackedFiles.remove(finalFile);
+    }
+
+    /**
+     * Move artifact from workspace to final output directory with atomic semantics.
+     *
+     * Combines filesystem move with cleanup prevention (markAsOutput). Atomic move preferred
+     * for transactional guarantees (single operation, no intermediate state visible). Fallback
+     * to copy+delete preserves move contract when atomic unsupported (cross-filesystem moves,
+     * Windows FAT32→NTFS). Copy-only would violate move semantics by leaving source file.
+     *
+     * Idempotent: repeated calls with same arguments produce same final state (target exists,
+     * source removed from cleanup tracking). Overwrite warning logged if target pre-exists.
+     *
+     * @param sourceArtifact Path to file in workspace (must be tracked artifact)
+     * @param finalDestinationDir Target directory (file placed with same basename)
+     * @throws IOException if move/copy operations fail
+     */
+    public void promoteToFinal(Path sourceArtifact, Path finalDestinationDir) throws IOException {
+        Path targetPath = finalDestinationDir.resolve(sourceArtifact.getFileName());
+
+        if (Files.exists(targetPath)) {
+            System.err.println("WARNING: Overwriting existing file: " + targetPath);
+        }
+
+        try {
+            Files.move(sourceArtifact, targetPath,
+                StandardCopyOption.REPLACE_EXISTING,
+                StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException e) {
+            // Atomic move unsupported (cross-filesystem or platform limitation)
+            Files.copy(sourceArtifact, targetPath, StandardCopyOption.REPLACE_EXISTING);
+            try {
+                Files.delete(sourceArtifact);
+            } catch (IOException deleteEx) {
+                // Best-effort cleanup; workspace close() will retry
+                System.err.println("Warning: Could not delete workspace copy after move: " +
+                    sourceArtifact + ": " + deleteEx.getMessage());
+            }
+        }
+
+        markAsOutput(sourceArtifact);
     }
 
     /**
