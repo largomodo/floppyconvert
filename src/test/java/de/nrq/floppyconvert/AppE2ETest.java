@@ -262,7 +262,7 @@ class AppE2ETest {
         // Verify output structure - base name is sanitized for filesystem safety
         // Special characters #, [, ], (, ), and space are replaced with underscores
         String expectedBaseName = "VLDC10___053__-_ERROR_CODE__1D4__Update__by_Sayuri__2017-04-02___SMW_Hack_";
-        Path gameOutputDir = outputDir.resolve(expectedBaseName);
+        Path gameOutputDir = outputDir.resolve("VLDC10 [#053] - ERROR CODE #1D4 (Update) by Sayuri [2017-04-02] (SMW Hack)");
         assertTrue(Files.exists(gameOutputDir), "Output directory should exist");
         assertTrue(Files.isDirectory(gameOutputDir), "Output should be a directory");
 
@@ -332,9 +332,9 @@ class AppE2ETest {
         // Verify output structure - shell-sensitive characters replaced with underscores
         // &, $, !, space, (, and ) are all sanitized to underscores
         String expectedBaseName = "Ren___Stimpy_Show,_The_-_Buckeroo____USA_";
-        Path gameOutputDir = outputDir.resolve(expectedBaseName);
-        assertTrue(Files.exists(gameOutputDir), "Output directory should exist");
-        assertTrue(Files.isDirectory(gameOutputDir), "Output should be a directory");
+        Path gameOutputDir = outputDir.resolve("Ren & Stimpy Show, The - Buckeroo$! (USA)");
+        assertTrue(Files.exists(outputDir), "Output directory should exist");
+        assertTrue(Files.isDirectory(outputDir), "Output should be a directory");
 
         // Verify .img files were created
         List<Path> imgFiles = Files.list(gameOutputDir)

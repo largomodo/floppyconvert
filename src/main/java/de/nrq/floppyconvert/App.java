@@ -9,6 +9,9 @@ import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
 import de.nrq.floppyconvert.core.ConversionObserver;
 import de.nrq.floppyconvert.core.CopierFormat;
+import de.nrq.floppyconvert.core.DiskTemplateFactory;
+import de.nrq.floppyconvert.core.ResourceDiskTemplateFactory;
+import de.nrq.floppyconvert.core.RomPartNormalizer;
 import de.nrq.floppyconvert.core.RomProcessor;
 import de.nrq.floppyconvert.core.domain.DiskPacker;
 import de.nrq.floppyconvert.core.domain.GreedyDiskPacker;
@@ -151,7 +154,9 @@ public class App implements Callable<Integer> {
         DiskPacker packer = new GreedyDiskPacker();
         RomSplitter splitter = new Ucon64Driver(config.ucon64Path);
         FloppyImageWriter writer = new MtoolsDriver(config.mtoolsPath);
-        RomProcessor processor = new RomProcessor(packer, splitter, writer);
+        DiskTemplateFactory templateFactory = new ResourceDiskTemplateFactory();
+        RomPartNormalizer normalizer = new RomPartNormalizer();
+        RomProcessor processor = new RomProcessor(packer, splitter, writer, templateFactory, normalizer);
 
         Path failuresLog = Paths.get(config.outputDir, "failures.txt");
 
@@ -308,7 +313,9 @@ public class App implements Callable<Integer> {
         DiskPacker packer = new GreedyDiskPacker();
         RomSplitter splitter = new Ucon64Driver(config.ucon64Path);
         FloppyImageWriter writer = new MtoolsDriver(config.mtoolsPath);
-        RomProcessor processor = new RomProcessor(packer, splitter, writer);
+        DiskTemplateFactory templateFactory = new ResourceDiskTemplateFactory();
+        RomPartNormalizer normalizer = new RomPartNormalizer();
+        RomProcessor processor = new RomProcessor(packer, splitter, writer, templateFactory, normalizer);
 
         // Process ROM with provided outputBase (enables test isolation)
         // Single file processing uses static suffix (no concurrent workspace collisions)
