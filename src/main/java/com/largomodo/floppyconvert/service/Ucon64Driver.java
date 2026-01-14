@@ -37,8 +37,8 @@ public class Ucon64Driver extends ExternalProcessDriver implements RomSplitter {
      * ROM remains at original location (inputRom.getAbsolutePath()), split parts go directly to final destination.
      *
      * @param inputRom Source ROM file (.sfc format expected)
-     * @param workDir Final output directory for split parts (ucon64 working directory)
-     * @param format  Backup unit format (determines ucon64 flag and output naming)
+     * @param workDir  Final output directory for split parts (ucon64 working directory)
+     * @param format   Backup unit format (determines ucon64 flag and output naming)
      * @return Sorted list of part files (ordered by numeric extension: .1, .2, .3)
      * @throws IOException if ucon64 fails or no parts generated
      */
@@ -109,12 +109,12 @@ public class Ucon64Driver extends ExternalProcessDriver implements RomSplitter {
         // If split parts were created, delete intermediate file (.fig/.swc/.ufo/.gd3)
         // Small ROMs (≤4 Mbit) don't get split, so intermediate file IS the part - don't delete
         // Best-effort deletion: if locked, warn but continue (Risk mitigation: "Windows file locking prevents deletion")
-        if (!parts.isEmpty() && parts.get(0).toPath().equals(convertedFile) == false) {
+        if (!parts.isEmpty() && !parts.get(0).toPath().equals(convertedFile)) {
             try {
                 Files.deleteIfExists(convertedFile);
             } catch (IOException e) {
                 System.err.println("Warning: Could not delete intermediate file " +
-                                  convertedFile + ": " + e.getMessage());
+                        convertedFile + ": " + e.getMessage());
             }
         }
 
@@ -130,7 +130,7 @@ public class Ucon64Driver extends ExternalProcessDriver implements RomSplitter {
      * retry with 12 Mbit split (fits ROMs up to 144 Mbit).
      *
      * @param convertedFile Path to converted ROM file
-     * @param workDir     Output directory for split parts
+     * @param workDir       Output directory for split parts
      * @param format        Backup unit format (for identifying split part files during cleanup)
      * @throws IOException if split fails with non-recoverable error
      */
@@ -175,7 +175,7 @@ public class Ucon64Driver extends ExternalProcessDriver implements RomSplitter {
      * Execute ucon64 split command with specified size.
      *
      * @param convertedFile Path to converted ROM file
-     * @param workDir     Output directory for split parts
+     * @param workDir       Output directory for split parts
      * @param size          Split size in Mbit (4 or 12)
      * @throws IOException if split command fails
      */

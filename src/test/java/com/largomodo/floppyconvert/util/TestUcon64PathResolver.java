@@ -8,16 +8,16 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Test utility for ucon64 binary path resolution.
- *
+ * <p>
  * Implements two-stage resolution strategy: system PATH first (respects user's
  * installed version), then classpath resource /ucon64 (ensures CI/isolated
  * environments work without manual setup). Returns Optional.empty() when binary
  * unavailable, allowing tests to skip gracefully via JUnit Assumptions.
- *
+ * <p>
  * PATH-first strategy chosen over classpath-first to respect user environment:
  * system ucon64 may have different features or versions that tests should use
  * when available.
- *
+ * <p>
  * Static utility class pattern: resolution is stateless and reusable across
  * multiple test classes (Ucon64DriverTest, AppE2ETest, future tests).
  */
@@ -25,7 +25,7 @@ public class TestUcon64PathResolver {
 
     /**
      * Resolves the path to the ucon64 binary.
-     *
+     * <p>
      * Resolution strategy:
      * 1. If ucon64 is available in PATH, returns the system path (e.g., /usr/local/bin/ucon64)
      * 2. Otherwise, attempts to locate /ucon64 in the classpath (e.g., /workspace/target/test-classes/ucon64)
@@ -38,8 +38,8 @@ public class TestUcon64PathResolver {
         if (isCommandAvailable("ucon64")) {
             try {
                 Process process = new ProcessBuilder("which", "ucon64")
-                    .redirectErrorStream(true)
-                    .start();
+                        .redirectErrorStream(true)
+                        .start();
                 // 5-second timeout (which command completes in <100ms; generous margin for slow systems)
                 boolean completed = process.waitFor(5, TimeUnit.SECONDS);
                 if (completed && process.exitValue() == 0) {
@@ -78,8 +78,8 @@ public class TestUcon64PathResolver {
     public static boolean isCommandAvailable(String command) {
         try {
             Process process = new ProcessBuilder("which", command)
-                .redirectErrorStream(true)
-                .start();
+                    .redirectErrorStream(true)
+                    .start();
             // 5-second timeout (which command completes in <100ms; generous margin for slow systems)
             boolean completed = process.waitFor(5, TimeUnit.SECONDS);
             return completed && process.exitValue() == 0;

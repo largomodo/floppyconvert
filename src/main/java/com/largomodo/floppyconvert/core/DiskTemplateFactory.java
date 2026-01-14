@@ -5,7 +5,7 @@ import java.nio.file.Path;
 
 /**
  * Factory for creating blank floppy disk images.
- *
+ * <p>
  * Abstraction enables testability (RomProcessor tests can mock without requiring JAR resources)
  * and extensibility (future implementations: network-fetched templates, dynamic generation).
  * Interface pattern follows existing RomSplitter/FloppyImageWriter abstractions.
@@ -13,7 +13,8 @@ import java.nio.file.Path;
 public interface DiskTemplateFactory {
     /**
      * Create blank floppy disk image at target path.
-     * @param type Floppy format (determines capacity and template source)
+     *
+     * @param type       Floppy format (determines capacity and template source)
      * @param targetFile Destination path for disk image
      * @throws IOException if template cannot be loaded or copied
      */

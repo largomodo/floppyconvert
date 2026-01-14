@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * Normalizes ROM part filenames for shell and mcopy compatibility.
- *
+ * <p>
  * Stateless design enables concurrent use without synchronization (parallel batch processing),
  * simpler unit testing (no state reset between tests), and matches DosNameUtil pattern.
  * All operations idempotent (repeated sanitization produces same result).
@@ -23,15 +23,15 @@ public class RomPartNormalizer {
 
     /**
      * Sanitize ROM part filenames and generate metadata for disk packing.
-     *
+     * <p>
      * Renames files on disk to remove shell-sensitive characters (prevents mcopy argument
      * parser issues), updates workspace tracking to reflect new paths, and generates
      * DOS-compliant names for floppy image injection.
-     *
+     * <p>
      * Two-stage naming: sanitizeForShell produces filesystem paths safe for external tool
      * invocation, DosNameUtil produces 8.3 names for FAT12 directory entries.
      *
-     * @param rawParts Split ROM parts from RomSplitter (may have shell-unsafe names)
+     * @param rawParts  Split ROM parts from RomSplitter (may have shell-unsafe names)
      * @param workspace Conversion workspace for tracking artifact lifecycle
      * @return Immutable list of metadata (sanitized paths, sizes, DOS names)
      * @throws IOException if file rename operations fail or ROM part has no parent directory
@@ -42,7 +42,7 @@ public class RomPartNormalizer {
 
         for (File part : rawParts) {
             String sanitizedName = sanitizeForShell(part.getName());
-            
+
             Path parentDir = part.toPath().getParent();
             if (parentDir == null) {
                 throw new IOException("ROM part file has no parent directory: " + part.toPath());
@@ -51,9 +51,9 @@ public class RomPartNormalizer {
 
             // Check for filename collision before move
             if (Files.exists(sanitizedPath) && !sanitizedPath.equals(part.toPath())) {
-                throw new IOException("Filename sanitization collision: " + part.getName() + 
-                    " would overwrite existing file " + sanitizedPath.getFileName() + 
-                    ". ROM parts have conflicting names after sanitization.");
+                throw new IOException("Filename sanitization collision: " + part.getName() +
+                        " would overwrite existing file " + sanitizedPath.getFileName() +
+                        ". ROM parts have conflicting names after sanitization.");
             }
 
             Files.move(part.toPath(), sanitizedPath, StandardCopyOption.REPLACE_EXISTING);
@@ -65,9 +65,9 @@ public class RomPartNormalizer {
             String dosName = DosNameUtil.sanitize(sanitizedName);
 
             metadata.add(new RomPartMetadata(
-                sanitizedPath,
-                Files.size(sanitizedPath),
-                dosName
+                    sanitizedPath,
+                    Files.size(sanitizedPath),
+                    dosName
             ));
         }
 
@@ -76,7 +76,7 @@ public class RomPartNormalizer {
 
     /**
      * Sanitize a single string for filesystem and shell compatibility.
-     *
+     * <p>
      * Public wrapper for sanitizeForShell, enables RomProcessor to sanitize baseName
      * for workspace directory and disk image filenames. Centralizes shell-safe
      * sanitization logic in single location (DRY principle).
@@ -90,7 +90,7 @@ public class RomPartNormalizer {
 
     /**
      * Remove shell-sensitive characters that cause mcopy argument parsing issues.
-     *
+     * <p>
      * Replacements prevent path truncation (mcopy treats brackets/parens as special) and
      * command injection risks (ampersand, dollar sign, exclamation enable shell expansion).
      * Idempotent: applying twice produces same result as applying once (prevents cascading

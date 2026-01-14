@@ -30,21 +30,24 @@ public interface ConversionObserver {
      *
      * @param rom the ROM file being processed
      */
-    default void onStart(Path rom) {}
+    default void onStart(Path rom) {
+    }
 
     /**
      * Called when ROM conversion completes successfully.
      *
-     * @param rom the ROM file that was processed
+     * @param rom       the ROM file that was processed
      * @param diskCount the number of floppy disk images created
      */
-    default void onSuccess(Path rom, int diskCount) {}
+    default void onSuccess(Path rom, int diskCount) {
+    }
 
     /**
      * Called when ROM conversion fails.
      *
      * @param rom the ROM file that failed to process
-     * @param e the exception that caused the failure
+     * @param e   the exception that caused the failure
      */
-    default void onFailure(Path rom, Exception e) {}
+    default void onFailure(Path rom, Exception e) {
+    }
 }

@@ -30,9 +30,9 @@ public class GreedyDiskPacker implements DiskPacker {
         for (RomPartMetadata part : parts) {
             if (part.sizeInBytes() > FloppyType.FLOPPY_160M.getUsableBytes()) {
                 throw new IllegalArgumentException(
-                    "ROM part exceeds maximum floppy capacity: " +
-                    part.originalPath().getFileName() + " (" + part.sizeInBytes() +
-                    " bytes > " + FloppyType.FLOPPY_160M.getUsableBytes() + " bytes)"
+                        "ROM part exceeds maximum floppy capacity: " +
+                                part.originalPath().getFileName() + " (" + part.sizeInBytes() +
+                                " bytes > " + FloppyType.FLOPPY_160M.getUsableBytes() + " bytes)"
                 );
             }
         }
@@ -55,7 +55,7 @@ public class GreedyDiskPacker implements DiskPacker {
                 // First-fit: add part if it fits, otherwise start new disk
                 // Always add first part even if oversized (caught by fail-fast above)
                 if (diskUsed + partSize <= FloppyType.FLOPPY_160M.getUsableBytes() ||
-                    currentDiskContents.isEmpty()) {
+                        currentDiskContents.isEmpty()) {
                     currentDiskContents.add(part);
                     diskUsed += partSize;
                     partIdx++;

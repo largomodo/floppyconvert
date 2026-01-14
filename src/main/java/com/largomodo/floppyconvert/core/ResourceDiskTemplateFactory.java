@@ -8,7 +8,7 @@ import java.nio.file.StandardCopyOption;
 
 /**
  * Loads floppy disk templates from JAR classpath resources.
- *
+ * <p>
  * Templates bundled at build time via maven-resources-plugin. Each createBlankDisk() call
  * opens fresh InputStream for thread-safety (shared streams would cause race conditions
  * in concurrent batch processing where multiple threads invoke simultaneously).
@@ -25,7 +25,7 @@ public class ResourceDiskTemplateFactory implements DiskTemplateFactory {
             // Null check verifies resource exists before creating target file
             if (templateStream == null) {
                 throw new IOException("Internal resource " + resourcePath +
-                    " not found. Ensure application is built correctly.");
+                        " not found. Ensure application is built correctly.");
             }
 
             Files.copy(templateStream, targetFile, StandardCopyOption.REPLACE_EXISTING);

@@ -1,14 +1,13 @@
 package com.largomodo.floppyconvert.core.workspace;
 
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import java.nio.file.StandardCopyOption;
-import java.nio.file.AtomicMoveNotSupportedException;
 
 /**
  * Manages temporary artifacts during ROM conversion with automatic cleanup.
@@ -72,16 +71,16 @@ public class ConversionWorkspace implements AutoCloseable {
 
     /**
      * Move artifact from workspace to final output directory with atomic semantics.
-     *
+     * <p>
      * Combines filesystem move with cleanup prevention (markAsOutput). Atomic move preferred
      * for transactional guarantees (single operation, no intermediate state visible). Fallback
      * to copy+delete preserves move contract when atomic unsupported (cross-filesystem moves,
      * Windows FAT32→NTFS). Copy-only would violate move semantics by leaving source file.
-     *
+     * <p>
      * Idempotent: repeated calls with same arguments produce same final state (target exists,
      * source removed from cleanup tracking). Overwrite warning logged if target pre-exists.
      *
-     * @param sourceArtifact Path to file in workspace (must be tracked artifact)
+     * @param sourceArtifact      Path to file in workspace (must be tracked artifact)
      * @param finalDestinationDir Target directory (file placed with same basename)
      * @throws IOException if move/copy operations fail
      */
@@ -94,8 +93,8 @@ public class ConversionWorkspace implements AutoCloseable {
 
         try {
             Files.move(sourceArtifact, targetPath,
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE);
+                    StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE);
         } catch (AtomicMoveNotSupportedException e) {
             // Atomic move unsupported (cross-filesystem or platform limitation)
             Files.copy(sourceArtifact, targetPath, StandardCopyOption.REPLACE_EXISTING);
@@ -104,7 +103,7 @@ public class ConversionWorkspace implements AutoCloseable {
             } catch (IOException deleteEx) {
                 // Best-effort cleanup; workspace close() will retry
                 System.err.println("Warning: Could not delete workspace copy after move: " +
-                    sourceArtifact + ": " + deleteEx.getMessage());
+                        sourceArtifact + ": " + deleteEx.getMessage());
             }
         }
 
@@ -156,13 +155,13 @@ public class ConversionWorkspace implements AutoCloseable {
 
         try (var stream = Files.walk(dir)) {
             stream.sorted(java.util.Comparator.reverseOrder())
-                  .forEach(path -> {
-                      try {
-                          Files.deleteIfExists(path);
-                      } catch (IOException e) {
-                          throw new java.io.UncheckedIOException(e);
-                      }
-                  });
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (IOException e) {
+                            throw new java.io.UncheckedIOException(e);
+                        }
+                    });
         } catch (java.io.UncheckedIOException e) {
             throw e.getCause();
         }

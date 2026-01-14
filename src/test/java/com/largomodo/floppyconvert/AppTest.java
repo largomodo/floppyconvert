@@ -1,10 +1,10 @@
 package com.largomodo.floppyconvert;
 
-import picocli.CommandLine;
-import picocli.CommandLine.ParameterException;
 import com.largomodo.floppyconvert.core.CopierFormat;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import picocli.CommandLine;
+import picocli.CommandLine.ParameterException;
 
 import java.io.File;
 import java.io.IOException;
@@ -63,8 +63,8 @@ class AppTest {
         App app = new App();
         CommandLine cmd = new CommandLine(app);
         cmd.parseArgs(testFile.getAbsolutePath(),
-                      "--ucon64-path", mockUcon64.getAbsolutePath(),
-                      "--mtools-path", mockMtools.getAbsolutePath());
+                "--ucon64-path", mockUcon64.getAbsolutePath(),
+                "--mtools-path", mockMtools.getAbsolutePath());
 
         assertNull(app.outputDir, "outputDir should be null until call() computes smart defaults");
 
@@ -75,7 +75,7 @@ class AppTest {
         }
 
         assertEquals(new File(".").getCanonicalPath(), app.outputDir.getCanonicalPath(),
-                     "File input should default outputDir to current directory");
+                "File input should default outputDir to current directory");
     }
 
     @Test
@@ -97,8 +97,8 @@ class AppTest {
         App app = new App();
         CommandLine cmd = new CommandLine(app);
         cmd.parseArgs(testDir.getAbsolutePath(),
-                      "--ucon64-path", mockUcon64.getAbsolutePath(),
-                      "--mtools-path", mockMtools.getAbsolutePath());
+                "--ucon64-path", mockUcon64.getAbsolutePath(),
+                "--mtools-path", mockMtools.getAbsolutePath());
 
         assertNull(app.outputDir, "outputDir should be null until call() computes smart defaults");
 
@@ -109,7 +109,7 @@ class AppTest {
         }
 
         assertEquals(new File(testDir, "output").getCanonicalPath(), app.outputDir.getCanonicalPath(),
-                     "Directory input should default outputDir to input/output");
+                "Directory input should default outputDir to input/output");
     }
 
     @Test
@@ -121,10 +121,10 @@ class AppTest {
         App app = new App();
         CommandLine cmd = new CommandLine(app);
         cmd.parseArgs(testFile.getAbsolutePath(),
-                      "-o", explicitOutput.getAbsolutePath());
+                "-o", explicitOutput.getAbsolutePath());
 
         assertEquals(explicitOutput.getAbsolutePath(), app.outputDir.getAbsolutePath(),
-                     "Explicit -o flag should override smart defaults");
+                "Explicit -o flag should override smart defaults");
     }
 
     @Test
@@ -136,7 +136,7 @@ class AppTest {
         CommandLine cmd = new CommandLine(app);
         cmd.setCaseInsensitiveEnumValuesAllowed(true);
         cmd.parseArgs(testFile.getAbsolutePath(),
-                      "--format", "gd3");
+                "--format", "gd3");
 
         assertEquals(CopierFormat.GD3, app.format, "Lowercase 'gd3' should parse to CopierFormat.GD3");
     }
@@ -152,6 +152,6 @@ class AppTest {
         ParameterException exception = assertThrows(ParameterException.class, app::call,
                 "Should throw ParameterException for non-existent input path");
         assertTrue(exception.getMessage().contains("Input path does not exist"),
-                   "Error message should indicate path does not exist");
+                "Error message should indicate path does not exist");
     }
 }

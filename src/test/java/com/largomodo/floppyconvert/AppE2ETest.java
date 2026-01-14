@@ -1,18 +1,15 @@
 package com.largomodo.floppyconvert;
 
-import com.largomodo.floppyconvert.util.TestUcon64PathResolver;
-
 import com.largomodo.floppyconvert.core.CopierFormat;
+import com.largomodo.floppyconvert.util.TestUcon64PathResolver;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
 
-import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,7 +23,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 /**
  * End-to-end tests for the full ROM conversion pipeline.
  * Tests all supported backup unit formats (FIG, SWC, UFO, GD3) with real ROM files.
- *
+ * <p>
  * Requires external tools: ucon64 and mtools (mcopy).
  * Tests skip gracefully when tools are unavailable.
  */
@@ -42,7 +39,7 @@ class AppE2ETest {
 
     /**
      * Verify both ucon64 and mcopy are available before running E2E tests.
-     *
+     * <p>
      * Delegates ucon64 resolution to TestUcon64PathResolver (eliminates
      * code duplication with Ucon64DriverTest). mcopy check remains local
      * (no other tests require mcopy, so no shared utility needed).
@@ -63,16 +60,16 @@ class AppE2ETest {
 
     static Stream<Arguments> formatAndRomProvider() {
         return Stream.of(
-            // Multi-part tests: Chrono Trigger (32 Mbit - produces 8 split parts)
-            Arguments.of(CopierFormat.FIG, CHRONO_TRIGGER_RESOURCE),
-            Arguments.of(CopierFormat.SWC, CHRONO_TRIGGER_RESOURCE),
-            Arguments.of(CopierFormat.UFO, CHRONO_TRIGGER_RESOURCE),
-            Arguments.of(CopierFormat.GD3, CHRONO_TRIGGER_RESOURCE),
-            // Single-file tests: Super Mario World (4 Mbit - no split, 1 file per disk)
-            Arguments.of(CopierFormat.FIG, SUPER_MARIO_WORLD_RESOURCE),
-            Arguments.of(CopierFormat.SWC, SUPER_MARIO_WORLD_RESOURCE),
-            Arguments.of(CopierFormat.UFO, SUPER_MARIO_WORLD_RESOURCE),
-            Arguments.of(CopierFormat.GD3, SUPER_MARIO_WORLD_RESOURCE)
+                // Multi-part tests: Chrono Trigger (32 Mbit - produces 8 split parts)
+                Arguments.of(CopierFormat.FIG, CHRONO_TRIGGER_RESOURCE),
+                Arguments.of(CopierFormat.SWC, CHRONO_TRIGGER_RESOURCE),
+                Arguments.of(CopierFormat.UFO, CHRONO_TRIGGER_RESOURCE),
+                Arguments.of(CopierFormat.GD3, CHRONO_TRIGGER_RESOURCE),
+                // Single-file tests: Super Mario World (4 Mbit - no split, 1 file per disk)
+                Arguments.of(CopierFormat.FIG, SUPER_MARIO_WORLD_RESOURCE),
+                Arguments.of(CopierFormat.SWC, SUPER_MARIO_WORLD_RESOURCE),
+                Arguments.of(CopierFormat.UFO, SUPER_MARIO_WORLD_RESOURCE),
+                Arguments.of(CopierFormat.GD3, SUPER_MARIO_WORLD_RESOURCE)
         );
     }
 
@@ -95,14 +92,14 @@ class AppE2ETest {
 
         // Invoke CLI via CommandLine.execute() with positional input parameter
         int exitCode = new CommandLine(new App())
-            .setCaseInsensitiveEnumValuesAllowed(true)
-            .execute(
-                inputRom.toString(),
-                "--output-dir", outputDir.toString(),
-                "--ucon64-path", ucon64Path,
-                "--mtools-path", "mcopy",
-                "--format", format.name().toLowerCase()
-            );
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(
+                        inputRom.toString(),
+                        "--output-dir", outputDir.toString(),
+                        "--ucon64-path", ucon64Path,
+                        "--mtools-path", "mcopy",
+                        "--format", format.name().toLowerCase()
+                );
 
         assertEquals(0, exitCode, "Conversion should succeed");
 
@@ -116,8 +113,8 @@ class AppE2ETest {
         // Verify .img files were created and are non-empty
         try (var imgFiles = Files.list(gameOutputDir)) {
             var images = imgFiles
-                .filter(p -> p.toString().endsWith(".img"))
-                .toList();
+                    .filter(p -> p.toString().endsWith(".img"))
+                    .toList();
 
             assertFalse(images.isEmpty(), "No .img files produced for " + format + " / " + baseName);
 
@@ -130,10 +127,10 @@ class AppE2ETest {
         // Verify cleanup: no split parts (.1, .2, .3, etc) should remain
         try (var stream = Files.list(gameOutputDir)) {
             long partFileCount = stream
-                .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
-                .count();
+                    .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
+                    .count();
             assertEquals(0, partFileCount,
-                "Split parts (.1, .2, .3) must not remain in output for " + format + " / " + baseName);
+                    "Split parts (.1, .2, .3) must not remain in output for " + format + " / " + baseName);
         }
 
         // Verify cleanup removed intermediate format files (only for large ROMs that were split)
@@ -142,13 +139,13 @@ class AppE2ETest {
         if (isLargeRom) {
             try (var files = Files.list(gameOutputDir)) {
                 long intermediateCount = files
-                    .filter(p -> p.toString().endsWith(".fig") ||
-                                 p.toString().endsWith(".swc") ||
-                                 p.toString().endsWith(".ufo") ||
-                                 p.toString().endsWith(".gd3"))
-                    .count();
+                        .filter(p -> p.toString().endsWith(".fig") ||
+                                p.toString().endsWith(".swc") ||
+                                p.toString().endsWith(".ufo") ||
+                                p.toString().endsWith(".gd3"))
+                        .count();
                 assertEquals(0, intermediateCount,
-                    "Intermediate format files must be cleaned up for large ROMs: " + format);
+                        "Intermediate format files must be cleaned up for large ROMs: " + format);
             }
         }
     }
@@ -170,14 +167,14 @@ class AppE2ETest {
 
         // Invoke CLI via CommandLine.execute() with positional input parameter (single file mode)
         int exitCode = new CommandLine(new App())
-            .setCaseInsensitiveEnumValuesAllowed(true)
-            .execute(
-                testRom.toString(),
-                "--output-dir", outputDir.toString(),
-                "--ucon64-path", ucon64Path,
-                "--mtools-path", "mcopy",
-                "--format", "fig"
-            );
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(
+                        testRom.toString(),
+                        "--output-dir", outputDir.toString(),
+                        "--ucon64-path", ucon64Path,
+                        "--mtools-path", "mcopy",
+                        "--format", "fig"
+                );
 
         assertEquals(0, exitCode, "Conversion should succeed");
 
@@ -188,35 +185,35 @@ class AppE2ETest {
 
         // Verify .img files were created
         List<Path> imgFiles = Files.list(gameOutputDir)
-            .filter(p -> p.toString().endsWith(".img"))
-            .collect(Collectors.toList());
+                .filter(p -> p.toString().endsWith(".img"))
+                .collect(Collectors.toList());
         assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
 
         assertEquals(1, imgFiles.size(), "Should produce single disk for 4Mbit ROM");
         assertTrue(imgFiles.get(0).getFileName().toString().matches(".*\\.img"),
-            "Output should be .img file");
+                "Output should be .img file");
 
         // Super Mario World is 4Mbit (512KB) - should fit on 720K disk
         long imageSize = Files.size(imgFiles.get(0));
         assertTrue(imageSize < 800_000,
-            "Should use 720K template (~737KB) for 512KB ROM, got " + imageSize + " bytes");
+                "Should use 720K template (~737KB) for 512KB ROM, got " + imageSize + " bytes");
 
         // Verify cleanup: no split parts (.1, .2, .3) should remain (small ROM doesn't split)
         try (var stream = Files.list(gameOutputDir)) {
             long partFileCount = stream
-                .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
-                .count();
+                    .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
+                    .count();
             assertEquals(0, partFileCount, "No split parts should exist for small ROM");
         }
 
         // Verify cleanup: no intermediate format files remain (converted to .img)
         try (var files = Files.list(gameOutputDir)) {
             long intermediateCount = files
-                .filter(p -> p.toString().endsWith(".fig") ||
-                             p.toString().endsWith(".swc") ||
-                             p.toString().endsWith(".ufo") ||
-                             p.toString().endsWith(".gd3"))
-                .count();
+                    .filter(p -> p.toString().endsWith(".fig") ||
+                            p.toString().endsWith(".swc") ||
+                            p.toString().endsWith(".ufo") ||
+                            p.toString().endsWith(".gd3"))
+                    .count();
             assertEquals(0, intermediateCount, "Intermediate format files should be converted to .img");
         }
     }
@@ -248,14 +245,14 @@ class AppE2ETest {
 
         // Invoke CLI - should handle special characters without truncation
         int exitCode = new CommandLine(new App())
-            .setCaseInsensitiveEnumValuesAllowed(true)
-            .execute(
-                testRom.toString(),
-                "--output-dir", outputDir.toString(),
-                "--ucon64-path", ucon64Path,
-                "--mtools-path", "mcopy",
-                "--format", "fig"
-            );
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(
+                        testRom.toString(),
+                        "--output-dir", outputDir.toString(),
+                        "--ucon64-path", ucon64Path,
+                        "--mtools-path", "mcopy",
+                        "--format", "fig"
+                );
 
         assertEquals(0, exitCode, "Conversion should succeed even with special characters in filename");
 
@@ -268,25 +265,25 @@ class AppE2ETest {
 
         // Verify .img files were created
         List<Path> imgFiles = Files.list(gameOutputDir)
-            .filter(p -> p.toString().endsWith(".img"))
-            .collect(Collectors.toList());
+                .filter(p -> p.toString().endsWith(".img"))
+                .collect(Collectors.toList());
         assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
 
         // Verify cleanup: no split parts or intermediate files remain
         try (var stream = Files.list(gameOutputDir)) {
             long partFileCount = stream
-                .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
-                .count();
+                    .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
+                    .count();
             assertEquals(0, partFileCount, "No split parts should remain after processing");
         }
 
         try (var files = Files.list(gameOutputDir)) {
             long intermediateCount = files
-                .filter(p -> p.toString().endsWith(".fig") ||
-                             p.toString().endsWith(".swc") ||
-                             p.toString().endsWith(".ufo") ||
-                             p.toString().endsWith(".gd3"))
-                .count();
+                    .filter(p -> p.toString().endsWith(".fig") ||
+                            p.toString().endsWith(".swc") ||
+                            p.toString().endsWith(".ufo") ||
+                            p.toString().endsWith(".gd3"))
+                    .count();
             assertEquals(0, intermediateCount, "No intermediate format files should remain");
         }
     }
@@ -318,14 +315,14 @@ class AppE2ETest {
 
         // Invoke CLI - should handle shell-sensitive characters without truncation
         int exitCode = new CommandLine(new App())
-            .setCaseInsensitiveEnumValuesAllowed(true)
-            .execute(
-                testRom.toString(),
-                "--output-dir", outputDir.toString(),
-                "--ucon64-path", ucon64Path,
-                "--mtools-path", "mcopy",
-                "--format", "fig"
-            );
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(
+                        testRom.toString(),
+                        "--output-dir", outputDir.toString(),
+                        "--ucon64-path", ucon64Path,
+                        "--mtools-path", "mcopy",
+                        "--format", "fig"
+                );
 
         assertEquals(0, exitCode, "Conversion should succeed with shell-sensitive characters (&, $, !, space)");
 
@@ -338,25 +335,25 @@ class AppE2ETest {
 
         // Verify .img files were created
         List<Path> imgFiles = Files.list(gameOutputDir)
-            .filter(p -> p.toString().endsWith(".img"))
-            .collect(Collectors.toList());
+                .filter(p -> p.toString().endsWith(".img"))
+                .collect(Collectors.toList());
         assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
 
         // Verify cleanup: no split parts or intermediate files remain
         try (var stream = Files.list(gameOutputDir)) {
             long partFileCount = stream
-                .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
-                .count();
+                    .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
+                    .count();
             assertEquals(0, partFileCount, "No split parts should remain after processing");
         }
 
         try (var files = Files.list(gameOutputDir)) {
             long intermediateCount = files
-                .filter(p -> p.toString().endsWith(".fig") ||
-                             p.toString().endsWith(".swc") ||
-                             p.toString().endsWith(".ufo") ||
-                             p.toString().endsWith(".gd3"))
-                .count();
+                    .filter(p -> p.toString().endsWith(".fig") ||
+                            p.toString().endsWith(".swc") ||
+                            p.toString().endsWith(".ufo") ||
+                            p.toString().endsWith(".gd3"))
+                    .count();
             assertEquals(0, intermediateCount, "No intermediate format files should remain");
         }
     }

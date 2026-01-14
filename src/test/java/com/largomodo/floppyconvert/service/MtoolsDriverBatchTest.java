@@ -13,7 +13,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
@@ -29,7 +30,7 @@ class MtoolsDriverBatchTest {
     @BeforeAll
     static void checkMtoolsAvailable() {
         mtoolsAvailable = TestUcon64PathResolver.isCommandAvailable("mcopy") &&
-                          TestUcon64PathResolver.isCommandAvailable("mdir");
+                TestUcon64PathResolver.isCommandAvailable("mdir");
     }
 
     @Test
@@ -50,9 +51,9 @@ class MtoolsDriverBatchTest {
 
         // Build batch write request
         List<File> sources = Arrays.asList(
-            file1.toFile(),
-            file2.toFile(),
-            file3.toFile()
+                file1.toFile(),
+                file2.toFile(),
+                file3.toFile()
         );
 
         Map<File, String> dosNameMap = new HashMap<>();
@@ -117,8 +118,8 @@ class MtoolsDriverBatchTest {
         MtoolsDriver driver = new MtoolsDriver("mcopy");
 
         IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> driver.write(imageFile.toFile(), sources, dosNameMap)
+                IllegalArgumentException.class,
+                () -> driver.write(imageFile.toFile(), sources, dosNameMap)
         );
 
         assertTrue(exception.getMessage().contains("No DOS name mapping for source"));
@@ -141,8 +142,8 @@ class MtoolsDriverBatchTest {
         MtoolsDriver driver = new MtoolsDriver("mcopy");
 
         IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> driver.write(imageFile.toFile(), sources, dosNameMap)
+                IllegalArgumentException.class,
+                () -> driver.write(imageFile.toFile(), sources, dosNameMap)
         );
 
         assertTrue(exception.getMessage().contains("Invalid DOS 8.3 name"));
@@ -154,7 +155,7 @@ class MtoolsDriverBatchTest {
     private void createBlankFloppyImage(Path imagePath) throws IOException {
         // Create 1.44MB blank file
         ProcessBuilder pb = new ProcessBuilder("dd", "if=/dev/zero",
-            "of=" + imagePath.toAbsolutePath(), "bs=1024", "count=1440");
+                "of=" + imagePath.toAbsolutePath(), "bs=1024", "count=1440");
         Process ddProcess = pb.start();
         try {
             int exitCode = ddProcess.waitFor();
@@ -168,7 +169,7 @@ class MtoolsDriverBatchTest {
 
         // Format as FAT12
         ProcessBuilder formatPb = new ProcessBuilder("mformat", "-i",
-            imagePath.toAbsolutePath().toString(), "-f", "1440", "::");
+                imagePath.toAbsolutePath().toString(), "-f", "1440", "::");
         Process formatProcess = formatPb.start();
         try {
             int exitCode = formatProcess.waitFor();
@@ -186,7 +187,7 @@ class MtoolsDriverBatchTest {
      */
     private List<String> getMdirListing(Path imagePath) throws IOException {
         ProcessBuilder pb = new ProcessBuilder("mdir", "-i",
-            imagePath.toAbsolutePath().toString());
+                imagePath.toAbsolutePath().toString());
         Process mdirProcess = pb.start();
 
         List<String> lines = new ArrayList<>();

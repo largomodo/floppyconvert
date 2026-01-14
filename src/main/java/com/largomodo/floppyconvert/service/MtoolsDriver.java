@@ -2,7 +2,10 @@ package com.largomodo.floppyconvert.service;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Wrapper for mtools mcopy utility (FAT filesystem file injection).
@@ -27,31 +30,31 @@ public class MtoolsDriver extends ExternalProcessDriver implements FloppyImageWr
         if (!targetImage.exists()) {
             throw new IllegalArgumentException("Target image does not exist: " + targetImage);
         }
-        
+
         // Write each file individually to apply DOS name mapping
         // mcopy batch mode does not support per-file target naming
         for (File source : sources) {
             if (!source.exists()) {
                 throw new IllegalArgumentException("Source file does not exist: " + source);
             }
-            
+
             String dosName = dosNameMap.get(source);
             if (dosName == null) {
                 throw new IllegalArgumentException("No DOS name mapping for source: " + source);
             }
-            
+
             // Validate DOS 8.3 format
             if (!dosName.matches("^[A-Z0-9]{1,8}(\\.[A-Z0-9]{1,3})?$")) {
                 throw new IllegalArgumentException("Invalid DOS 8.3 name: " + dosName);
             }
-            
+
             String[] cmd = {
-                mcopyPath,
-                "-i", targetImage.getAbsolutePath(),
-                source.getAbsolutePath(),
-                "::" + dosName
+                    mcopyPath,
+                    "-i", targetImage.getAbsolutePath(),
+                    source.getAbsolutePath(),
+                    "::" + dosName
             };
-            
+
             executeCommand(cmd, DEFAULT_TIMEOUT_MS);
         }
     }

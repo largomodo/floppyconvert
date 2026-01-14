@@ -30,14 +30,6 @@ public enum FloppyType {
         this.resourcePath = resourcePath;
     }
 
-    public long getUsableBytes() {
-        return usableBytes;
-    }
-
-    public String getResourcePath() {
-        return resourcePath;
-    }
-
     /**
      * Selects smallest floppy format that can hold specified payload size.
      * <p>
@@ -47,7 +39,7 @@ public enum FloppyType {
      * @param sizeInBytes total payload size in bytes
      * @return smallest format that fits payload
      * @throws IllegalArgumentException if sizeInBytes is negative
-     * @throws IOException if payload exceeds 1.6MB capacity
+     * @throws IOException              if payload exceeds 1.6MB capacity
      */
     public static FloppyType bestFit(long sizeInBytes) throws IOException {
         if (sizeInBytes < 0) {
@@ -61,8 +53,16 @@ public enum FloppyType {
             return FLOPPY_160M;
         } else {
             throw new IOException("Total payload size (" + sizeInBytes +
-                " bytes) exceeds maximum floppy capacity (1.6MB). " +
-                "Consider using larger ROM split size.");
+                    " bytes) exceeds maximum floppy capacity (1.6MB). " +
+                    "Consider using larger ROM split size.");
         }
+    }
+
+    public long getUsableBytes() {
+        return usableBytes;
+    }
+
+    public String getResourcePath() {
+        return resourcePath;
     }
 }

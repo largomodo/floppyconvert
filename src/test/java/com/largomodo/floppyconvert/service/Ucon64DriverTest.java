@@ -3,7 +3,6 @@ package com.largomodo.floppyconvert.service;
 import com.largomodo.floppyconvert.core.CopierFormat;
 import com.largomodo.floppyconvert.util.TestUcon64PathResolver;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -25,7 +24,7 @@ class Ucon64DriverTest {
 
     /**
      * Resolve ucon64 path once before all tests.
-     *
+     * <p>
      * Single resolution in @BeforeAll reduces overhead (avoids N PATH checks
      * for N tests) and ensures consistent binary used across test methods.
      */
@@ -164,7 +163,7 @@ class Ucon64DriverTest {
                     return 0;
                 } else if (lastArg.endsWith("largegame.fig")) {
                     splitCallCount++;
-                    
+
                     if (splitCallCount == 1) {
                         // Step 2: First split attempt with --ssize=4 fails with max parts error
                         // Verify 4Mb split size is present
@@ -178,9 +177,9 @@ class Ucon64DriverTest {
                         if (!hasSsize4) {
                             throw new IOException("Expected --ssize=4 in first split attempt");
                         }
-                        
+
                         throw new ExternalProcessDriver.ProcessFailureException(
-                            "Process exited with code 1: ucon64: error: more than the maximum number"
+                                "Process exited with code 1: ucon64: error: more than the maximum number"
                         );
                     } else if (splitCallCount == 2) {
                         // Step 3: Retry with --ssize=12 succeeds
@@ -195,7 +194,7 @@ class Ucon64DriverTest {
                         if (!hasSsize12) {
                             throw new IOException("Expected --ssize=12 in retry split attempt");
                         }
-                        
+
                         // Create mock split part files for discovery
                         Files.write(workingDir.toPath().resolve("largegame.1"), new byte[512]);
                         Files.write(workingDir.toPath().resolve("largegame.2"), new byte[512]);
@@ -233,7 +232,7 @@ class Ucon64DriverTest {
                 } else if (lastArg.endsWith("game.fig")) {
                     // Split fails with generic error (e.g., disk full)
                     throw new ExternalProcessDriver.ProcessFailureException(
-                        "Process exited with code 1: ucon64: error: disk full"
+                            "Process exited with code 1: ucon64: error: disk full"
                     );
                 }
                 return 0;

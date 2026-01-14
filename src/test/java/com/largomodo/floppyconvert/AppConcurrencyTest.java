@@ -1,6 +1,5 @@
 package com.largomodo.floppyconvert;
 
-import com.largomodo.floppyconvert.core.CopierFormat;
 import com.largomodo.floppyconvert.util.TestUcon64PathResolver;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,10 +14,10 @@ import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration tests for concurrent batch processing.
@@ -73,7 +72,7 @@ class AppConcurrencyTest {
         // Create 10 small test ROMs (enough to exercise thread pool without long runtime)
         // Use distinct basenames to avoid ucon64 split-file detection
         String[] romNames = {"Mario", "Zelda", "Metroid", "DonkeyKong", "Kirby",
-                            "StarFox", "FZero", "Pilotwings", "SimCity", "Yoshi"};
+                "StarFox", "FZero", "Pilotwings", "SimCity", "Yoshi"};
         int romCount = romNames.length;
         for (int i = 0; i < romCount; i++) {
             Path romFile = inputDir.resolve(romNames[i] + ".sfc");
@@ -82,14 +81,14 @@ class AppConcurrencyTest {
 
         // Execute batch processing
         int exitCode = new CommandLine(new App())
-            .setCaseInsensitiveEnumValuesAllowed(true)
-            .execute(
-                inputDir.toString(),
-                "--output-dir", outputDir.toString(),
-                "--ucon64-path", ucon64Path,
-                "--mtools-path", "mcopy",
-                "--format", "fig"
-            );
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(
+                        inputDir.toString(),
+                        "--output-dir", outputDir.toString(),
+                        "--ucon64-path", ucon64Path,
+                        "--mtools-path", "mcopy",
+                        "--format", "fig"
+                );
 
         assertEquals(0, exitCode, "Batch processing should succeed");
 
@@ -102,7 +101,7 @@ class AppConcurrencyTest {
         Set<String> actualImages = new HashSet<>();
         try (Stream<Path> stream = Files.walk(outputDir)) {
             stream.filter(p -> p.toString().endsWith(".img"))
-                  .forEach(p -> actualImages.add(p.getFileName().toString()));
+                    .forEach(p -> actualImages.add(p.getFileName().toString()));
         }
 
         assertEquals(expectedImages, actualImages,
@@ -143,14 +142,14 @@ class AppConcurrencyTest {
 
         // Execute batch processing
         int exitCode = new CommandLine(new App())
-            .setCaseInsensitiveEnumValuesAllowed(true)
-            .execute(
-                inputDir.toString(),
-                "--output-dir", outputDir.toString(),
-                "--ucon64-path", ucon64Path,
-                "--mtools-path", "mcopy",
-                "--format", "swc"
-            );
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(
+                        inputDir.toString(),
+                        "--output-dir", outputDir.toString(),
+                        "--ucon64-path", ucon64Path,
+                        "--mtools-path", "mcopy",
+                        "--format", "swc"
+                );
 
         assertEquals(0, exitCode, "Batch processing should succeed despite basename collision");
 
@@ -178,9 +177,9 @@ class AppConcurrencyTest {
         // Create 20 small test ROMs to increase concurrency
         // Use distinct basenames to avoid ucon64 split-file detection
         String[] romNames = {"ActRaiser", "Breath", "Chrono", "Dragon", "Earthbound",
-                            "Final", "Gradius", "Hagane", "Illusion", "Jungle",
-                            "Killer", "Legend", "Mega", "Ninja", "Ogre",
-                            "Pilot", "Quest", "Rival", "Secret", "Terranigma"};
+                "Final", "Gradius", "Hagane", "Illusion", "Jungle",
+                "Killer", "Legend", "Mega", "Ninja", "Ogre",
+                "Pilot", "Quest", "Rival", "Secret", "Terranigma"};
         int romCount = romNames.length;
         for (int i = 0; i < romCount; i++) {
             Path romFile = inputDir.resolve(romNames[i] + ".sfc");
@@ -189,14 +188,14 @@ class AppConcurrencyTest {
 
         // Execute batch processing
         int exitCode = new CommandLine(new App())
-            .setCaseInsensitiveEnumValuesAllowed(true)
-            .execute(
-                inputDir.toString(),
-                "--output-dir", outputDir.toString(),
-                "--ucon64-path", ucon64Path,
-                "--mtools-path", "mcopy",
-                "--format", "ufo"
-            );
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(
+                        inputDir.toString(),
+                        "--output-dir", outputDir.toString(),
+                        "--ucon64-path", ucon64Path,
+                        "--mtools-path", "mcopy",
+                        "--format", "ufo"
+                );
 
         assertEquals(0, exitCode, "Batch processing should succeed");
 
@@ -230,14 +229,14 @@ class AppConcurrencyTest {
 
         // Execute batch processing (completes normally)
         int exitCode = new CommandLine(new App())
-            .setCaseInsensitiveEnumValuesAllowed(true)
-            .execute(
-                inputDir.toString(),
-                "--output-dir", outputDir.toString(),
-                "--ucon64-path", ucon64Path,
-                "--mtools-path", "mcopy",
-                "--format", "gd3"
-            );
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(
+                        inputDir.toString(),
+                        "--output-dir", outputDir.toString(),
+                        "--ucon64-path", ucon64Path,
+                        "--mtools-path", "mcopy",
+                        "--format", "gd3"
+                );
 
         assertEquals(0, exitCode, "Should complete normally");
 
@@ -263,8 +262,8 @@ class AppConcurrencyTest {
         // Create multiple ROMs that will be processed concurrently
         // Use distinct basenames to avoid ucon64 split-file detection
         String[] romNames = {"Contra", "Castlevania", "Bomberman", "Tetris", "Pacman",
-                            "Galaga", "Donkey", "Sonic", "Tails", "Knuckles",
-                            "Ryu", "Ken", "Chun", "Guile", "Blanka"};
+                "Galaga", "Donkey", "Sonic", "Tails", "Knuckles",
+                "Ryu", "Ken", "Chun", "Guile", "Blanka"};
         int romCount = romNames.length;
         for (int i = 0; i < romCount; i++) {
             Path romFile = inputDir.resolve(romNames[i] + ".sfc");
@@ -276,14 +275,14 @@ class AppConcurrencyTest {
         // 1. All ROMs complete successfully (no collisions)
         // 2. All workspaces cleaned up afterward
         int exitCode = new CommandLine(new App())
-            .setCaseInsensitiveEnumValuesAllowed(true)
-            .execute(
-                inputDir.toString(),
-                "--output-dir", outputDir.toString(),
-                "--ucon64-path", ucon64Path,
-                "--mtools-path", "mcopy",
-                "--format", "fig"
-            );
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(
+                        inputDir.toString(),
+                        "--output-dir", outputDir.toString(),
+                        "--ucon64-path", ucon64Path,
+                        "--mtools-path", "mcopy",
+                        "--format", "fig"
+                );
 
         assertEquals(0, exitCode, "All ROMs should process without collision");
 

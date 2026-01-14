@@ -1,22 +1,17 @@
 package com.largomodo.floppyconvert.core;
 
-import com.largomodo.floppyconvert.service.FloppyImageWriter;
-import com.largomodo.floppyconvert.service.RomSplitter;
-import com.largomodo.floppyconvert.core.FloppyType;
 import com.largomodo.floppyconvert.core.domain.DiskLayout;
 import com.largomodo.floppyconvert.core.domain.DiskPacker;
 import com.largomodo.floppyconvert.core.domain.RomPartMetadata;
 import com.largomodo.floppyconvert.core.workspace.ConversionWorkspace;
+import com.largomodo.floppyconvert.service.FloppyImageWriter;
+import com.largomodo.floppyconvert.service.RomSplitter;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -48,17 +43,17 @@ public class RomProcessor {
      * Constructor injection pattern: dependencies become private final fields,
      * enabling immutability, thread-safety, and fail-fast validation.
      *
-     * @param packer   Disk packing strategy (e.g., GreedyDiskPacker)
-     * @param splitter ROM splitting service (e.g., Ucon64Driver)
-     * @param writer   Floppy image writer (e.g., MtoolsDriver)
+     * @param packer          Disk packing strategy (e.g., GreedyDiskPacker)
+     * @param splitter        ROM splitting service (e.g., Ucon64Driver)
+     * @param writer          Floppy image writer (e.g., MtoolsDriver)
      * @param templateFactory Floppy disk template provider (mockable for testing)
-     * @param normalizer ROM part filename normalizer (stateless utility)
+     * @param normalizer      ROM part filename normalizer (stateless utility)
      * @throws IllegalArgumentException if any dependency is null
      */
     public RomProcessor(DiskPacker packer, RomSplitter splitter, FloppyImageWriter writer,
                         DiskTemplateFactory templateFactory, RomPartNormalizer normalizer) {
         if (packer == null || splitter == null || writer == null ||
-            templateFactory == null || normalizer == null) {
+                templateFactory == null || normalizer == null) {
             throw new IllegalArgumentException("All dependencies must not be null");
         }
         this.packer = packer;
@@ -77,10 +72,10 @@ public class RomProcessor {
      * Multi-disk naming: GameName_1.img, GameName_2.img (explicit numbering for manual sorting).
      * Single-disk naming: GameName.img (no suffix needed).
      *
-     * @param romFile            Source ROM file (.sfc format)
-     * @param outputBaseDir      Base output directory (final .img location)
-     * @param uniqueSuffix       Unique suffix to prevent workspace collisions (e.g., UUID for concurrent execution)
-     * @param format             Backup unit format for ROM splitting
+     * @param romFile       Source ROM file (.sfc format)
+     * @param outputBaseDir Base output directory (final .img location)
+     * @param uniqueSuffix  Unique suffix to prevent workspace collisions (e.g., UUID for concurrent execution)
+     * @param format        Backup unit format for ROM splitting
      * @return Number of disk images created (for observer reporting)
      * @throws IOException if any pipeline step fails
      */
@@ -101,7 +96,7 @@ public class RomProcessor {
         String sanitizedBaseName = normalizer.sanitizeName(baseName);
         if (sanitizedBaseName.isEmpty()) {
             throw new IOException("Sanitized base name is empty for ROM file: " +
-                                 romFile.getName() + " (original: " + baseName + ")");
+                    romFile.getName() + " (original: " + baseName + ")");
         }
 
         try (ConversionWorkspace ws = new ConversionWorkspace(outputBaseDir, sanitizedBaseName, uniqueSuffix)) {
@@ -137,10 +132,10 @@ public class RomProcessor {
                 // GD3 uses unpredictable naming - scan for non-split files created after process start
                 try (var stream = Files.list(gameOutputDir)) {
                     stream.filter(p -> !existingFiles.contains(p))  // Only new files (preserves user files)
-                          .filter(p -> !p.getFileName().toString().startsWith("."))
-                          .filter(p -> !format.getSplitPartFilter().test(p.toFile()))
-                          .filter(p -> !p.toString().endsWith(".img"))
-                          .forEach(ws::track);
+                            .filter(p -> !p.getFileName().toString().startsWith("."))
+                            .filter(p -> !format.getSplitPartFilter().test(p.toFile()))
+                            .filter(p -> !p.toString().endsWith(".img"))
+                            .forEach(ws::track);
                 }
             } else {
                 // Standard formats use predictable extension
@@ -181,7 +176,7 @@ public class RomProcessor {
 
                 // Track .img file for cleanup in case subsequent operations fail
                 ws.track(targetImage.toPath());
-                
+
                 // Protect from cleanup immediately after creation
                 ws.markAsOutput(targetImage.toPath());
                 createdImages.add(targetImage.toPath());
@@ -191,12 +186,12 @@ public class RomProcessor {
                 for (RomPartMetadata partMeta : layout.contents()) {
                     File part = partMeta.originalPath().toFile();
                     String dosName = partMeta.dosName();
-                    
+
                     if (dosNameMap.containsKey(part)) {
-                        throw new IOException("Duplicate part in layout for disk " + diskNumber + ": " + 
+                        throw new IOException("Duplicate part in layout for disk " + diskNumber + ": " +
                                 part.getName());
                     }
-                    
+
                     // Check for DOS name collisions
                     for (Map.Entry<File, String> entry : dosNameMap.entrySet()) {
                         if (entry.getValue().equals(dosName)) {
@@ -205,10 +200,10 @@ public class RomProcessor {
                                     " with " + part.getName() + " (8.3 truncation conflict)");
                         }
                     }
-                    
+
                     dosNameMap.put(part, dosName);
                 }
-                
+
                 // Batch write all parts to the image
                 writer.write(targetImage, new ArrayList<>(dosNameMap.keySet()), dosNameMap);
 
@@ -227,7 +222,7 @@ public class RomProcessor {
 
             System.out.println("Success: " + romFile.getName() +
                     " -> " + (diskNumber - 1) + " disk(s) [" + format.name() + "]");
-            
+
             return diskLayouts.size();
         }
     }

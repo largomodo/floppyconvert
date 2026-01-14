@@ -5,8 +5,6 @@ import com.largomodo.floppyconvert.core.domain.DiskPacker;
 import com.largomodo.floppyconvert.core.domain.RomPartMetadata;
 import com.largomodo.floppyconvert.service.FloppyImageWriter;
 import com.largomodo.floppyconvert.service.RomSplitter;
-import com.largomodo.floppyconvert.core.DiskTemplateFactory;
-import com.largomodo.floppyconvert.core.RomPartNormalizer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -18,7 +16,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -35,15 +32,14 @@ import static org.mockito.Mockito.*;
  */
 class RomProcessorTest {
 
+    @TempDir
+    Path tempDir;
     private DiskPacker mockPacker;
     private RomSplitter mockSplitter;
     private FloppyImageWriter mockWriter;
     private DiskTemplateFactory mockTemplateFactory;
     private RomPartNormalizer normalizer;  // Real instance (stateless utility)
     private RomProcessor processor;
-
-    @TempDir
-    Path tempDir;
 
     @BeforeEach
     void setUp() {
@@ -58,7 +54,7 @@ class RomProcessorTest {
     @Test
     void testConstructorRejectsNullPacker() {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
-            new RomProcessor(null, mockSplitter, mockWriter, mockTemplateFactory, normalizer)
+                new RomProcessor(null, mockSplitter, mockWriter, mockTemplateFactory, normalizer)
         );
         assertEquals("All dependencies must not be null", ex.getMessage());
     }
@@ -66,7 +62,7 @@ class RomProcessorTest {
     @Test
     void testConstructorRejectsNullSplitter() {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
-            new RomProcessor(mockPacker, null, mockWriter, mockTemplateFactory, normalizer)
+                new RomProcessor(mockPacker, null, mockWriter, mockTemplateFactory, normalizer)
         );
         assertEquals("All dependencies must not be null", ex.getMessage());
     }
@@ -74,7 +70,7 @@ class RomProcessorTest {
     @Test
     void testConstructorRejectsNullWriter() {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
-            new RomProcessor(mockPacker, mockSplitter, null, mockTemplateFactory, normalizer)
+                new RomProcessor(mockPacker, mockSplitter, null, mockTemplateFactory, normalizer)
         );
         assertEquals("All dependencies must not be null", ex.getMessage());
     }
@@ -82,7 +78,7 @@ class RomProcessorTest {
     @Test
     void testConstructorRejectsNullTemplateFactory() {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
-            new RomProcessor(mockPacker, mockSplitter, mockWriter, null, normalizer)
+                new RomProcessor(mockPacker, mockSplitter, mockWriter, null, normalizer)
         );
         assertEquals("All dependencies must not be null", ex.getMessage());
     }
@@ -90,7 +86,7 @@ class RomProcessorTest {
     @Test
     void testConstructorRejectsNullNormalizer() {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
-            new RomProcessor(mockPacker, mockSplitter, mockWriter, mockTemplateFactory, null)
+                new RomProcessor(mockPacker, mockSplitter, mockWriter, mockTemplateFactory, null)
         );
         assertEquals("All dependencies must not be null", ex.getMessage());
     }
@@ -112,7 +108,7 @@ class RomProcessorTest {
         Files.write(part2.toPath(), new byte[]{0x02});
 
         when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.FIG)))
-            .thenReturn(Arrays.asList(part1, part2));
+                .thenReturn(Arrays.asList(part1, part2));
 
         // Mock templateFactory to create actual .img files
         doAnswer(invocation -> {
@@ -124,7 +120,7 @@ class RomProcessorTest {
         // Mock packer to return single disk layout (normalizer will run in real code)
         when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
             List<RomPartMetadata> metadata = invocation.getArgument(0);
-            return Arrays.asList(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
+            return List.of(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
         });
 
         // Execute
@@ -164,7 +160,7 @@ class RomProcessorTest {
         Files.write(part1.toPath(), new byte[]{0x01});
 
         when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.SWC)))
-            .thenReturn(Arrays.asList(part1));
+                .thenReturn(List.of(part1));
 
         // Mock templateFactory to create actual .img files
         doAnswer(invocation -> {
@@ -177,9 +173,9 @@ class RomProcessorTest {
         when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
             List<RomPartMetadata> metadata = invocation.getArgument(0);
             return Arrays.asList(
-                new DiskLayout(metadata, FloppyType.FLOPPY_720K),
-                new DiskLayout(metadata, FloppyType.FLOPPY_720K),
-                new DiskLayout(metadata, FloppyType.FLOPPY_720K)
+                    new DiskLayout(metadata, FloppyType.FLOPPY_720K),
+                    new DiskLayout(metadata, FloppyType.FLOPPY_720K),
+                    new DiskLayout(metadata, FloppyType.FLOPPY_720K)
             );
         });
 
@@ -201,11 +197,11 @@ class RomProcessorTest {
 
         // Mock splitter to throw exception
         when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.UFO)))
-            .thenThrow(new IOException("Splitter failure"));
+                .thenThrow(new IOException("Splitter failure"));
 
         // Execute and expect exception
         IOException ex = assertThrows(IOException.class, () ->
-            processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.UFO)
+                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.UFO)
         );
 
         assertEquals("Splitter failure", ex.getMessage());
@@ -237,14 +233,14 @@ class RomProcessorTest {
         Files.write(part1.toPath(), new byte[]{0x01});
 
         when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.GD3)))
-            .thenReturn(Arrays.asList(part1));
+                .thenReturn(List.of(part1));
 
         // Mock packer to throw exception (normalizer will run in real code)
         when(mockPacker.pack(anyList())).thenThrow(new IllegalArgumentException("Part too large"));
 
         // Execute and expect exception
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
-            processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.GD3)
+                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.GD3)
         );
 
         assertEquals("Part too large", ex.getMessage());
@@ -270,7 +266,7 @@ class RomProcessorTest {
         Files.write(part1.toPath(), new byte[]{0x01});
 
         when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.FIG)))
-            .thenReturn(Arrays.asList(part1));
+                .thenReturn(List.of(part1));
 
         // Mock templateFactory to create actual .img files
         doAnswer(invocation -> {
@@ -282,16 +278,16 @@ class RomProcessorTest {
         // Mock packer to return layout (normalizer will run in real code)
         when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
             List<RomPartMetadata> metadata = invocation.getArgument(0);
-            return Arrays.asList(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
+            return List.of(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
         });
 
         // Mock writer to throw exception
         doThrow(new IOException("Disk full")).when(mockWriter)
-            .write(any(File.class), anyList(), anyMap());
+                .write(any(File.class), anyList(), anyMap());
 
         // Execute and expect exception
         IOException ex = assertThrows(IOException.class, () ->
-            processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG)
+                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG)
         );
 
         assertEquals("Disk full", ex.getMessage());
@@ -313,11 +309,11 @@ class RomProcessorTest {
 
         // Execute and expect exception
         IOException ex = assertThrows(IOException.class, () ->
-            processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG)
+                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG)
         );
 
         assertTrue(ex.getMessage().contains("Cannot extract base name"),
-            "Should reject file with no base name");
+                "Should reject file with no base name");
 
         verifyNoInteractions(mockSplitter);
         verifyNoInteractions(mockPacker);
@@ -338,7 +334,7 @@ class RomProcessorTest {
         Files.write(part1.toPath(), new byte[]{0x01});
 
         when(mockSplitter.split(any(File.class), any(Path.class), eq(CopierFormat.SWC)))
-            .thenReturn(Arrays.asList(part1));
+                .thenReturn(List.of(part1));
 
         // Mock templateFactory to create actual .img files
         doAnswer(invocation -> {
@@ -350,7 +346,7 @@ class RomProcessorTest {
         // Mock packer to return layout (normalizer will run in real code)
         when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
             List<RomPartMetadata> metadata = invocation.getArgument(0);
-            return Arrays.asList(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
+            return List.of(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
         });
 
         // Execute
@@ -362,8 +358,8 @@ class RomProcessorTest {
         Path expectedImage = expectedGameDir.resolve("SingleDisk.img");
 
         assertTrue(Files.exists(expectedGameDir),
-            "Game directory should exist");
+                "Game directory should exist");
         assertTrue(Files.exists(expectedImage),
-            "Single disk should be named GameName.img (no numbering)");
+                "Single disk should be named GameName.img (no numbering)");
     }
 }

@@ -31,14 +31,14 @@ class FloppyTypeTest {
     @Test
     void testNegativeInputThrows() {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-            () -> FloppyType.bestFit(-1));
+                () -> FloppyType.bestFit(-1));
         assertTrue(ex.getMessage().contains("negative"));
     }
 
     @Test
     void testOverflowThrows() {
         IOException ex = assertThrows(IOException.class,
-            () -> FloppyType.bestFit(1_700_000));
+                () -> FloppyType.bestFit(1_700_000));
         assertTrue(ex.getMessage().contains("1700000"));
         assertTrue(ex.getMessage().contains("1.6MB"));
     }

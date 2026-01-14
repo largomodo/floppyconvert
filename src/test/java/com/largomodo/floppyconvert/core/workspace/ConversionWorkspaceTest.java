@@ -15,10 +15,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ConversionWorkspaceTest {
 
+    private final PrintStream originalErr = System.err;
     @TempDir
     Path tempDir;
-
-    private final PrintStream originalErr = System.err;
     private ByteArrayOutputStream errContent;
 
     @BeforeEach
@@ -147,7 +146,7 @@ class ConversionWorkspaceTest {
         String stderr = errContent.toString();
         if (!System.getProperty("os.name").toLowerCase().contains("win")) {
             assertTrue(stderr.contains("Warning: Could not delete artifact") ||
-                      stderr.isEmpty(), // May succeed on some systems
+                            stderr.isEmpty(), // May succeed on some systems
                     "Should log warning for deletion failure on Unix");
         }
     }

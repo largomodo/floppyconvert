@@ -1,62 +1,45 @@
 package com.largomodo.floppyconvert;
 
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
-import picocli.CommandLine.ParameterException;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
-import com.largomodo.floppyconvert.core.ConversionObserver;
-import com.largomodo.floppyconvert.core.CopierFormat;
-import com.largomodo.floppyconvert.core.DiskTemplateFactory;
-import com.largomodo.floppyconvert.core.ResourceDiskTemplateFactory;
-import com.largomodo.floppyconvert.core.RomPartNormalizer;
-import com.largomodo.floppyconvert.core.RomProcessor;
+import com.largomodo.floppyconvert.core.*;
 import com.largomodo.floppyconvert.core.domain.DiskPacker;
 import com.largomodo.floppyconvert.core.domain.GreedyDiskPacker;
 import com.largomodo.floppyconvert.service.FloppyImageWriter;
 import com.largomodo.floppyconvert.service.MtoolsDriver;
 import com.largomodo.floppyconvert.service.RomSplitter;
 import com.largomodo.floppyconvert.service.Ucon64Driver;
+import picocli.CommandLine;
+import picocli.CommandLine.*;
+import picocli.CommandLine.Model.CommandSpec;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 /**
  * CLI entry point for SNES ROM to floppy image conversion.
- *
+ * <p>
  * Uses Picocli framework for argument parsing with automatic help generation
  * and type-safe validation. Accepts a single positional input path (file or
  * directory) and determines processing mode via runtime inspection (no
  * mutual exclusivity validation needed).
- *
+ * <p>
  * Smart defaults:
- *   - File input without -o: outputs to current working directory
- *   - Directory input without -o: outputs to <input>/output subdirectory
- *   - Explicit -o flag: overrides all defaults
+ * - File input without -o: outputs to current working directory
+ * - Directory input without -o: outputs to <input>/output subdirectory
+ * - Explicit -o flag: overrides all defaults
  */
 @Command(name = "floppyconvert", mixinStandardHelpOptions = true, version = "1.0",
-         description = "Converts SNES ROM files to floppy disk images for backup units (FIG/SWC/UFO/GD3).")
+        description = "Converts SNES ROM files to floppy disk images for backup units (FIG/SWC/UFO/GD3).")
 public class App implements Callable<Integer> {
 
     @Parameters(index = "0", paramLabel = "INPUT",
-                description = "ROM file (.sfc) or directory containing ROM files")
+            description = "ROM file (.sfc) or directory containing ROM files")
     File inputPath;
 
     @Option(names = {"-o", "--output-dir"},
@@ -66,64 +49,14 @@ public class App implements Callable<Integer> {
     @Option(names = "--format", defaultValue = "FIG",
             description = "Backup unit format (default: FIG). Valid values: ${COMPLETION-CANDIDATES}")
     CopierFormat format;
-
+    @Spec
+    CommandSpec spec;
     @Option(names = "--ucon64-path", defaultValue = "ucon64",
             description = "Path to ucon64 binary (default: ucon64)")
     private String ucon64Path;
-
     @Option(names = "--mtools-path", defaultValue = "mcopy",
             description = "Path to mcopy binary from mtools (default: mcopy)")
     private String mtoolsPath;
-
-    @Spec
-    CommandSpec spec;
-
-    @Override
-    public Integer call() throws Exception {
-        if (!inputPath.exists()) {
-            throw new ParameterException(spec.commandLine(),
-                "Input path does not exist: " + inputPath.getAbsolutePath());
-        }
-
-        if (!inputPath.canRead()) {
-            throw new ParameterException(spec.commandLine(),
-                "Input path is not readable (check permissions): " + inputPath.getAbsolutePath());
-        }
-
-        if (outputDir == null) {
-            if (inputPath.isFile()) {
-                outputDir = new File(".");
-            } else {
-                outputDir = new File(inputPath, "output");
-            }
-        }
-
-        if (outputDir.exists() && !outputDir.isDirectory()) {
-            throw new ParameterException(spec.commandLine(),
-                "Output path must be a directory, not a file: " + outputDir.getAbsolutePath());
-        }
-        if (outputDir.exists() && !outputDir.canWrite()) {
-            throw new ParameterException(spec.commandLine(),
-                "Output directory is not writable (check permissions): " + outputDir.getAbsolutePath());
-        }
-
-        Files.createDirectories(outputDir.toPath());
-
-        if (inputPath.isFile()) {
-            runSingleFile(
-                new Config(null, outputDir.getAbsolutePath(),
-                           ucon64Path, mtoolsPath, format, inputPath.getAbsolutePath()),
-                outputDir.toPath()
-            );
-        } else {
-            runBatch(
-                new Config(inputPath.getAbsolutePath(), outputDir.getAbsolutePath(),
-                           ucon64Path, mtoolsPath, format, null)
-            );
-        }
-
-        return 0;
-    }
 
     public static void main(String[] args) {
         CommandLine cmd = new CommandLine(new App());
@@ -131,7 +64,6 @@ public class App implements Callable<Integer> {
         int exitCode = cmd.execute(args);
         System.exit(exitCode);
     }
-
 
     /**
      * Execute batch ROM processing with concurrent execution and fail-soft error handling.
@@ -163,18 +95,18 @@ public class App implements Callable<Integer> {
         // Fixed thread pool: one thread per CPU core (no context switching overhead)
         int coreCount = Runtime.getRuntime().availableProcessors();
         ExecutorService executor = new ThreadPoolExecutor(
-            coreCount,              // Core pool size: one thread per CPU core
-            coreCount,              // Max pool size: fixed (no elasticity needed)
-            0L,                     // Keep-alive: 0 (threads never time out)
-            TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue<>(2 * coreCount),  // Bounded queue: limits memory for queued tasks
-            new ThreadPoolExecutor.CallerRunsPolicy()  // Overflow policy: main thread provides backpressure
+                coreCount,              // Core pool size: one thread per CPU core
+                coreCount,              // Max pool size: fixed (no elasticity needed)
+                0L,                     // Keep-alive: 0 (threads never time out)
+                TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(2 * coreCount),  // Bounded queue: limits memory for queued tasks
+                new ThreadPoolExecutor.CallerRunsPolicy()  // Overflow policy: main thread provides backpressure
         );
 
         // AtomicInteger for thread-safe counters (multiple workers increment concurrently)
         final AtomicInteger successCount = new AtomicInteger(0);
         final AtomicInteger failCount = new AtomicInteger(0);
-        
+
         ConversionObserver observer = new ConversionObserver() {
             @Override
             public void onSuccess(Path rom, int diskCount) {
@@ -206,39 +138,39 @@ public class App implements Callable<Integer> {
 
         try (Stream<Path> stream = Files.walk(inputRoot)) {
             stream.filter(path -> {
-                      try {
-                          return Files.isRegularFile(path);
-                      } catch (UncheckedIOException e) {
-                          // File attributes unreadable (broken symlink, permission denied on file)
-                          System.err.println("WARNING: Cannot access " + inputRoot.relativize(path) + " - skipping");
-                          return false;
-                      }
-                  })
-                  .filter(path -> path.toString().toLowerCase().endsWith(".sfc"))
-                  .forEach(romPath -> {
-                      executor.submit(() -> {
-                          try {
-                              // UUID suffix creates thread-unique workspace (prevents ucon64 .1/.2/.3 collisions)
-                              String uniqueSuffix = UUID.randomUUID().toString();
-                              Path relativePath = inputRoot.relativize(romPath.getParent());
-                              Path targetBaseDir = outputRoot.resolve(relativePath);
-                              Files.createDirectories(targetBaseDir);
+                        try {
+                            return Files.isRegularFile(path);
+                        } catch (UncheckedIOException e) {
+                            // File attributes unreadable (broken symlink, permission denied on file)
+                            System.err.println("WARNING: Cannot access " + inputRoot.relativize(path) + " - skipping");
+                            return false;
+                        }
+                    })
+                    .filter(path -> path.toString().toLowerCase().endsWith(".sfc"))
+                    .forEach(romPath -> {
+                        executor.submit(() -> {
+                            try {
+                                // UUID suffix creates thread-unique workspace (prevents ucon64 .1/.2/.3 collisions)
+                                String uniqueSuffix = UUID.randomUUID().toString();
+                                Path relativePath = inputRoot.relativize(romPath.getParent());
+                                Path targetBaseDir = outputRoot.resolve(relativePath);
+                                Files.createDirectories(targetBaseDir);
 
-                              observer.onStart(romPath);
-                              int diskCount = processor.processRom(
-                                      romPath.toFile(),
-                                      targetBaseDir,
-                                      uniqueSuffix,
-                                      config.format
-                              );
-                              observer.onSuccess(romPath, diskCount);
-                          } catch (Exception e) {
-                              // Catch all exceptions to prevent worker thread death (batch continues)
-                              observer.onFailure(romPath, e);
-                          }
-                          return null;
-                      });
-                  });
+                                observer.onStart(romPath);
+                                int diskCount = processor.processRom(
+                                        romPath.toFile(),
+                                        targetBaseDir,
+                                        uniqueSuffix,
+                                        config.format
+                                );
+                                observer.onSuccess(romPath, diskCount);
+                            } catch (Exception e) {
+                                // Catch all exceptions to prevent worker thread death (batch continues)
+                                observer.onFailure(romPath, e);
+                            }
+                            return null;
+                        });
+                    });
         } catch (UncheckedIOException e) {
             /*
              * IOException during directory traversal (mid-traversal).
@@ -329,7 +261,6 @@ public class App implements Callable<Integer> {
         System.out.println("Conversion complete: " + inputPath.getFileName());
     }
 
-
     /**
      * Check if command exists in system PATH.
      */
@@ -374,6 +305,52 @@ public class App implements Callable<Integer> {
         }
     }
 
+    @Override
+    public Integer call() throws Exception {
+        if (!inputPath.exists()) {
+            throw new ParameterException(spec.commandLine(),
+                    "Input path does not exist: " + inputPath.getAbsolutePath());
+        }
+
+        if (!inputPath.canRead()) {
+            throw new ParameterException(spec.commandLine(),
+                    "Input path is not readable (check permissions): " + inputPath.getAbsolutePath());
+        }
+
+        if (outputDir == null) {
+            if (inputPath.isFile()) {
+                outputDir = new File(".");
+            } else {
+                outputDir = new File(inputPath, "output");
+            }
+        }
+
+        if (outputDir.exists() && !outputDir.isDirectory()) {
+            throw new ParameterException(spec.commandLine(),
+                    "Output path must be a directory, not a file: " + outputDir.getAbsolutePath());
+        }
+        if (outputDir.exists() && !outputDir.canWrite()) {
+            throw new ParameterException(spec.commandLine(),
+                    "Output directory is not writable (check permissions): " + outputDir.getAbsolutePath());
+        }
+
+        Files.createDirectories(outputDir.toPath());
+
+        if (inputPath.isFile()) {
+            runSingleFile(
+                    new Config(null, outputDir.getAbsolutePath(),
+                            ucon64Path, mtoolsPath, format, inputPath.getAbsolutePath()),
+                    outputDir.toPath()
+            );
+        } else {
+            runBatch(
+                    new Config(inputPath.getAbsolutePath(), outputDir.getAbsolutePath(),
+                            ucon64Path, mtoolsPath, format, null)
+            );
+        }
+
+        return 0;
+    }
 
     /**
      * Bridges Picocli field-based arguments to runBatch/runSingleFile method
