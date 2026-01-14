@@ -13,8 +13,8 @@ import java.util.List;
  * RomProcessor to execute the actual file copying.
  * </p>
  *
- * @param contents    The list of ROM parts to include on this disk (unmodifiable)
- * @param floppyType  The disk format (720KB, 1.44MB, or 1.6MB)
+ * @param contents   The list of ROM parts to include on this disk (unmodifiable)
+ * @param floppyType The disk format (720KB, 1.44MB, or 1.6MB)
  */
 public record DiskLayout(List<RomPartMetadata> contents, FloppyType floppyType) {
     /**

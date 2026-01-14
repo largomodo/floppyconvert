@@ -21,8 +21,8 @@ class RomPartMetadataTest {
     @Test
     void negativeSizeThrowsException() {
         IllegalArgumentException ex = assertThrows(
-            IllegalArgumentException.class,
-            () -> new RomPartMetadata(Path.of("/test/rom.fig"), -1, "ROM.FIG")
+                IllegalArgumentException.class,
+                () -> new RomPartMetadata(Path.of("/test/rom.fig"), -1, "ROM.FIG")
         );
         assertTrue(ex.getMessage().contains("must be positive"));
         assertTrue(ex.getMessage().contains("-1"));
@@ -31,8 +31,8 @@ class RomPartMetadataTest {
     @Test
     void zeroSizeThrowsException() {
         IllegalArgumentException ex = assertThrows(
-            IllegalArgumentException.class,
-            () -> new RomPartMetadata(Path.of("/test/rom.fig"), 0, "ROM.FIG")
+                IllegalArgumentException.class,
+                () -> new RomPartMetadata(Path.of("/test/rom.fig"), 0, "ROM.FIG")
         );
         assertTrue(ex.getMessage().contains("must be positive"));
         assertTrue(ex.getMessage().contains("0"));

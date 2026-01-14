@@ -9,7 +9,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -67,7 +66,7 @@ class RomPartNormalizerTest {
         workspace.close();
 
         assertFalse(Files.exists(safePath),
-            "Safe file should be deleted on close (verifying workspace tracking updated)");
+                "Safe file should be deleted on close (verifying workspace tracking updated)");
     }
 
     @Test
@@ -203,7 +202,7 @@ class RomPartNormalizerTest {
 
         Path expectedPath = workDir.resolve("test_____________file.sfc");
         assertTrue(Files.exists(expectedPath),
-            "All shell-sensitive characters should be replaced with underscores");
+                "All shell-sensitive characters should be replaced with underscores");
 
         workspace.close();
     }

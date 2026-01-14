@@ -56,7 +56,7 @@ class ResourceDiskTemplateFactoryTest {
                 try (var stream = getClass().getResourceAsStream(resourcePath)) {
                     if (stream == null) {
                         throw new IOException("Internal resource " + resourcePath +
-                            " not found. Ensure application is built correctly.");
+                                " not found. Ensure application is built correctly.");
                     }
                     Files.copy(stream, targetFile);
                 }

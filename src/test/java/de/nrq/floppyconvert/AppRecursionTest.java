@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * Integration tests for recursive directory traversal feature.
  * Verifies that batch mode correctly processes ROMs in nested directory structures
  * and mirrors the source structure in output.
- *
+ * <p>
  * Requires external tools: ucon64 and mtools (mcopy).
  * Tests skip gracefully when tools are unavailable.
  */
@@ -55,8 +55,8 @@ class AppRecursionTest {
     private static boolean isCommandAvailable(String command) {
         try {
             Process process = new ProcessBuilder("which", command)
-                .redirectErrorStream(true)
-                .start();
+                    .redirectErrorStream(true)
+                    .start();
             boolean completed = process.waitFor(5, TimeUnit.SECONDS);
             return completed && process.exitValue() == 0;
         } catch (IOException | InterruptedException e) {
@@ -79,14 +79,14 @@ class AppRecursionTest {
         Files.copy(getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE), testRom);
 
         int exitCode = new CommandLine(new App())
-            .setCaseInsensitiveEnumValuesAllowed(true)
-            .execute(
-                inputRoot.toString(),
-                "--output-dir", outputRoot.toString(),
-                "--ucon64-path", ucon64Path,
-                "--mtools-path", "mcopy",
-                "--format", "fig"
-            );
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(
+                        inputRoot.toString(),
+                        "--output-dir", outputRoot.toString(),
+                        "--ucon64-path", ucon64Path,
+                        "--mtools-path", "mcopy",
+                        "--format", "fig"
+                );
         assertEquals(0, exitCode, "Conversion should succeed");
 
         Path expectedCategoryDir = outputRoot.resolve("Category");
@@ -122,14 +122,14 @@ class AppRecursionTest {
         Files.copy(getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE), testRom2);
 
         int exitCode = new CommandLine(new App())
-            .setCaseInsensitiveEnumValuesAllowed(true)
-            .execute(
-                inputRoot.toString(),
-                "--output-dir", outputRoot.toString(),
-                "--ucon64-path", ucon64Path,
-                "--mtools-path", "mcopy",
-                "--format", "fig"
-            );
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(
+                        inputRoot.toString(),
+                        "--output-dir", outputRoot.toString(),
+                        "--ucon64-path", ucon64Path,
+                        "--mtools-path", "mcopy",
+                        "--format", "fig"
+                );
         assertEquals(0, exitCode, "Conversion should succeed");
 
         Path outputA = outputRoot.resolve("A");
@@ -164,14 +164,14 @@ class AppRecursionTest {
         Files.copy(getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE), testRom);
 
         int exitCode = new CommandLine(new App())
-            .setCaseInsensitiveEnumValuesAllowed(true)
-            .execute(
-                inputRoot.toString(),
-                "--output-dir", outputRoot.toString(),
-                "--ucon64-path", ucon64Path,
-                "--mtools-path", "mcopy",
-                "--format", "fig"
-            );
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(
+                        inputRoot.toString(),
+                        "--output-dir", outputRoot.toString(),
+                        "--ucon64-path", ucon64Path,
+                        "--mtools-path", "mcopy",
+                        "--format", "fig"
+                );
         assertEquals(0, exitCode, "Conversion should succeed");
 
         Path expectedGameDir = outputRoot.resolve("game");
@@ -209,14 +209,14 @@ class AppRecursionTest {
         }
 
         int exitCode = new CommandLine(new App())
-            .setCaseInsensitiveEnumValuesAllowed(true)
-            .execute(
-                inputRoot.toString(),
-                "--output-dir", outputRoot.toString(),
-                "--ucon64-path", ucon64Path,
-                "--mtools-path", "mcopy",
-                "--format", "fig"
-            );
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(
+                        inputRoot.toString(),
+                        "--output-dir", outputRoot.toString(),
+                        "--ucon64-path", ucon64Path,
+                        "--mtools-path", "mcopy",
+                        "--format", "fig"
+                );
         assertEquals(0, exitCode, "Conversion should succeed");
 
         Path symlinkOutputDir = outputRoot.resolve("symlinked");
