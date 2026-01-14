@@ -34,28 +34,76 @@ import java.util.stream.Stream;
  * - Directory input without -o: outputs to <input>/output subdirectory
  * - Explicit -o flag: overrides all defaults
  */
-@Command(name = "floppyconvert", mixinStandardHelpOptions = true, version = "1.0",
-        description = "Converts SNES ROM files to floppy disk images for backup units (FIG/SWC/UFO/GD3).")
+@Command(name = "floppyconvert",
+        mixinStandardHelpOptions = true,
+        version = "1.0",
+        header = "Converts SNES ROM files to floppy disk images.",
+        description = {
+                "Automates the conversion of SNES ROM files (.sfc) into FAT12 floppy disk images " +
+                        "compatible with retro backup units.",
+                "",
+                "This tool orchestrates 'ucon64' (to split ROMs) and 'mtools' (to inject files into " +
+                        "disk images) to create ready-to-use .img files.",
+                "It supports recursive directory processing and batch conversion."
+        },
+        exitCodeListHeading = "%nExit Codes:%n",
+        exitCodeList = {
+                "0:Successful completion",
+                "1:General execution error (I/O, missing tools, etc.)",
+                "2:Invalid command line arguments"
+        },
+        footerHeading = "%nSee Also:%n",
+        footer = {
+                "ucon64(1), mtools(1), mcopy(1)",
+                "",
+                "Project home: https://noneyet..."
+        }
+)
 public class App implements Callable<Integer> {
 
     @Parameters(index = "0", paramLabel = "INPUT",
-            description = "ROM file (.sfc) or directory containing ROM files")
+            description = {
+                    "The source ROM file (.sfc) to convert, or a directory to process.",
+                    "If a directory is provided, the tool scans it recursively for .sfc files and " +
+                            "converts them in batch mode, preserving the directory structure."
+            })
     File inputPath;
 
     @Option(names = {"-o", "--output-dir"},
-            description = "Output directory for floppy images (default: . for files, <input>/output for directories)")
+            description = {
+                    "The destination directory for generated floppy images.",
+                    "If omitted, defaults apply:",
+                    "  - Single file input: Defaults to the current directory ('.').",
+                    "  - Directory input: Defaults to a folder named 'output' inside the input directory.",
+                    "Necessary subdirectories will be created automatically."
+            })
     File outputDir;
 
     @Option(names = "--format", defaultValue = "FIG",
-            description = "Backup unit format (default: FIG). Valid values: ${COMPLETION-CANDIDATES}")
+            description = {
+                    "Backup unit format.",
+                    "Valid values: ${COMPLETION-CANDIDATES}", // This auto-expands to FIG, SWC, UFO, GD3
+                    "Default: ${DEFAULT-VALUE}"
+            })
     CopierFormat format;
+
     @Spec
     CommandSpec spec;
+
     @Option(names = "--ucon64-path", defaultValue = "ucon64",
-            description = "Path to ucon64 binary (default: ucon64)")
+            description = {
+                    "Path to the 'ucon64' executable used for ROM splitting.",
+                    "Can be a full path or just the command name if it is in your system PATH.",
+                    "Default: ${DEFAULT-VALUE}"
+            })
     private String ucon64Path;
+
     @Option(names = "--mtools-path", defaultValue = "mcopy",
-            description = "Path to mcopy binary from mtools (default: mcopy)")
+            description = {
+                    "Path to the 'mcopy' utility (from the mtools suite).",
+                    "Used to inject ROM parts into the FAT12 floppy images.",
+                    "Default: ${DEFAULT-VALUE}"
+            })
     private String mtoolsPath;
 
     public static void main(String[] args) {
