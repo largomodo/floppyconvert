@@ -54,7 +54,7 @@ public class DosNameUtil {
         }
 
         // Validate name portion is not empty (FAT12 requires at least 1 char in name)
-        // Prevents cryptic mcopy "Cannot initialize" errors later in pipeline
+        // Prevents cryptic FAT12 writer "Cannot initialize" errors later in pipeline
         if (cleanName.isEmpty()) {
             throw new IllegalArgumentException(
                     "Filename cannot be sanitized to valid DOS 8.3 format (name portion would be empty): " + filename

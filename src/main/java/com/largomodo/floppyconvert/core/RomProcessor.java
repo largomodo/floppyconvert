@@ -45,7 +45,7 @@ public class RomProcessor {
      *
      * @param packer          Disk packing strategy (e.g., GreedyDiskPacker)
      * @param splitter        ROM splitting service (e.g., Ucon64Driver)
-     * @param writer          Floppy image writer (e.g., MtoolsDriver)
+     * @param writer          Floppy image writer (e.g., Fat12ImageWriter)
      * @param templateFactory Floppy disk template provider (mockable for testing)
      * @param normalizer      ROM part filename normalizer (stateless utility)
      * @throws IllegalArgumentException if any dependency is null

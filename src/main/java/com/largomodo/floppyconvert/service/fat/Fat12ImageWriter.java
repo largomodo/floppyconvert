@@ -17,7 +17,7 @@ import java.util.Map;
 /**
  * Native Java implementation for writing files into FAT12 floppy disk images.
  * <p>
- * This class replaces the external 'mtools' dependency by directly manipulating
+ * This class provides native FAT12 image manipulation by directly manipulating
  * the FAT12 filesystem structure. It handles:
  * <ul>
  *   <li>Parsing the BIOS Parameter Block (BPB) to locate filesystem areas</li>

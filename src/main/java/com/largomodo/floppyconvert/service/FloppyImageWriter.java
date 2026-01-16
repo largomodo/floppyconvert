@@ -8,10 +8,10 @@ import java.util.Map;
 /**
  * Service interface for writing files into floppy disk images.
  * <p>
- * Abstracts the image injection process to enable alternative implementations beyond mtools.
+ * Abstracts the image injection process to enable alternative implementations.
  * Primary use cases:
  * <ul>
- *   <li>Production: mtools mcopy for FAT12 image manipulation (current implementation)</li>
+ *   <li>Production: Fat12ImageWriter for native FAT12 image manipulation (current implementation)</li>
  *   <li>Testing: Mock implementations for unit testing without external dependencies</li>
  *   <li>Future: Direct FAT12 implementation (no external tools) or alternative image formats</li>
  * </ul>

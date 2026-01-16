@@ -56,9 +56,7 @@ class AppTest {
         mockUcon64.createNewFile();
         mockUcon64.setExecutable(true);
 
-        File mockMtools = tempDir.resolve("mcopy").toFile();
-        mockMtools.createNewFile();
-        mockMtools.setExecutable(true);
+        // Fat12ImageWriter handles image operations natively; ucon64 splits large ROMs into floppy-sized parts
 
         App app = new App();
         CommandLine cmd = new CommandLine(app);
@@ -89,9 +87,7 @@ class AppTest {
         mockUcon64.createNewFile();
         mockUcon64.setExecutable(true);
 
-        File mockMtools = tempDir.resolve("mcopy").toFile();
-        mockMtools.createNewFile();
-        mockMtools.setExecutable(true);
+        // Fat12ImageWriter handles image operations natively; ucon64 splits large ROMs into floppy-sized parts
 
         App app = new App();
         CommandLine cmd = new CommandLine(app);

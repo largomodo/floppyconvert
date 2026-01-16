@@ -7,7 +7,7 @@ import java.io.IOException;
  * <p>
  * Capacity limits are conservative to account for FAT12 filesystem overhead
  * (boot sector, FAT tables, root directory). Using raw disk capacity would
- * cause mcopy failures when filesystem structures exceed available space.
+ * cause write failures when filesystem structures exceed available space.
  */
 public enum FloppyType {
     // 720KB raw (80 tracks × 9 sectors × 2 sides × 512 bytes = 737,280)
