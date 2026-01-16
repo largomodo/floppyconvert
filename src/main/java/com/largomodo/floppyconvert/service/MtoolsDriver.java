@@ -9,6 +9,14 @@ import java.util.Map;
 
 /**
  * Wrapper for mtools mcopy utility (FAT filesystem file injection).
+ *
+ * @deprecated Use {@link com.largomodo.floppyconvert.service.fat.Fat12ImageWriter} instead.
+ *             Fat12ImageWriter provides native Java FAT12 manipulation (no external dependencies).
+ *             This class retained as safety net: if undiscovered FAT12 edge cases surface,
+ *             rollback requires changing only one line in App.java (FloppyImageWriter instantiation).
+ *             Decision rationale: comprehensive unit tests cover all FAT12 operations + E2E tests
+ *             validate full pipeline, but git history alone requires code archaeology for rollback.
+ *             Zero-cost insurance until production stability proven.
  * <p>
  * Injects files into floppy disk images using mcopy. Validates DOS 8.3 compliance
  * BEFORE execution to fail fast (mcopy error messages are cryptic for invalid names).
@@ -16,6 +24,7 @@ import java.util.Map;
  * Batch operation: spawns single mcopy process per disk image with multiple source files,
  * reducing process overhead for multi-part ROMs (typical: 3 parts per disk).
  */
+@Deprecated(since = "2.0", forRemoval = true)
 public class MtoolsDriver extends ExternalProcessDriver implements FloppyImageWriter {
 
     private final String mcopyPath;

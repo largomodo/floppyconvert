@@ -63,8 +63,7 @@ class AppTest {
         App app = new App();
         CommandLine cmd = new CommandLine(app);
         cmd.parseArgs(testFile.getAbsolutePath(),
-                "--ucon64-path", mockUcon64.getAbsolutePath(),
-                "--mtools-path", mockMtools.getAbsolutePath());
+                "--ucon64-path", mockUcon64.getAbsolutePath());
 
         assertNull(app.outputDir, "outputDir should be null until call() computes smart defaults");
 
@@ -97,8 +96,7 @@ class AppTest {
         App app = new App();
         CommandLine cmd = new CommandLine(app);
         cmd.parseArgs(testDir.getAbsolutePath(),
-                "--ucon64-path", mockUcon64.getAbsolutePath(),
-                "--mtools-path", mockMtools.getAbsolutePath());
+                "--ucon64-path", mockUcon64.getAbsolutePath());
 
         assertNull(app.outputDir, "outputDir should be null until call() computes smart defaults");
 

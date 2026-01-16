@@ -4,9 +4,9 @@ import com.largomodo.floppyconvert.core.*;
 import com.largomodo.floppyconvert.core.domain.DiskPacker;
 import com.largomodo.floppyconvert.core.domain.GreedyDiskPacker;
 import com.largomodo.floppyconvert.service.FloppyImageWriter;
-import com.largomodo.floppyconvert.service.MtoolsDriver;
 import com.largomodo.floppyconvert.service.RomSplitter;
 import com.largomodo.floppyconvert.service.Ucon64Driver;
+import com.largomodo.floppyconvert.service.fat.Fat12ImageWriter;
 import picocli.CommandLine;
 import picocli.CommandLine.*;
 import picocli.CommandLine.Model.CommandSpec;
@@ -42,8 +42,7 @@ import java.util.stream.Stream;
                 "Automates the conversion of SNES ROM files (.sfc) into FAT12 floppy disk images " +
                         "compatible with retro backup units.",
                 "",
-                "This tool orchestrates 'ucon64' (to split ROMs) and 'mtools' (to inject files into " +
-                        "disk images) to create ready-to-use .img files.",
+                "This tool uses 'ucon64' to split ROMs and a native FAT12 engine to create .img files.",
                 "It supports recursive directory processing and batch conversion."
         },
         exitCodeListHeading = "%nExit Codes:%n",
@@ -54,7 +53,7 @@ import java.util.stream.Stream;
         },
         footerHeading = "%nSee Also:%n",
         footer = {
-                "ucon64(1), mtools(1), mcopy(1)",
+                "ucon64(1)",
                 "",
                 "Project home: https://noneyet..."
         }
@@ -98,13 +97,6 @@ public class App implements Callable<Integer> {
             })
     private String ucon64Path;
 
-    @Option(names = "--mtools-path", defaultValue = "mcopy",
-            description = {
-                    "Path to the 'mcopy' utility (from the mtools suite).",
-                    "Used to inject ROM parts into the FAT12 floppy images.",
-                    "Default: ${DEFAULT-VALUE}"
-            })
-    private String mtoolsPath;
 
     public static void main(String[] args) {
         CommandLine cmd = new CommandLine(new App());
@@ -120,7 +112,7 @@ public class App implements Callable<Integer> {
      * Bounded queue provides backpressure. CallerRunsPolicy throttles submission.
      * Each ROM processed in isolated workspace directory (UUID suffix prevents collisions).
      * <p>
-     * Thread pool sizing: coreCount threads prevents CPU oversubscription (ucon64/mtools are CPU-bound).
+     * Thread pool sizing: coreCount threads prevents CPU oversubscription (ucon64 is CPU-bound).
      * Bounded queue (2 * coreCount) limits memory footprint on large ROM libraries (prevents OOM).
      * CallerRunsPolicy throttles submission when queue full (main thread processes ROM).
      */
@@ -128,12 +120,13 @@ public class App implements Callable<Integer> {
         Path inputRoot = Paths.get(config.inputDir);
         Path outputRoot = Paths.get(config.outputDir);
 
-        validateExternalTools(config);
+        validateUcon64(config);
 
         // Dependency injection: instantiate service implementations
         DiskPacker packer = new GreedyDiskPacker();
         RomSplitter splitter = new Ucon64Driver(config.ucon64Path);
-        FloppyImageWriter writer = new MtoolsDriver(config.mtoolsPath);
+        // Native Java FAT12 engine with no external dependencies (comprehensive E2E test coverage validates safety)
+        FloppyImageWriter writer = new Fat12ImageWriter();
         DiskTemplateFactory templateFactory = new ResourceDiskTemplateFactory();
         RomPartNormalizer normalizer = new RomPartNormalizer();
         RomProcessor processor = new RomProcessor(packer, splitter, writer, templateFactory, normalizer);
@@ -287,12 +280,13 @@ public class App implements Callable<Integer> {
             throw new IOException("Input path is not a file: " + inputPath);
         }
 
-        validateExternalTools(config);
+        validateUcon64(config);
 
         // Dependency injection: instantiate service implementations
         DiskPacker packer = new GreedyDiskPacker();
         RomSplitter splitter = new Ucon64Driver(config.ucon64Path);
-        FloppyImageWriter writer = new MtoolsDriver(config.mtoolsPath);
+        // Native Java FAT12 engine with no external dependencies (comprehensive E2E test coverage validates safety)
+        FloppyImageWriter writer = new Fat12ImageWriter();
         DiskTemplateFactory templateFactory = new ResourceDiskTemplateFactory();
         RomPartNormalizer normalizer = new RomPartNormalizer();
         RomProcessor processor = new RomProcessor(packer, splitter, writer, templateFactory, normalizer);
@@ -323,17 +317,14 @@ public class App implements Callable<Integer> {
     }
 
     /**
-     * Validate external tool availability (ucon64 and mcopy).
-     * Fail-fast validation prevents processing attempts when tools are missing.
+     * Validate ucon64 availability.
+     * Fail-fast validation prevents processing attempts when tool is missing.
+     * Fat12ImageWriter provides native Java FAT12 manipulation (no external mcopy dependency).
      */
-    private static void validateExternalTools(Config config) throws IOException {
+    private static void validateUcon64(Config config) throws IOException {
         File ucon64 = new File(config.ucon64Path);
         if (!ucon64.canExecute() && !commandExistsInPath(config.ucon64Path)) {
             throw new IOException("ucon64 not found: install via package manager or specify --ucon64-path");
-        }
-        File mcopy = new File(config.mtoolsPath);
-        if (!mcopy.canExecute() && !commandExistsInPath(config.mtoolsPath)) {
-            throw new IOException("mcopy not found: install via package manager (mtools) or specify --mtools-path");
         }
     }
 
@@ -387,13 +378,13 @@ public class App implements Callable<Integer> {
         if (inputPath.isFile()) {
             runSingleFile(
                     new Config(null, outputDir.getAbsolutePath(),
-                            ucon64Path, mtoolsPath, format, inputPath.getAbsolutePath()),
+                            ucon64Path, format, inputPath.getAbsolutePath()),
                     outputDir.toPath()
             );
         } else {
             runBatch(
                     new Config(inputPath.getAbsolutePath(), outputDir.getAbsolutePath(),
-                            ucon64Path, mtoolsPath, format, null)
+                            ucon64Path, format, null)
             );
         }
 
@@ -405,6 +396,6 @@ public class App implements Callable<Integer> {
      * signatures (avoids cascading changes to RomProcessor integration points).
      */
     private record Config(String inputDir, String outputDir,
-                          String ucon64Path, String mtoolsPath, CopierFormat format, String inputFile) {
+                          String ucon64Path, CopierFormat format, String inputFile) {
     }
 }

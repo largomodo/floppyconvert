@@ -97,8 +97,7 @@ class AppE2ETest {
                         inputRom.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                        "--mtools-path", "mcopy",
-                        "--format", format.name().toLowerCase()
+                                                "--format", format.name().toLowerCase()
                 );
 
         assertEquals(0, exitCode, "Conversion should succeed");
@@ -172,8 +171,7 @@ class AppE2ETest {
                         testRom.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                        "--mtools-path", "mcopy",
-                        "--format", "fig"
+                                                "--format", "fig"
                 );
 
         assertEquals(0, exitCode, "Conversion should succeed");
@@ -250,8 +248,7 @@ class AppE2ETest {
                         testRom.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                        "--mtools-path", "mcopy",
-                        "--format", "fig"
+                                                "--format", "fig"
                 );
 
         assertEquals(0, exitCode, "Conversion should succeed even with special characters in filename");
@@ -320,8 +317,7 @@ class AppE2ETest {
                         testRom.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                        "--mtools-path", "mcopy",
-                        "--format", "fig"
+                                                "--format", "fig"
                 );
 
         assertEquals(0, exitCode, "Conversion should succeed with shell-sensitive characters (&, $, !, space)");

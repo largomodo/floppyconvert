@@ -20,8 +20,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * Verifies that batch mode correctly processes ROMs in nested directory structures
  * and mirrors the source structure in output.
  * <p>
- * Requires external tools: ucon64 and mtools (mcopy).
- * Tests skip gracefully when tools are unavailable.
+ * Requires external tool: ucon64.
+ * Tests skip gracefully when ucon64 is unavailable.
  */
 class AppRecursionTest {
 
@@ -49,7 +49,7 @@ class AppRecursionTest {
             return;
         }
 
-        toolsAvailable = isCommandAvailable("mcopy");
+        toolsAvailable = true;
     }
 
     private static boolean isCommandAvailable(String command) {
@@ -66,7 +66,7 @@ class AppRecursionTest {
 
     @Test
     void testDeepNesting(@TempDir Path tempDir) throws Exception {
-        assumeTrue(toolsAvailable, "Skipping: ucon64 and/or mcopy not available");
+        assumeTrue(toolsAvailable, "Skipping: ucon64 not available");
 
         Path inputRoot = tempDir.resolve("input");
         Path outputRoot = tempDir.resolve("output");
@@ -84,8 +84,7 @@ class AppRecursionTest {
                         inputRoot.toString(),
                         "--output-dir", outputRoot.toString(),
                         "--ucon64-path", ucon64Path,
-                        "--mtools-path", "mcopy",
-                        "--format", "fig"
+                                                "--format", "fig"
                 );
         assertEquals(0, exitCode, "Conversion should succeed");
 
@@ -106,7 +105,7 @@ class AppRecursionTest {
 
     @Test
     void testSiblingDirectories(@TempDir Path tempDir) throws Exception {
-        assumeTrue(toolsAvailable, "Skipping: ucon64 and/or mcopy not available");
+        assumeTrue(toolsAvailable, "Skipping: ucon64 not available");
 
         Path inputRoot = tempDir.resolve("input");
         Path outputRoot = tempDir.resolve("output");
@@ -127,8 +126,7 @@ class AppRecursionTest {
                         inputRoot.toString(),
                         "--output-dir", outputRoot.toString(),
                         "--ucon64-path", ucon64Path,
-                        "--mtools-path", "mcopy",
-                        "--format", "fig"
+                                                "--format", "fig"
                 );
         assertEquals(0, exitCode, "Conversion should succeed");
 
@@ -154,7 +152,7 @@ class AppRecursionTest {
 
     @Test
     void testRootLevelFile(@TempDir Path tempDir) throws Exception {
-        assumeTrue(toolsAvailable, "Skipping: ucon64 and/or mcopy not available");
+        assumeTrue(toolsAvailable, "Skipping: ucon64 not available");
 
         Path inputRoot = tempDir.resolve("input");
         Path outputRoot = tempDir.resolve("output");
@@ -169,8 +167,7 @@ class AppRecursionTest {
                         inputRoot.toString(),
                         "--output-dir", outputRoot.toString(),
                         "--ucon64-path", ucon64Path,
-                        "--mtools-path", "mcopy",
-                        "--format", "fig"
+                                                "--format", "fig"
                 );
         assertEquals(0, exitCode, "Conversion should succeed");
 
@@ -190,7 +187,7 @@ class AppRecursionTest {
 
     @Test
     void testSymlinkNotFollowed(@TempDir Path tempDir) throws Exception {
-        assumeTrue(toolsAvailable, "Skipping: ucon64 and/or mcopy not available");
+        assumeTrue(toolsAvailable, "Skipping: ucon64 not available");
 
         Path inputRoot = tempDir.resolve("input");
         Path outputRoot = tempDir.resolve("output");
@@ -214,8 +211,7 @@ class AppRecursionTest {
                         inputRoot.toString(),
                         "--output-dir", outputRoot.toString(),
                         "--ucon64-path", ucon64Path,
-                        "--mtools-path", "mcopy",
-                        "--format", "fig"
+                                                "--format", "fig"
                 );
         assertEquals(0, exitCode, "Conversion should succeed");
 
