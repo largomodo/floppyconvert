@@ -9,11 +9,11 @@ import java.io.IOException;
 /**
  * Base class for external process execution with timeout and exit code enforcement.
  * <p>
- * Provides watchdog-based timeout protection (prevents hung ucon64/mtools from stalling
+ * Provides watchdog-based timeout protection (prevents hung external processes from stalling
  * batch jobs) and automatic non-zero exit code detection (fails fast on tool errors
  * with stderr captured for diagnostics).
  * <p>
- * Subclasses: Ucon64Driver, MtoolsDriver
+ * Subclass: Ucon64Driver
  */
 public abstract class ExternalProcessDriver {
 
@@ -69,7 +69,7 @@ public abstract class ExternalProcessDriver {
         }
 
         // Watchdog terminates process if execution exceeds timeout
-        // Prevents hung ucon64/mtools processes from stalling batch jobs indefinitely
+        // Prevents hung external processes from stalling batch jobs indefinitely
         // 60s default = 6x typical runtime, balances responsiveness with large ROM tolerance
         ExecuteWatchdog watchdog = new ExecuteWatchdog(timeoutMs);
         executor.setWatchdog(watchdog);

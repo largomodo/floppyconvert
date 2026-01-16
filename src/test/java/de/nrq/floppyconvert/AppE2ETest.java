@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * End-to-end tests for the full ROM conversion pipeline.
  * Tests all supported backup unit formats (FIG, SWC, UFO, GD3) with real ROM files.
  * <p>
- * Requires external tools: ucon64 and mtools (mcopy).
+ * Requires external tools: ucon64.
  * Tests skip gracefully when tools are unavailable.
  */
 class AppE2ETest {
@@ -34,28 +34,22 @@ class AppE2ETest {
     // Super Mario World is 4 Mbit - too small to split, tests single-file-per-disk path
     private static final String SUPER_MARIO_WORLD_RESOURCE = "/snes/Super Mario World (USA).sfc";
 
-    private static boolean toolsAvailable = false;
     private static String ucon64Path;
 
     /**
-     * Verify both ucon64 and mcopy are available before running E2E tests.
+     * Verify ucon64 is available before running E2E tests.
      * <p>
      * Delegates ucon64 resolution to TestUcon64PathResolver (eliminates
-     * code duplication with Ucon64DriverTest). mcopy check remains local
-     * (no other tests require mcopy, so no shared utility needed).
+     * code duplication with Ucon64DriverTest).
      */
     @BeforeAll
     static void checkExternalToolsAvailable() {
         // Use shared resolver for ucon64 (PATH-first, then classpath fallback)
         var resolvedPath = TestUcon64PathResolver.resolveUcon64Path();
         if (resolvedPath.isEmpty()) {
-            toolsAvailable = false;
             return;
         }
         ucon64Path = resolvedPath.get();
-
-        // mcopy check independent of ucon64 resolution
-        toolsAvailable = TestUcon64PathResolver.isCommandAvailable("mcopy");
     }
 
     static Stream<Arguments> formatAndRomProvider() {
@@ -76,9 +70,6 @@ class AppE2ETest {
     @ParameterizedTest(name = "{0} - {1}")
     @MethodSource("formatAndRomProvider")
     void testFullConversionPipeline(CopierFormat format, String romResourcePath, @TempDir Path tempDir) throws Exception {
-
-        assumeTrue(toolsAvailable, "Skipping: ucon64 and/or mcopy not available");
-
         // Copy ROM file to temp directory
         Path inputRom = tempDir.resolve("input.sfc");
         try (InputStream is = getClass().getResourceAsStream(romResourcePath)) {
@@ -151,8 +142,6 @@ class AppE2ETest {
 
     @Test
     void testSingleFileMode(@TempDir Path tempDir) throws Exception {
-        assumeTrue(toolsAvailable, "Skipping: ucon64 and/or mcopy not available");
-
         // Copy Super Mario World ROM to temp directory
         Path testRom = tempDir.resolve("SuperMarioWorld.sfc");
         try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
@@ -218,10 +207,8 @@ class AppE2ETest {
 
     @Test
     void testSpecialCharactersInFilename(@TempDir Path tempDir) throws Exception {
-        assumeTrue(toolsAvailable, "Skipping: ucon64 and/or mcopy not available");
-
         // Copy ROM file with special characters in the filename
-        // This tests the mcopy sanitization fix for characters like #, [, ], (, ), and space
+        // Validates filename sanitization for special characters (#, [, ], (, ), space)
         String problematicFilename = "VLDC10 [#053] - ERROR CODE #1D4 (Update) by Sayuri [2017-04-02] (SMW Hack).sfc";
         Path testRom = tempDir.resolve(problematicFilename);
 
@@ -287,10 +274,8 @@ class AppE2ETest {
 
     @Test
     void testShellSensitiveCharactersInFilename(@TempDir Path tempDir) throws Exception {
-        assumeTrue(toolsAvailable, "Skipping: ucon64 and/or mcopy not available");
-
         // Test file with shell-sensitive characters: &, $, !, and space
-        // These characters cause mcopy's argument parser to truncate paths
+        // These characters require escaping to prevent argument parser truncation
         String problematicFilename = "Ren & Stimpy Show, The - Buckeroo$! (USA).sfc";
         Path testRom = tempDir.resolve(problematicFilename);
 
