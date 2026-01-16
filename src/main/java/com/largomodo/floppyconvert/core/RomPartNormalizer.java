@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Normalizes ROM part filenames for shell and mcopy compatibility.
+ * Normalizes ROM part filenames for filesystem safety and shell compatibility.
  * <p>
  * Stateless design enables concurrent use without synchronization (parallel batch processing),
  * simpler unit testing (no state reset between tests), and matches DosNameUtil pattern.
@@ -24,7 +24,7 @@ public class RomPartNormalizer {
     /**
      * Sanitize ROM part filenames and generate metadata for disk packing.
      * <p>
-     * Renames files on disk to remove shell-sensitive characters (prevents mcopy argument
+     * Renames files on disk to remove shell-sensitive characters (prevents command-line argument
      * parser issues), updates workspace tracking to reflect new paths, and generates
      * DOS-compliant names for floppy image injection.
      * <p>
@@ -89,9 +89,9 @@ public class RomPartNormalizer {
     }
 
     /**
-     * Remove shell-sensitive characters that cause mcopy argument parsing issues.
+     * Remove shell-sensitive characters that cause command-line argument parsing issues.
      * <p>
-     * Replacements prevent path truncation (mcopy treats brackets/parens as special) and
+     * Replacements prevent path truncation (some tools treat brackets/parens as special) and
      * command injection risks (ampersand, dollar sign, exclamation enable shell expansion).
      * Idempotent: applying twice produces same result as applying once (prevents cascading
      * transformations during retries).

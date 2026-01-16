@@ -319,7 +319,7 @@ public class App implements Callable<Integer> {
     /**
      * Validate ucon64 availability.
      * Fail-fast validation prevents processing attempts when tool is missing.
-     * Fat12ImageWriter provides native Java FAT12 manipulation (no external mcopy dependency).
+     * Fat12ImageWriter provides native Java FAT12 manipulation.
      */
     private static void validateUcon64(Config config) throws IOException {
         File ucon64 = new File(config.ucon64Path);
