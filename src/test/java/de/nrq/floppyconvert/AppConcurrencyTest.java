@@ -86,8 +86,7 @@ class AppConcurrencyTest {
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                        "--mtools-path", "mcopy",
-                        "--format", "fig"
+                                                "--format", "fig"
                 );
 
         assertEquals(0, exitCode, "Batch processing should succeed");
@@ -147,8 +146,7 @@ class AppConcurrencyTest {
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                        "--mtools-path", "mcopy",
-                        "--format", "swc"
+                                                "--format", "swc"
                 );
 
         assertEquals(0, exitCode, "Batch processing should succeed despite basename collision");
@@ -193,8 +191,7 @@ class AppConcurrencyTest {
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                        "--mtools-path", "mcopy",
-                        "--format", "ufo"
+                                                "--format", "ufo"
                 );
 
         assertEquals(0, exitCode, "Batch processing should succeed");
@@ -234,8 +231,7 @@ class AppConcurrencyTest {
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                        "--mtools-path", "mcopy",
-                        "--format", "gd3"
+                                                "--format", "gd3"
                 );
 
         assertEquals(0, exitCode, "Should complete normally");
@@ -280,8 +276,7 @@ class AppConcurrencyTest {
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                        "--mtools-path", "mcopy",
-                        "--format", "fig"
+                                                "--format", "fig"
                 );
 
         assertEquals(0, exitCode, "All ROMs should process without collision");
