@@ -9,6 +9,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Manages temporary artifacts during ROM conversion with automatic cleanup.
  * <p>
@@ -24,6 +27,8 @@ import java.util.List;
  * deletion to avoid blocking on I/O operations.
  */
 public class ConversionWorkspace implements AutoCloseable {
+
+    private static final Logger log = LoggerFactory.getLogger(ConversionWorkspace.class);
 
     private final Path workDir;
     private final List<Path> trackedFiles = new ArrayList<>();
@@ -88,7 +93,7 @@ public class ConversionWorkspace implements AutoCloseable {
         Path targetPath = finalDestinationDir.resolve(sourceArtifact.getFileName());
 
         if (Files.exists(targetPath)) {
-            System.err.println("WARNING: Overwriting existing file: " + targetPath);
+            log.warn("Overwriting existing file: {}", targetPath);
         }
 
         try {
@@ -102,8 +107,7 @@ public class ConversionWorkspace implements AutoCloseable {
                 Files.delete(sourceArtifact);
             } catch (IOException deleteEx) {
                 // Best-effort cleanup; workspace close() will retry
-                System.err.println("Warning: Could not delete workspace copy after move: " +
-                        sourceArtifact + ": " + deleteEx.getMessage());
+                log.warn("Could not delete workspace copy after move: {}: {}", sourceArtifact, deleteEx.getMessage());
             }
         }
 
@@ -122,7 +126,7 @@ public class ConversionWorkspace implements AutoCloseable {
     public void close() {
         // Check interruption status WITHOUT clearing flag (non-destructive read)
         if (Thread.currentThread().isInterrupted()) {
-            System.err.println("Warning: Thread interrupted, skipping cleanup for workspace: " + workDir);
+            log.warn("Thread interrupted, skipping cleanup for workspace: {}", workDir);
             return;
         }
 
@@ -139,8 +143,7 @@ public class ConversionWorkspace implements AutoCloseable {
             } catch (IOException e) {
                 // Best-effort cleanup: log but don't propagate
                 // Windows file locking may prevent immediate deletion
-                System.err.println("Warning: Could not delete artifact " + artifact +
-                        ": " + e.getMessage());
+                log.warn("Could not delete artifact {}: {}", artifact, e.getMessage());
             }
         }
     }
