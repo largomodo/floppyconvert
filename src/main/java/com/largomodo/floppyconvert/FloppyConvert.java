@@ -58,7 +58,7 @@ import java.util.stream.Stream;
         footer = {
                 "ucon64(1)",
                 "",
-                "Project home: https://noneyet..."
+                "Project home: https://github.com/largomodo/floppyconvert"
         }
 )
 public class FloppyConvert implements Callable<Integer> {
