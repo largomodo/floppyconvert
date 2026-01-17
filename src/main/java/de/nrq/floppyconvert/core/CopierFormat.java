@@ -8,7 +8,7 @@ import java.util.function.Predicate;
  * Encapsulates the command-line flag for each format.
  */
 public enum CopierFormat {
-    FIG("--fig"),   // Doctor V64 / Mr Backup Z64
+    FIG("--fig"),   // Pro Fighter Q/X/Turbo
     SWC("--swc"),   // Super Wild Card
     UFO("--ufo"),   // Super UFO
     GD3("--gd3");   // Game Doctor SF3/SF6/SF7
