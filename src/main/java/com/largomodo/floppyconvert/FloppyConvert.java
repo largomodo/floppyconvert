@@ -61,9 +61,9 @@ import java.util.stream.Stream;
                 "Project home: https://noneyet..."
         }
 )
-public class App implements Callable<Integer> {
+public class FloppyConvert implements Callable<Integer> {
 
-    private static final Logger log = LoggerFactory.getLogger(App.class);
+    private static final Logger log = LoggerFactory.getLogger(FloppyConvert.class);
 
     @Parameters(index = "0", paramLabel = "INPUT",
             description = {
@@ -107,7 +107,7 @@ public class App implements Callable<Integer> {
 
 
     public static void main(String[] args) {
-        CommandLine cmd = new CommandLine(new App());
+        CommandLine cmd = new CommandLine(new FloppyConvert());
         cmd.setCaseInsensitiveEnumValuesAllowed(true);
         int exitCode = cmd.execute(args);
         System.exit(exitCode);

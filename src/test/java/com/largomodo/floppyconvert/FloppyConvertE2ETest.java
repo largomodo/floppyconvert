@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * Requires external tools: ucon64.
  * Tests skip gracefully when tools are unavailable.
  */
-class AppE2ETest {
+class FloppyConvertE2ETest {
 
     // Chrono Trigger is 32 Mbit - large enough for split testing (produces multiple parts)
     private static final String CHRONO_TRIGGER_RESOURCE = "/snes/Chrono Trigger (USA).sfc";
@@ -82,7 +82,7 @@ class AppE2ETest {
         Path outputDir = tempDir.resolve("output");
 
         // Invoke CLI via CommandLine.execute() with positional input parameter
-        int exitCode = new CommandLine(new App())
+        int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute(
                         inputRom.toString(),
@@ -154,7 +154,7 @@ class AppE2ETest {
         Path outputDir = tempDir.resolve("output");
 
         // Invoke CLI via CommandLine.execute() with positional input parameter (single file mode)
-        int exitCode = new CommandLine(new App())
+        int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute(
                         testRom.toString(),
@@ -229,7 +229,7 @@ class AppE2ETest {
         Path outputDir = tempDir.resolve("output");
 
         // Invoke CLI - should handle special characters without truncation
-        int exitCode = new CommandLine(new App())
+        int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute(
                         testRom.toString(),
@@ -296,7 +296,7 @@ class AppE2ETest {
         Path outputDir = tempDir.resolve("output");
 
         // Invoke CLI - should handle shell-sensitive characters without truncation
-        int exitCode = new CommandLine(new App())
+        int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute(
                         testRom.toString(),

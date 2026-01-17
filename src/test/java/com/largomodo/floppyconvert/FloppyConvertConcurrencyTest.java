@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * - Final .img files moved to correct output locations
  * - Concurrent ROMs with same basename handled correctly (overwrite with warning)
  */
-class AppConcurrencyTest {
+class FloppyConvertConcurrencyTest {
 
     @TempDir
     Path tempDir;
@@ -80,7 +80,7 @@ class AppConcurrencyTest {
         }
 
         // Execute batch processing
-        int exitCode = new CommandLine(new App())
+        int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute(
                         inputDir.toString(),
@@ -140,7 +140,7 @@ class AppConcurrencyTest {
         Files.write(subdir2.resolve("SameName.sfc"), templateRomData);
 
         // Execute batch processing
-        int exitCode = new CommandLine(new App())
+        int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute(
                         inputDir.toString(),
@@ -185,7 +185,7 @@ class AppConcurrencyTest {
         }
 
         // Execute batch processing
-        int exitCode = new CommandLine(new App())
+        int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute(
                         inputDir.toString(),
@@ -225,7 +225,7 @@ class AppConcurrencyTest {
         Files.write(romFile, templateRomData);
 
         // Execute batch processing (completes normally)
-        int exitCode = new CommandLine(new App())
+        int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute(
                         inputDir.toString(),
@@ -270,7 +270,7 @@ class AppConcurrencyTest {
         // This is tricky to observe directly, so we verify via side effects:
         // 1. All ROMs complete successfully (no collisions)
         // 2. All workspaces cleaned up afterward
-        int exitCode = new CommandLine(new App())
+        int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute(
                         inputDir.toString(),
