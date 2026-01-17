@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ConversionWorkspaceTest {
 
-    private final PrintStream originalErr = System.err;
+    private final PrintStream originalOut = System.out;
     @TempDir
     Path tempDir;
     private ByteArrayOutputStream errContent;
@@ -23,12 +23,12 @@ class ConversionWorkspaceTest {
     @BeforeEach
     void setUp() {
         errContent = new ByteArrayOutputStream();
-        System.setErr(new PrintStream(errContent));
+        System.setOut(new PrintStream(errContent));
     }
 
     @AfterEach
     void tearDown() {
-        System.setErr(originalErr);
+        System.setOut(originalOut);
         Thread.interrupted(); // Clear interrupted flag if set
     }
 
@@ -145,7 +145,7 @@ class ConversionWorkspaceTest {
         // On Windows, this test documents expected behavior for locked files
         String stderr = errContent.toString();
         if (!System.getProperty("os.name").toLowerCase().contains("win")) {
-            assertTrue(stderr.contains("Warning: Could not delete artifact") ||
+            assertTrue(stderr.contains("Could not delete artifact") ||
                             stderr.isEmpty(), // May succeed on some systems
                     "Should log warning for deletion failure on Unix");
         }
@@ -168,7 +168,7 @@ class ConversionWorkspaceTest {
 
         // Verify warning was logged
         String stderr = errContent.toString();
-        assertTrue(stderr.contains("Warning: Thread interrupted, skipping cleanup"),
+        assertTrue(stderr.contains("Thread interrupted, skipping cleanup"),
                 "Should log warning for interrupted thread");
         assertTrue(stderr.contains(tempDir.resolve("TestRom").toString()),
                 "Warning should include workspace path");
@@ -271,7 +271,7 @@ class ConversionWorkspaceTest {
         workspace.promoteToFinal(workspaceFile, finalDir);
 
         String stderr = errContent.toString();
-        assertTrue(stderr.contains("WARNING: Overwriting existing file:"),
+        assertTrue(stderr.contains("Overwriting existing file:"),
                 "Should log overwrite warning");
         assertTrue(stderr.contains(targetFile.toString()),
                 "Warning should include target path");

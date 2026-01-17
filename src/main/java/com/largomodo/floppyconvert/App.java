@@ -7,6 +7,9 @@ import com.largomodo.floppyconvert.service.FloppyImageWriter;
 import com.largomodo.floppyconvert.service.RomSplitter;
 import com.largomodo.floppyconvert.service.Ucon64Driver;
 import com.largomodo.floppyconvert.service.fat.Fat12ImageWriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import picocli.CommandLine;
 import picocli.CommandLine.*;
 import picocli.CommandLine.Model.CommandSpec;
@@ -60,6 +63,8 @@ import java.util.stream.Stream;
 )
 public class App implements Callable<Integer> {
 
+    private static final Logger log = LoggerFactory.getLogger(App.class);
+
     @Parameters(index = "0", paramLabel = "INPUT",
             description = {
                     "The source ROM file (.sfc) to convert, or a directory to process.",
@@ -77,6 +82,9 @@ public class App implements Callable<Integer> {
                     "Necessary subdirectories will be created automatically."
             })
     File outputDir;
+
+    @Option(names = {"-v", "--verbose"}, description = "Enable verbose output")
+    private boolean verbose;
 
     @Option(names = "--format", defaultValue = "FIG",
             description = {
@@ -131,8 +139,6 @@ public class App implements Callable<Integer> {
         RomPartNormalizer normalizer = new RomPartNormalizer();
         RomProcessor processor = new RomProcessor(packer, splitter, writer, templateFactory, normalizer);
 
-        Path failuresLog = Paths.get(config.outputDir, "failures.txt");
-
         // Fixed thread pool: one thread per CPU core (no context switching overhead)
         int coreCount = Runtime.getRuntime().availableProcessors();
         ExecutorService executor = new ThreadPoolExecutor(
@@ -157,15 +163,14 @@ public class App implements Callable<Integer> {
             @Override
             public void onFailure(Path rom, Exception e) {
                 failCount.incrementAndGet();  // Thread-safe increment
-                logFailure(failuresLog, inputRoot.relativize(rom).toString(), e);
-                System.err.println("FAILED: " + inputRoot.relativize(rom) + " - " + e.getMessage());
+                log.error("FAILED: {} - {}", inputRoot.relativize(rom), e.getMessage());
             }
         };
 
         // Shutdown hook for graceful SIGINT handling
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             if (!executor.isShutdown()) {
-                System.err.println("Interrupt received, shutting down gracefully...");
+                log.info("Interrupt received, shutting down gracefully...");
                 executor.shutdown();
                 try {
                     if (!executor.awaitTermination(5, TimeUnit.MINUTES)) {
@@ -183,7 +188,7 @@ public class App implements Callable<Integer> {
                             return Files.isRegularFile(path);
                         } catch (UncheckedIOException e) {
                             // File attributes unreadable (broken symlink, permission denied on file)
-                            System.err.println("WARNING: Cannot access " + inputRoot.relativize(path) + " - skipping");
+                            log.warn("WARNING: Cannot access {} - skipping", inputRoot.relativize(path));
                             return false;
                         }
                     })
@@ -191,6 +196,7 @@ public class App implements Callable<Integer> {
                     .forEach(romPath -> {
                         executor.submit(() -> {
                             try {
+                                MDC.put("rom", romPath.getFileName().toString());
                                 // UUID suffix creates thread-unique workspace (prevents ucon64 .1/.2/.3 collisions)
                                 String uniqueSuffix = UUID.randomUUID().toString();
                                 Path relativePath = inputRoot.relativize(romPath.getParent());
@@ -208,6 +214,8 @@ public class App implements Callable<Integer> {
                             } catch (Exception e) {
                                 // Catch all exceptions to prevent worker thread death (batch continues)
                                 observer.onFailure(romPath, e);
+                            } finally {
+                                MDC.clear();
                             }
                             return null;
                         });
@@ -221,9 +229,9 @@ public class App implements Callable<Integer> {
              * Successfully processed ROMs counted, error logged with specific path from exception.
              * Fail-soft: partial batch completion better than aborting already-completed work.
              */
-            System.err.println("WARNING: Directory traversal interrupted - " + e.getCause().getMessage());
-            System.err.println("Batch incomplete: " + successCount.get() + " successful, " +
-                    failCount.get() + " failed, some directories skipped");
+            log.error("WARNING: Directory traversal interrupted - {}", e.getCause().getMessage());
+            log.error("Batch incomplete: {} successful, {} failed, some directories skipped",
+                    successCount.get(), failCount.get());
             return;
         } catch (IOException e) {
             /*
@@ -232,7 +240,7 @@ public class App implements Callable<Integer> {
              * Indicates fundamental access problem (input directory unreadable).
              * Fails before any ROM processing begins.
              */
-            System.err.println("ERROR: Cannot traverse input directory: " + e.getMessage());
+            log.error("ERROR: Cannot traverse input directory: {}", e.getMessage());
             return;
         } finally {
             // Standard two-phase shutdown: graceful (5 min) then forceful
@@ -247,11 +255,7 @@ public class App implements Callable<Integer> {
             }
         }
 
-        System.out.println("\nBatch complete: " + successCount.get() + " successful, " +
-                failCount.get() + " failed");
-        if (failCount.get() > 0) {
-            System.out.println("See " + failuresLog + " for failure details");
-        }
+        log.info("Batch complete: {} successful, {} failed", successCount.get(), failCount.get());
     }
 
     /**
@@ -300,7 +304,7 @@ public class App implements Callable<Integer> {
                 config.format
         );
 
-        System.out.println("Conversion complete: " + inputPath.getFileName());
+        log.info("Conversion complete: {}", inputPath.getFileName());
     }
 
     /**
@@ -328,24 +332,14 @@ public class App implements Callable<Integer> {
         }
     }
 
-    /**
-     * Append failure record to failures.txt log.
-     * <p>
-     * Swallows IOException on log write failure (batch processing continues regardless).
-     * Rationale: Logging failure should not halt batch job; console output provides
-     * primary failure notification, file log is secondary convenience.
-     */
-    private static void logFailure(Path logFile, String romName, Exception e) {
-        try (PrintWriter writer = new PrintWriter(new FileWriter(logFile.toFile(), true))) {
-            writer.println(romName + ": " + e.getMessage());
-        } catch (IOException ignored) {
-            // Swallow: logging failure should not halt batch processing
-            // User still sees console error output
-        }
-    }
-
     @Override
     public Integer call() throws Exception {
+        if (verbose) {
+            ch.qos.logback.classic.Logger root =
+                (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+            root.setLevel(ch.qos.logback.classic.Level.DEBUG);
+        }
+
         if (!inputPath.exists()) {
             throw new ParameterException(spec.commandLine(),
                     "Input path does not exist: " + inputPath.getAbsolutePath());

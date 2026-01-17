@@ -6,6 +6,8 @@ import com.largomodo.floppyconvert.core.domain.RomPartMetadata;
 import com.largomodo.floppyconvert.core.workspace.ConversionWorkspace;
 import com.largomodo.floppyconvert.service.FloppyImageWriter;
 import com.largomodo.floppyconvert.service.RomSplitter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -30,6 +32,8 @@ import java.util.stream.Collectors;
  * Dependencies stored as private final fields for thread-safety.
  */
 public class RomProcessor {
+
+    private static final Logger log = LoggerFactory.getLogger(RomProcessor.class);
 
     private final DiskPacker packer;
     private final RomSplitter splitter;
@@ -106,7 +110,7 @@ public class RomProcessor {
             // Track workspace directory for cleanup (deleted last due to reverse-order)
             ws.track(gameOutputDir);
 
-            System.out.println("Processing: " + romFile.getName());
+            log.info("Processing: {}", romFile.getName());
 
             // Invariant 4: preserve pre-existing user files
             // Snapshot existing files BEFORE splitter.split for comparison (needed for GD3 tracking)
@@ -207,8 +211,7 @@ public class RomProcessor {
                 // Batch write all parts to the image
                 writer.write(targetImage, new ArrayList<>(dosNameMap.keySet()), dosNameMap);
 
-                System.out.println("  Created: " + diskName +
-                        " (" + layout.contents().size() + " parts)");
+                log.info("  Created: {} ({} parts)", diskName, layout.contents().size());
                 diskNumber++;
             }
 
@@ -220,8 +223,7 @@ public class RomProcessor {
                 ws.promoteToFinal(imgFile, finalGameDir);
             }
 
-            System.out.println("Success: " + romFile.getName() +
-                    " -> " + (diskNumber - 1) + " disk(s) [" + format.name() + "]");
+            log.info("Success: {} -> {} disk(s) [{}]", romFile.getName(), diskNumber - 1, format.name());
 
             return diskLayouts.size();
         }

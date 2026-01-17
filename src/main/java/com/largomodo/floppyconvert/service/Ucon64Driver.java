@@ -10,6 +10,9 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Wrapper for ucon64 ROM splitting tool.
  * <p>
@@ -19,6 +22,8 @@ import java.util.stream.Collectors;
  * Timeout protection prevents hung processes on corrupted ROMs (60s default).
  */
 public class Ucon64Driver extends ExternalProcessDriver implements RomSplitter {
+
+    private static final Logger log = LoggerFactory.getLogger(Ucon64Driver.class);
 
     private final String ucon64Path;
 
@@ -113,8 +118,7 @@ public class Ucon64Driver extends ExternalProcessDriver implements RomSplitter {
             try {
                 Files.deleteIfExists(convertedFile);
             } catch (IOException e) {
-                System.err.println("Warning: Could not delete intermediate file " +
-                        convertedFile + ": " + e.getMessage());
+                log.warn("Could not delete intermediate file {}: {}", convertedFile, e.getMessage());
             }
         }
 
@@ -139,7 +143,7 @@ public class Ucon64Driver extends ExternalProcessDriver implements RomSplitter {
             executeSplit(convertedFile, workDir, 4);
         } catch (ProcessFailureException e) {
             if (isTooManyPartsError(e)) {
-                System.err.println("WARNING: Large ROM detected, retrying with 12Mbit split...");
+                log.warn("Large ROM detected, retrying with 12Mbit split...");
                 // Clean up partial files from failed 4Mbit attempt
                 try (var stream = Files.list(workDir)) {
                     stream.map(Path::toFile).filter(format.getSplitPartFilter()).forEach(f -> {
