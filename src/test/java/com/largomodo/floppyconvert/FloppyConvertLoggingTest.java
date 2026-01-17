@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * - MDC context propagates ROM filename to log entries
  * - ERROR level logs reach FAILURES appender via LevelFilter
  */
-class AppLoggingTest {
+class FloppyConvertLoggingTest {
 
     @TempDir
     Path tempDir;
@@ -105,9 +105,9 @@ class AppLoggingTest {
 
     @Test
     void testVerboseFlagEnablesDebug() {
-        // Create App instance and parse arguments with verbose flag
-        App app = new App();
-        CommandLine cmd = new CommandLine(app);
+        // Create FloppyConvert instance and parse arguments with verbose flag
+        FloppyConvert floppyConvert = new FloppyConvert();
+        CommandLine cmd = new CommandLine(floppyConvert);
 
         // Parse arguments but don't execute yet
         Path dummyInput = tempDir.resolve("dummy.sfc");
@@ -118,7 +118,7 @@ class AppLoggingTest {
 
         // Execute call() which should set DEBUG level when verbose=true
         try {
-            app.call();
+            floppyConvert.call();
         } catch (Exception e) {
             // Expected to fail due to missing input file, but that's OK
             // We're testing the logging setup that happens at the start of call()
@@ -144,7 +144,7 @@ class AppLoggingTest {
         Path outputDir = tempDir.resolve("output");
 
         // Execute batch conversion using CommandLine
-        new CommandLine(new App())
+        new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute(
                         inputDir.toString(),
@@ -194,7 +194,7 @@ class AppLoggingTest {
         Path outputDir = tempDir.resolve("output");
 
         // Execute batch conversion using CommandLine (should fail and log error)
-        new CommandLine(new App())
+        new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute(
                         inputDir.toString(),

@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * Requires external tool: ucon64.
  * Tests skip gracefully when ucon64 is unavailable.
  */
-class AppRecursionTest {
+class FloppyConvertRecursionTest {
 
     private static final String SUPER_MARIO_WORLD_RESOURCE = "/snes/Super Mario World (USA).sfc";
 
@@ -32,7 +32,7 @@ class AppRecursionTest {
 
     @BeforeAll
     static void checkExternalToolsAvailable() {
-        var ucon64Resource = AppRecursionTest.class.getResource("/ucon64");
+        var ucon64Resource = FloppyConvertRecursionTest.class.getResource("/ucon64");
         if (ucon64Resource == null) {
             toolsAvailable = false;
             return;
@@ -78,7 +78,7 @@ class AppRecursionTest {
         Path testRom = subCategoryDir.resolve("game.sfc");
         Files.copy(getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE), testRom);
 
-        int exitCode = new CommandLine(new App())
+        int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute(
                         inputRoot.toString(),
@@ -120,7 +120,7 @@ class AppRecursionTest {
         Files.copy(getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE), testRom1);
         Files.copy(getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE), testRom2);
 
-        int exitCode = new CommandLine(new App())
+        int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute(
                         inputRoot.toString(),
@@ -161,7 +161,7 @@ class AppRecursionTest {
         Path testRom = inputRoot.resolve("game.sfc");
         Files.copy(getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE), testRom);
 
-        int exitCode = new CommandLine(new App())
+        int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute(
                         inputRoot.toString(),
@@ -205,7 +205,7 @@ class AppRecursionTest {
             assumeTrue(false, "Skipping: filesystem does not support symlinks");
         }
 
-        int exitCode = new CommandLine(new App())
+        int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute(
                         inputRoot.toString(),
