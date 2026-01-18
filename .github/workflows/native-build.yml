@@ -4,7 +4,9 @@ on:
   push:
     branches: [ "main" ]
   release:
-    types: [created]
+    types: [ created ]
+  # Manual trigger for testing without pushing
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -28,14 +30,14 @@ jobs:
             executable: floppyconvert.exe
             zip_name: floppyconvert-windows-x86.zip
 
-          # macOS Intel (x86_64) - Explicitly request macos-13
-          - os: macos-13
+          # macOS Intel (x86_64)
+          - os: macos-15-intel
             name: macOS-Intel
             executable: floppyconvert
             zip_name: floppyconvert-macos-intel.zip
 
-          # macOS Apple Silicon (ARM64) - Explicitly request macos-14 or latest
-          - os: macos-14
+          # macOS Apple Silicon (ARM64)
+          - os: macos-latest
             name: macOS-ARM64
             executable: floppyconvert
             zip_name: floppyconvert-macos-arm64.zip
@@ -56,8 +58,8 @@ jobs:
       - name: Build Native Image
         run: mvn -Pnative clean package native:build
 
-      # Packaging logic (Linux/Mac)
-      - name: Prepare Zip (Unix)
+      # Packaging logic (Unix)
+      - name: Prepare Distribution (Unix)
         if: matrix.os != 'windows-latest'
         run: |
           mkdir dist
@@ -67,22 +69,22 @@ jobs:
           zip -r ../${{ matrix.zip_name }} .
 
       # Packaging logic (Windows)
-      - name: Prepare Zip (Windows)
+      - name: Prepare Distribution (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path dist
           Copy-Item target\${{ matrix.executable }} dist\${{ matrix.executable }}
           Compress-Archive -Path dist\* -DestinationPath ${{ matrix.zip_name }}
-
-      # Upload Artifacts to Action Run
+          
+            # Upload Artifacts to Action Run
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.zip_name }}
-          path: ${{ matrix.zip_name }}
+          name: floppyconvert-${{ matrix.name }}
+          path: dist/${{ matrix.executable }}
 
-      # Attach to Release (if applicable)
+          # Attach to Release (if applicable)
       - name: Upload Release Asset
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v1
