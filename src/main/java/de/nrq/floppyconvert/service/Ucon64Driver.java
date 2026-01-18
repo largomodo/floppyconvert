@@ -189,7 +189,7 @@ public class Ucon64Driver extends ExternalProcessDriver implements RomSplitter {
                 "--ncol",
                 "-s",
                 "--ssize=" + size,
-                convertedFile.toString()
+                convertedFile.toAbsolutePath().toString()
         };
 
         executeCommand(splitCmd, DEFAULT_TIMEOUT_MS, workDir.toFile());
