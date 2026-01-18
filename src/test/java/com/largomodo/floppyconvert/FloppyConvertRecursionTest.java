@@ -1,17 +1,17 @@
 package com.largomodo.floppyconvert;
 
+import com.largomodo.floppyconvert.util.TestUcon64PathResolver;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -32,24 +32,13 @@ class FloppyConvertRecursionTest {
 
     @BeforeAll
     static void checkExternalToolsAvailable() {
-        var ucon64Resource = FloppyConvertRecursionTest.class.getResource("/ucon64");
-        if (ucon64Resource == null) {
+        Optional<String> resolvedPath = TestUcon64PathResolver.resolveUcon64Path();
+        if (resolvedPath.isPresent()) {
+            ucon64Path = resolvedPath.get();
+            toolsAvailable = true;
+        } else {
             toolsAvailable = false;
-            return;
         }
-        try {
-            File ucon64File = new File(ucon64Resource.toURI());
-            if (!ucon64File.canExecute()) {
-                toolsAvailable = false;
-                return;
-            }
-            ucon64Path = ucon64File.getAbsolutePath();
-        } catch (URISyntaxException e) {
-            toolsAvailable = false;
-            return;
-        }
-
-        toolsAvailable = true;
     }
 
     @Test

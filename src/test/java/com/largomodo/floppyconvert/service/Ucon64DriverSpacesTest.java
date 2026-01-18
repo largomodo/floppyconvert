@@ -1,6 +1,7 @@
 package com.largomodo.floppyconvert.service;
 
 import com.largomodo.floppyconvert.core.CopierFormat;
+import com.largomodo.floppyconvert.util.TestUcon64PathResolver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -10,6 +11,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -22,12 +24,11 @@ class Ucon64DriverSpacesTest {
 
     @Test
     void testSplitRomWithSpacesInPath(@TempDir Path tempDir) throws IOException, URISyntaxException {
-        // Check if ucon64 is available
-        var ucon64Resource = getClass().getResource("/ucon64");
-        assumeTrue(ucon64Resource != null, "ucon64 not found in test resources");
+        // Check if ucon64 is available via path resolver
+        Optional<String> resolvedPath = TestUcon64PathResolver.resolveUcon64Path();
+        assumeTrue(resolvedPath.isPresent(), "ucon64 not found in system path");
 
-        File ucon64File = new File(ucon64Resource.toURI());
-        assumeTrue(ucon64File.canExecute(), "ucon64 not executable");
+        String ucon64Path = resolvedPath.get();
 
         // Get Chrono Trigger ROM
         var romResource = getClass().getResource("/snes/Chrono Trigger (USA).sfc");
@@ -41,7 +42,7 @@ class Ucon64DriverSpacesTest {
         Files.createDirectories(splitDir);
 
         // Split the ROM
-        Ucon64Driver driver = new Ucon64Driver(ucon64File.getAbsolutePath());
+        Ucon64Driver driver = new Ucon64Driver(ucon64Path);
         List<File> parts = driver.split(romFile, splitDir, CopierFormat.FIG);
 
         // Verify parts were created
