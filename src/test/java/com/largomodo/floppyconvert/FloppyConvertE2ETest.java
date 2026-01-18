@@ -88,7 +88,7 @@ class FloppyConvertE2ETest {
                         inputRom.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                                                "--format", format.name().toLowerCase()
+                        "--format", format.name().toLowerCase()
                 );
 
         assertEquals(0, exitCode, "Conversion should succeed");
@@ -160,7 +160,7 @@ class FloppyConvertE2ETest {
                         testRom.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                                                "--format", "fig"
+                        "--format", "fig"
                 );
 
         assertEquals(0, exitCode, "Conversion should succeed");
@@ -235,7 +235,7 @@ class FloppyConvertE2ETest {
                         testRom.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                                                "--format", "fig"
+                        "--format", "fig"
                 );
 
         assertEquals(0, exitCode, "Conversion should succeed even with special characters in filename");
@@ -302,7 +302,7 @@ class FloppyConvertE2ETest {
                         testRom.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                                                "--format", "fig"
+                        "--format", "fig"
                 );
 
         assertEquals(0, exitCode, "Conversion should succeed with shell-sensitive characters (&, $, !, space)");

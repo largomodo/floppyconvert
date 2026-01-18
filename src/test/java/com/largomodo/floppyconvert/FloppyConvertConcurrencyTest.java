@@ -86,7 +86,7 @@ class FloppyConvertConcurrencyTest {
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                                                "--format", "fig"
+                        "--format", "fig"
                 );
 
         assertEquals(0, exitCode, "Batch processing should succeed");
@@ -146,7 +146,7 @@ class FloppyConvertConcurrencyTest {
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                                                "--format", "swc"
+                        "--format", "swc"
                 );
 
         assertEquals(0, exitCode, "Batch processing should succeed despite basename collision");
@@ -191,7 +191,7 @@ class FloppyConvertConcurrencyTest {
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                                                "--format", "ufo"
+                        "--format", "ufo"
                 );
 
         assertEquals(0, exitCode, "Batch processing should succeed");
@@ -231,7 +231,7 @@ class FloppyConvertConcurrencyTest {
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                                                "--format", "gd3"
+                        "--format", "gd3"
                 );
 
         assertEquals(0, exitCode, "Should complete normally");
@@ -276,7 +276,7 @@ class FloppyConvertConcurrencyTest {
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
                         "--ucon64-path", ucon64Path,
-                                                "--format", "fig"
+                        "--format", "fig"
                 );
 
         assertEquals(0, exitCode, "All ROMs should process without collision");
