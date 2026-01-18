@@ -2,6 +2,8 @@ package de.nrq.floppyconvert.service;
 
 import de.nrq.floppyconvert.core.CopierFormat;
 import de.nrq.floppyconvert.core.RomPartComparator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -9,9 +11,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Collectors;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Wrapper for ucon64 ROM splitting tool.

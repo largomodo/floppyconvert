@@ -15,7 +15,9 @@ import picocli.CommandLine;
 import picocli.CommandLine.*;
 import picocli.CommandLine.Model.CommandSpec;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -85,10 +87,6 @@ public class FloppyConvert implements Callable<Integer> {
                     "Necessary subdirectories will be created automatically."
             })
     File outputDir;
-
-    @Option(names = {"-v", "--verbose"}, description = "Enable verbose output")
-    private boolean verbose;
-
     @Option(names = "--format", defaultValue = "FIG",
             description = {
                     "Backup unit format.",
@@ -96,10 +94,10 @@ public class FloppyConvert implements Callable<Integer> {
                     "Default: ${DEFAULT-VALUE}"
             })
     CopierFormat format;
-
     @Spec
     CommandSpec spec;
-
+    @Option(names = {"-v", "--verbose"}, description = "Enable verbose output")
+    private boolean verbose;
     @Option(names = "--ucon64-path", defaultValue = "ucon64",
             description = {
                     "Path to the 'ucon64' executable used for ROM splitting.",
@@ -343,7 +341,7 @@ public class FloppyConvert implements Callable<Integer> {
     public Integer call() throws Exception {
         if (verbose) {
             ch.qos.logback.classic.Logger root =
-                (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+                    (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
             root.setLevel(ch.qos.logback.classic.Level.DEBUG);
         }
 

@@ -84,7 +84,7 @@ class FloppyConvertRecursionTest {
                         inputRoot.toString(),
                         "--output-dir", outputRoot.toString(),
                         "--ucon64-path", ucon64Path,
-                                                "--format", "fig"
+                        "--format", "fig"
                 );
         assertEquals(0, exitCode, "Conversion should succeed");
 
@@ -126,7 +126,7 @@ class FloppyConvertRecursionTest {
                         inputRoot.toString(),
                         "--output-dir", outputRoot.toString(),
                         "--ucon64-path", ucon64Path,
-                                                "--format", "fig"
+                        "--format", "fig"
                 );
         assertEquals(0, exitCode, "Conversion should succeed");
 
@@ -167,7 +167,7 @@ class FloppyConvertRecursionTest {
                         inputRoot.toString(),
                         "--output-dir", outputRoot.toString(),
                         "--ucon64-path", ucon64Path,
-                                                "--format", "fig"
+                        "--format", "fig"
                 );
         assertEquals(0, exitCode, "Conversion should succeed");
 
@@ -211,7 +211,7 @@ class FloppyConvertRecursionTest {
                         inputRoot.toString(),
                         "--output-dir", outputRoot.toString(),
                         "--ucon64-path", ucon64Path,
-                                                "--format", "fig"
+                        "--format", "fig"
                 );
         assertEquals(0, exitCode, "Conversion should succeed");
 
