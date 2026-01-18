@@ -2,6 +2,7 @@ package com.largomodo.floppyconvert;
 
 import com.largomodo.floppyconvert.core.CopierFormat;
 import com.largomodo.floppyconvert.util.TestUcon64PathResolver;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -18,14 +19,13 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * End-to-end tests for the full ROM conversion pipeline.
  * Tests all supported backup unit formats (FIG, SWC, UFO, GD3) with real ROM files.
  * <p>
  * Requires external tools: ucon64.
- * Tests skip gracefully when tools are unavailable.
+ * Tests skip gracefully when tools or copyrighted ROMs are unavailable.
  */
 class FloppyConvertE2ETest {
 
@@ -70,12 +70,15 @@ class FloppyConvertE2ETest {
     @ParameterizedTest(name = "{0} - {1}")
     @MethodSource("formatAndRomProvider")
     void testFullConversionPipeline(CopierFormat format, String romResourcePath, @TempDir Path tempDir) throws Exception {
+        // Verify ucon64 presence dynamically
+        Assumptions.assumeTrue(ucon64Path != null, "ucon64 not available - skipping E2E test");
+
         // Copy ROM file to temp directory
         Path inputRom = tempDir.resolve("input.sfc");
         try (InputStream is = getClass().getResourceAsStream(romResourcePath)) {
-            if (is == null) {
-                fail("Test resource not found: " + romResourcePath + " (ensure ROM files are in src/test/resources/)");
-            }
+            // Refactored: Skip test if resource is missing (Clean Checkout / CI support)
+            Assumptions.assumeTrue(is != null,
+                    "Test resource not found: " + romResourcePath + " - Skipping E2E test on clean checkout");
             Files.copy(is, inputRom);
         }
 
@@ -142,12 +145,15 @@ class FloppyConvertE2ETest {
 
     @Test
     void testSingleFileMode(@TempDir Path tempDir) throws Exception {
+        // Verify ucon64 presence dynamically
+        Assumptions.assumeTrue(ucon64Path != null, "ucon64 not available - skipping E2E test");
+
         // Copy Super Mario World ROM to temp directory
         Path testRom = tempDir.resolve("SuperMarioWorld.sfc");
         try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
-            if (is == null) {
-                fail("Test resource not found: " + SUPER_MARIO_WORLD_RESOURCE);
-            }
+            // Refactored: Skip test if resource is missing
+            Assumptions.assumeTrue(is != null,
+                    "Test resource not found: " + SUPER_MARIO_WORLD_RESOURCE + " - Skipping E2E test");
             Files.copy(is, testRom);
         }
 
@@ -207,23 +213,24 @@ class FloppyConvertE2ETest {
 
     @Test
     void testSpecialCharactersInFilename(@TempDir Path tempDir) throws Exception {
+        // Verify ucon64 presence dynamically
+        Assumptions.assumeTrue(ucon64Path != null, "ucon64 not available - skipping E2E test");
+
         // Copy ROM file with special characters in the filename
         // Validates filename sanitization for special characters (#, [, ], (, ), space)
         String problematicFilename = "VLDC10 [#053] - ERROR CODE #1D4 (Update) by Sayuri [2017-04-02] (SMW Hack).sfc";
         Path testRom = tempDir.resolve(problematicFilename);
 
-        // Use the actual problematic ROM file from workspace root
+        // Try to source from workspace or fallback to resource, skip if neither
         Path sourceRom = Path.of("/workspace", problematicFilename);
-        if (!Files.exists(sourceRom)) {
-            // Fallback: copy Super Mario World with the problematic filename
+        if (Files.exists(sourceRom)) {
+            Files.copy(sourceRom, testRom);
+        } else {
             try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
-                if (is == null) {
-                    fail("Test resource not found: " + SUPER_MARIO_WORLD_RESOURCE);
-                }
+                // Refactored: Skip test if resource is missing
+                Assumptions.assumeTrue(is != null, "Test resource not found: " + SUPER_MARIO_WORLD_RESOURCE);
                 Files.copy(is, testRom);
             }
-        } else {
-            Files.copy(sourceRom, testRom);
         }
 
         Path outputDir = tempDir.resolve("output");
@@ -274,6 +281,9 @@ class FloppyConvertE2ETest {
 
     @Test
     void testShellSensitiveCharactersInFilename(@TempDir Path tempDir) throws Exception {
+        // Verify ucon64 presence dynamically
+        Assumptions.assumeTrue(ucon64Path != null, "ucon64 not available - skipping E2E test");
+
         // Test file with shell-sensitive characters: &, $, !, and space
         // These characters require escaping to prevent argument parser truncation
         String problematicFilename = "Ren & Stimpy Show, The - Buckeroo$! (USA).sfc";
@@ -281,16 +291,14 @@ class FloppyConvertE2ETest {
 
         // Use the actual problematic ROM file from workspace root
         Path sourceRom = Path.of("/workspace", problematicFilename);
-        if (!Files.exists(sourceRom)) {
-            // Fallback: copy Super Mario World with the problematic filename
+        if (Files.exists(sourceRom)) {
+            Files.copy(sourceRom, testRom);
+        } else {
             try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
-                if (is == null) {
-                    fail("Test resource not found: " + SUPER_MARIO_WORLD_RESOURCE);
-                }
+                // Refactored: Skip test if resource is missing
+                Assumptions.assumeTrue(is != null, "Test resource not found: " + SUPER_MARIO_WORLD_RESOURCE);
                 Files.copy(is, testRom);
             }
-        } else {
-            Files.copy(sourceRom, testRom);
         }
 
         Path outputDir = tempDir.resolve("output");
@@ -341,13 +349,12 @@ class FloppyConvertE2ETest {
 
     @Test
     void testAlternativeExtension(@TempDir Path tempDir) throws Exception {
-        assumeTrue(ucon64Path != null, "ucon64 not available - skipping E2E test");
+        Assumptions.assumeTrue(ucon64Path != null, "ucon64 not available - skipping E2E test");
 
         Path testRom = tempDir.resolve("ChronoTrigger.fig");
         try (InputStream is = getClass().getResourceAsStream(CHRONO_TRIGGER_RESOURCE)) {
-            if (is == null) {
-                fail("Test resource not found: " + CHRONO_TRIGGER_RESOURCE);
-            }
+            // Refactored: Skip test if resource is missing
+            Assumptions.assumeTrue(is != null, "Test resource not found: " + CHRONO_TRIGGER_RESOURCE);
             Files.copy(is, testRom);
         }
 
