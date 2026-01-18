@@ -1,0 +1,114 @@
+// tag::picocli-generated-full-manpage[]
+// tag::picocli-generated-man-section-header[]
+:doctype: manpage
+:revnumber: 1.0-SNAPSHOT
+:manmanual: Floppyconvert Manual
+:mansource: 1.0-SNAPSHOT
+:man-linkstyle: pass:[blue R < >]
+= floppyconvert(1)
+
+// end::picocli-generated-man-section-header[]
+
+// tag::picocli-generated-man-section-name[]
+== Name
+
+floppyconvert - Converts SNES ROM files to floppy disk images.
+
+// end::picocli-generated-man-section-name[]
+
+// tag::picocli-generated-man-section-synopsis[]
+== Synopsis
+
+*floppyconvert* [*-hvV*] [*--format*=_<format>_] [*-o*=_<outputDir>_]
+              [*--ucon64-path*=_<ucon64Path>_] _INPUT_
+
+// end::picocli-generated-man-section-synopsis[]
+
+// tag::picocli-generated-man-section-description[]
+== Description
+
+Automates the conversion of SNES ROM files (.sfc, .fig, .smw, .swc, .ufo) into FAT12 floppy disk images compatible with retro backup units.
+
+This tool uses 'ucon64' to split ROMs and a native FAT12 engine to create .img files.
+It supports recursive directory processing and batch conversion.
+
+// end::picocli-generated-man-section-description[]
+
+// tag::picocli-generated-man-section-options[]
+== Options
+
+*--format*=_<format>_::
+  Backup unit format.
++
+Valid values: FIG, SWC, UFO, GD3
++
+Default: FIG
+
+*-h*, *--help*::
+  Show this help message and exit.
+
+*-o*, *--output-dir*=_<outputDir>_::
+  The destination directory for generated floppy images.
++
+If omitted, defaults apply:
++
+  - Single file input: Defaults to the current directory ('.').
++
+  - Directory input: Defaults to a folder named 'output' inside the input directory.
++
+Necessary subdirectories will be created automatically.
+
+*--ucon64-path*=_<ucon64Path>_::
+  Path to the 'ucon64' executable used for ROM splitting.
++
+Can be a full path or just the command name if it is in your system PATH.
++
+Default: ucon64
+
+*-v*, *--verbose*::
+  Enable verbose output
+
+*-V*, *--version*::
+  Print version information and exit.
+
+// end::picocli-generated-man-section-options[]
+
+// tag::picocli-generated-man-section-arguments[]
+== Arguments
+
+_INPUT_::
+  The source ROM file (.sfc) to convert, or a directory to process.
++
+If a directory is provided, the tool scans it recursively for .sfc files and converts them in batch mode, preserving the directory structure.
+
+// end::picocli-generated-man-section-arguments[]
+
+// tag::picocli-generated-man-section-commands[]
+// end::picocli-generated-man-section-commands[]
+
+// tag::picocli-generated-man-section-exit-status[]
+==  Exit Codes:
+
+*0*::
+  Successful completion
+
+*1*::
+  General execution error (I/O, missing tools, etc.)
+
+*2*::
+  Invalid command line arguments
+
+// end::picocli-generated-man-section-exit-status[]
+
+// tag::picocli-generated-man-section-footer[]
+==  See Also:
+
+[%hardbreaks]
+ucon64(1)
+
+[%hardbreaks]
+Project home: https://github.com/largomodo/floppyconvert
+
+// end::picocli-generated-man-section-footer[]
+
+// end::picocli-generated-full-manpage[]
