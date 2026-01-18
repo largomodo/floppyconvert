@@ -1,5 +1,6 @@
 package com.largomodo.floppyconvert;
 
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -7,13 +8,12 @@ import picocli.CommandLine;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Integration tests for recursive directory traversal feature.
@@ -52,21 +52,9 @@ class FloppyConvertRecursionTest {
         toolsAvailable = true;
     }
 
-    private static boolean isCommandAvailable(String command) {
-        try {
-            Process process = new ProcessBuilder("which", command)
-                    .redirectErrorStream(true)
-                    .start();
-            boolean completed = process.waitFor(5, TimeUnit.SECONDS);
-            return completed && process.exitValue() == 0;
-        } catch (IOException | InterruptedException e) {
-            return false;
-        }
-    }
-
     @Test
     void testDeepNesting(@TempDir Path tempDir) throws Exception {
-        assumeTrue(toolsAvailable, "Skipping: ucon64 not available");
+        Assumptions.assumeTrue(toolsAvailable, "Skipping: ucon64 not available");
 
         Path inputRoot = tempDir.resolve("input");
         Path outputRoot = tempDir.resolve("output");
@@ -76,7 +64,10 @@ class FloppyConvertRecursionTest {
         Files.createDirectories(subCategoryDir);
 
         Path testRom = subCategoryDir.resolve("game.sfc");
-        Files.copy(getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE), testRom);
+        try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
+            Assumptions.assumeTrue(is != null, "Skipping recursion test: ROM resource missing");
+            Files.copy(is, testRom);
+        }
 
         int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
@@ -105,7 +96,7 @@ class FloppyConvertRecursionTest {
 
     @Test
     void testSiblingDirectories(@TempDir Path tempDir) throws Exception {
-        assumeTrue(toolsAvailable, "Skipping: ucon64 not available");
+        Assumptions.assumeTrue(toolsAvailable, "Skipping: ucon64 not available");
 
         Path inputRoot = tempDir.resolve("input");
         Path outputRoot = tempDir.resolve("output");
@@ -117,8 +108,14 @@ class FloppyConvertRecursionTest {
 
         Path testRom1 = dirA.resolve("game1.sfc");
         Path testRom2 = dirB.resolve("game2.sfc");
-        Files.copy(getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE), testRom1);
-        Files.copy(getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE), testRom2);
+        try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
+            Assumptions.assumeTrue(is != null, "Skipping recursion test: ROM resource missing");
+            Files.copy(is, testRom1);
+        }
+        try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
+            Assumptions.assumeTrue(is != null, "Skipping recursion test: ROM resource missing");
+            Files.copy(is, testRom2);
+        }
 
         int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
@@ -152,14 +149,17 @@ class FloppyConvertRecursionTest {
 
     @Test
     void testRootLevelFile(@TempDir Path tempDir) throws Exception {
-        assumeTrue(toolsAvailable, "Skipping: ucon64 not available");
+        Assumptions.assumeTrue(toolsAvailable, "Skipping: ucon64 not available");
 
         Path inputRoot = tempDir.resolve("input");
         Path outputRoot = tempDir.resolve("output");
         Files.createDirectories(inputRoot);
 
         Path testRom = inputRoot.resolve("game.sfc");
-        Files.copy(getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE), testRom);
+        try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
+            Assumptions.assumeTrue(is != null, "Skipping recursion test: ROM resource missing");
+            Files.copy(is, testRom);
+        }
 
         int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
@@ -187,7 +187,7 @@ class FloppyConvertRecursionTest {
 
     @Test
     void testSymlinkNotFollowed(@TempDir Path tempDir) throws Exception {
-        assumeTrue(toolsAvailable, "Skipping: ucon64 not available");
+        Assumptions.assumeTrue(toolsAvailable, "Skipping: ucon64 not available");
 
         Path inputRoot = tempDir.resolve("input");
         Path outputRoot = tempDir.resolve("output");
@@ -196,13 +196,16 @@ class FloppyConvertRecursionTest {
         Path realDir = tempDir.resolve("real");
         Files.createDirectories(realDir);
         Path testRom = realDir.resolve("game.sfc");
-        Files.copy(getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE), testRom);
+        try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
+            Assumptions.assumeTrue(is != null, "Skipping recursion test: ROM resource missing");
+            Files.copy(is, testRom);
+        }
 
         Path symlinkDir = inputRoot.resolve("symlinked");
         try {
             Files.createSymbolicLink(symlinkDir, realDir);
         } catch (UnsupportedOperationException | IOException e) {
-            assumeTrue(false, "Skipping: filesystem does not support symlinks");
+            Assumptions.assumeTrue(false, "Skipping: filesystem does not support symlinks");
         }
 
         int exitCode = new CommandLine(new FloppyConvert())
