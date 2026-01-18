@@ -339,4 +339,47 @@ class FloppyConvertE2ETest {
         }
     }
 
+    @Test
+    void testAlternativeExtension(@TempDir Path tempDir) throws Exception {
+        assumeTrue(ucon64Path != null, "ucon64 not available - skipping E2E test");
+
+        Path testRom = tempDir.resolve("ChronoTrigger.fig");
+        try (InputStream is = getClass().getResourceAsStream(CHRONO_TRIGGER_RESOURCE)) {
+            if (is == null) {
+                fail("Test resource not found: " + CHRONO_TRIGGER_RESOURCE);
+            }
+            Files.copy(is, testRom);
+        }
+
+        Path outputDir = tempDir.resolve("output");
+
+        int exitCode = new CommandLine(new FloppyConvert())
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(
+                        testRom.toString(),
+                        "--output-dir", outputDir.toString(),
+                        "--ucon64-path", ucon64Path,
+                        "--format", "fig"
+                );
+
+        assertEquals(0, exitCode, "Conversion should succeed with .fig extension");
+
+        Path gameOutputDir = outputDir.resolve("ChronoTrigger");
+        assertTrue(Files.exists(gameOutputDir), "Output directory should exist");
+        assertTrue(Files.isDirectory(gameOutputDir), "Output should be a directory");
+
+        try (var imgFiles = Files.list(gameOutputDir)) {
+            var images = imgFiles
+                    .filter(p -> p.toString().endsWith(".img"))
+                    .toList();
+
+            assertFalse(images.isEmpty(), "Should have generated at least one .img file");
+
+            for (Path img : images) {
+                long size = Files.size(img);
+                assertTrue(size > 0, "Empty floppy image: " + img.getFileName());
+            }
+        }
+    }
+
 }
