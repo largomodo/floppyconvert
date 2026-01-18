@@ -7,6 +7,7 @@ import com.largomodo.floppyconvert.service.FloppyImageWriter;
 import com.largomodo.floppyconvert.service.RomSplitter;
 import com.largomodo.floppyconvert.service.Ucon64Driver;
 import com.largomodo.floppyconvert.service.fat.Fat12ImageWriter;
+import com.largomodo.floppyconvert.util.SnesRomMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -37,13 +38,15 @@ import java.util.stream.Stream;
  * - Directory input without -o: outputs to <input>/output subdirectory
  * - Explicit -o flag: overrides all defaults
  */
-@Command(name = "floppyconvert",
+@Command(
+        name = "floppyconvert",
         mixinStandardHelpOptions = true,
-        version = "1.0",
+        resourceBundle = "floppyconvert",
+        version = "${bundle:application.version}",
         header = "Converts SNES ROM files to floppy disk images.",
         description = {
-                "Automates the conversion of SNES ROM files (.sfc) into FAT12 floppy disk images " +
-                        "compatible with retro backup units.",
+                "Automates the conversion of SNES ROM files (.sfc, .fig, .smw, .swc, .ufo) into FAT12 floppy disk" +
+                        " images compatible with retro backup units.",
                 "",
                 "This tool uses 'ucon64' to split ROMs and a native FAT12 engine to create .img files.",
                 "It supports recursive directory processing and batch conversion."
@@ -58,7 +61,7 @@ import java.util.stream.Stream;
         footer = {
                 "ucon64(1)",
                 "",
-                "Project home: https://github.com/largomodo/floppyconvert"
+                "Project home: ${bundle:application.url}"
         }
 )
 public class FloppyConvert implements Callable<Integer> {
@@ -192,7 +195,7 @@ public class FloppyConvert implements Callable<Integer> {
                             return false;
                         }
                     })
-                    .filter(path -> path.toString().toLowerCase().endsWith(".sfc"))
+                    .filter(SnesRomMatcher::isRom)
                     .forEach(romPath -> {
                         executor.submit(() -> {
                             try {
@@ -282,6 +285,10 @@ public class FloppyConvert implements Callable<Integer> {
 
         if (!Files.isRegularFile(inputPath)) {
             throw new IOException("Input path is not a file: " + inputPath);
+        }
+
+        if (!SnesRomMatcher.isRom(inputPath)) {
+            throw new IOException("Input file is not a recognized SNES ROM format: " + inputPath);
         }
 
         validateUcon64(config);
