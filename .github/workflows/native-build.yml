@@ -1,0 +1,90 @@
+name: Build Native Executables
+
+on:
+  push:
+    branches: [ "main" ]
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  build-native:
+    name: Build Native - ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          # Linux (x86_64)
+          - os: ubuntu-latest
+            name: Linux-x86
+            executable: floppyconvert
+            zip_name: floppyconvert-linux-x86.zip
+
+          # Windows (x86_64)
+          - os: windows-latest
+            name: Windows-x86
+            executable: floppyconvert.exe
+            zip_name: floppyconvert-windows-x86.zip
+
+          # macOS Intel (x86_64) - Explicitly request macos-13
+          - os: macos-13
+            name: macOS-Intel
+            executable: floppyconvert
+            zip_name: floppyconvert-macos-intel.zip
+
+          # macOS Apple Silicon (ARM64) - Explicitly request macos-14 or latest
+          - os: macos-14
+            name: macOS-ARM64
+            executable: floppyconvert
+            zip_name: floppyconvert-macos-arm64.zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Setup GraalVM (Java 21)
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '21'
+          distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          native-image-job-reports: 'true'
+
+      # Build using the profile defined in pom.xml
+      - name: Build Native Image
+        run: mvn -Pnative clean package native:build
+
+      # Packaging logic (Linux/Mac)
+      - name: Prepare Zip (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          mkdir dist
+          cp target/${{ matrix.executable }} dist/${{ matrix.executable }}
+          chmod +x dist/${{ matrix.executable }}
+          cd dist
+          zip -r ../${{ matrix.zip_name }} .
+
+      # Packaging logic (Windows)
+      - name: Prepare Zip (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist
+          Copy-Item target\${{ matrix.executable }} dist\${{ matrix.executable }}
+          Compress-Archive -Path dist\* -DestinationPath ${{ matrix.zip_name }}
+
+      # Upload Artifacts to Action Run
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.zip_name }}
+          path: ${{ matrix.zip_name }}
+
+      # Attach to Release (if applicable)
+      - name: Upload Release Asset
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ matrix.zip_name }}
