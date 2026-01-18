@@ -56,7 +56,7 @@ jobs:
 
       # Build using the profile defined in pom.xml
       - name: Build Native Image
-        run: mvn -Pnative clean package native:build
+        run: mvn -Pnative clean package native:compile-no-fork
 
       # Packaging logic (Unix)
       - name: Prepare Distribution (Unix)
