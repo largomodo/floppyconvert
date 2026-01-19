@@ -62,14 +62,14 @@
                 <directory>src/main/resources</directory>
                 <filtering>true</filtering>
                 <includes>
-                    <include>floppyconvert.properties</include>
+                    <include>floppyconvert/floppyconvert.properties</include>
                 </includes>
             </resource>
             <resource>
                 <directory>src/main/resources</directory>
                 <filtering>false</filtering>
                 <excludes>
-                    <exclude>floppyconvert.properties</exclude>
+                    <exclude>floppyconvert/floppyconvert.properties</exclude>
                 </excludes>
             </resource>
         </resources>
@@ -158,7 +158,7 @@
                             <buildArgs>
                                 <buildArg>--no-fallback</buildArg>
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
-                                <buildArg>-H:IncludeResources=.*</buildArg>
+                                <buildArg>-H:IncludeResources=floppyconvert/.*|.*logback\.xml$</buildArg>
                             </buildArgs>
                             <metadataRepository>
                                 <enabled>true</enabled>
