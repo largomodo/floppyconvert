@@ -43,7 +43,7 @@ import java.util.stream.Stream;
 @Command(
         name = "floppyconvert",
         mixinStandardHelpOptions = true,
-        resourceBundle = "floppyconvert",
+        resourceBundle = "floppyconvert.floppyconvert",
         version = "${bundle:application.version}",
         header = "Converts SNES ROM files to floppy disk images.",
         description = {

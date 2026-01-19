@@ -12,15 +12,15 @@ import java.io.IOException;
 public enum FloppyType {
     // 720KB raw (80 tracks × 9 sectors × 2 sides × 512 bytes = 737,280)
     // Conservative limit accounts for ~12KB FAT overhead
-    FLOPPY_720K(725_000, "/720k.img"),
+    FLOPPY_720K(725_000, "/floppyconvert/720k.img"),
 
     // 1.44MB raw (80 tracks × 18 sectors × 2 sides × 512 bytes = 1,474,560)
     // Conservative limit accounts for ~24KB FAT overhead
-    FLOPPY_144M(1_450_000, "/1m44.img"),
+    FLOPPY_144M(1_450_000, "/floppyconvert/1m44.img"),
 
     // 1.6MB raw (80 tracks × 20 sectors × 2 sides × 512 bytes = 1,638,400)
     // Conservative limit accounts for ~38KB FAT overhead
-    FLOPPY_160M(1_600_000, "/1m6.img");
+    FLOPPY_160M(1_600_000, "/floppyconvert/1m6.img");
 
     private final long usableBytes;
     private final String resourcePath;
