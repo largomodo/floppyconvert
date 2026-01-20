@@ -159,6 +159,7 @@
                                 <buildArg>--no-fallback</buildArg>
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
                                 <buildArg>-H:IncludeResources=floppyconvert/.*|.*logback\.xml$</buildArg>
+                                <buildArg>-march=compatibility</buildArg>
                             </buildArgs>
                             <metadataRepository>
                                 <enabled>true</enabled>
