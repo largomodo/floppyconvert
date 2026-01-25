@@ -52,16 +52,9 @@ class FloppyConvertTest {
         File testFile = tempDir.resolve("test.sfc").toFile();
         testFile.createNewFile();
 
-        File mockUcon64 = tempDir.resolve("ucon64").toFile();
-        mockUcon64.createNewFile();
-        mockUcon64.setExecutable(true);
-
-        // Fat12ImageWriter handles image operations natively; ucon64 splits large ROMs into floppy-sized parts
-
         FloppyConvert floppyConvert = new FloppyConvert();
         CommandLine cmd = new CommandLine(floppyConvert);
-        cmd.parseArgs(testFile.getAbsolutePath(),
-                "--ucon64-path", mockUcon64.getAbsolutePath());
+        cmd.parseArgs(testFile.getAbsolutePath());
 
         assertNull(floppyConvert.outputDir, "outputDir should be null until call() computes smart defaults");
 
@@ -83,16 +76,9 @@ class FloppyConvertTest {
         File testFile = new File(testDir, "test.sfc");
         testFile.createNewFile();
 
-        File mockUcon64 = tempDir.resolve("ucon64").toFile();
-        mockUcon64.createNewFile();
-        mockUcon64.setExecutable(true);
-
-        // Fat12ImageWriter handles image operations natively; ucon64 splits large ROMs into floppy-sized parts
-
         FloppyConvert floppyConvert = new FloppyConvert();
         CommandLine cmd = new CommandLine(floppyConvert);
-        cmd.parseArgs(testDir.getAbsolutePath(),
-                "--ucon64-path", mockUcon64.getAbsolutePath());
+        cmd.parseArgs(testDir.getAbsolutePath());
 
         assertNull(floppyConvert.outputDir, "outputDir should be null until call() computes smart defaults");
 

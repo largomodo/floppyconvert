@@ -7,7 +7,6 @@ import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.FileAppender;
 import ch.qos.logback.core.read.ListAppender;
-import com.largomodo.floppyconvert.util.TestUcon64PathResolver;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +36,6 @@ class FloppyConvertLoggingTest {
     @TempDir
     Path tempDir;
 
-    private String ucon64Path;
     private byte[] templateRomData;
     private ListAppender<ILoggingEvent> listAppender;
     private FileAppender<ILoggingEvent> testFileAppender;
@@ -47,9 +45,6 @@ class FloppyConvertLoggingTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        // Check ucon64 availability for tests that need it
-        TestUcon64PathResolver.resolveUcon64Path().ifPresent(path -> ucon64Path = path);
-
         // Load real ROM file from test resources for MDC test
         Path templateRom = Paths.get("src/test/resources/snes/Super Mario World (USA).sfc");
         if (Files.exists(templateRom)) {
@@ -132,7 +127,6 @@ class FloppyConvertLoggingTest {
     @Test
     void testMdcContextInBatch() throws Exception {
         // Skip if ucon64 or template ROM not available
-        Assumptions.assumeTrue(ucon64Path != null, "ucon64 not available");
         Assumptions.assumeTrue(templateRomData != null, "Template ROM not available");
 
         // Create input directory with a ROM file
@@ -149,7 +143,6 @@ class FloppyConvertLoggingTest {
                 .execute(
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
-                        "--ucon64-path", ucon64Path,
                         "--format", "fig"
                 );
 
@@ -183,9 +176,7 @@ class FloppyConvertLoggingTest {
         // by checking that error-level logs are properly routed
 
         // Skip if ucon64 not available
-        Assumptions.assumeTrue(ucon64Path != null, "ucon64 not available");
-
-        // Create a scenario that will cause an error: invalid ROM file
+// Create a scenario that will cause an error: invalid ROM file
         Path inputDir = tempDir.resolve("input");
         Files.createDirectories(inputDir);
         Path invalidRom = inputDir.resolve("Invalid.sfc");
@@ -199,7 +190,6 @@ class FloppyConvertLoggingTest {
                 .execute(
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
-                        "--ucon64-path", ucon64Path,
                         "--format", "fig"
                 );
 

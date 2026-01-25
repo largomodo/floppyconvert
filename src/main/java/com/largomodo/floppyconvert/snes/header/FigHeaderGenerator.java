@@ -38,11 +38,7 @@ public class FigHeaderGenerator implements HeaderGenerator {
         int emu1 = 0;
         int emu2 = 0;
 
-        if (rom.hasDsp()) { // Uses DSP, SuperFX, etc.
-            // Special case logic from snes.c
-            // This is simplified; ucon64 has complex checks for ROM type 0x10 vs others.
-            // Assuming standard DSP behavior for now.
-        }
+        // DSP chipset handling logic applied below for HiROM and LoROM
 
         if (rom.isHiRom()) {
             // HiROM Defaults

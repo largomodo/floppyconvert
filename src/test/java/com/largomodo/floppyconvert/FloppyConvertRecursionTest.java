@@ -1,8 +1,6 @@
 package com.largomodo.floppyconvert;
 
-import com.largomodo.floppyconvert.util.TestUcon64PathResolver;
 import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
@@ -11,7 +9,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -19,31 +16,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * Integration tests for recursive directory traversal feature.
  * Verifies that batch mode correctly processes ROMs in nested directory structures
  * and mirrors the source structure in output.
- * <p>
- * Requires external tool: ucon64.
- * Tests skip gracefully when ucon64 is unavailable.
  */
 class FloppyConvertRecursionTest {
 
     private static final String SUPER_MARIO_WORLD_RESOURCE = "/snes/Super Mario World (USA).sfc";
 
-    private static boolean toolsAvailable = false;
-    private static String ucon64Path;
-
-    @BeforeAll
-    static void checkExternalToolsAvailable() {
-        Optional<String> resolvedPath = TestUcon64PathResolver.resolveUcon64Path();
-        if (resolvedPath.isPresent()) {
-            ucon64Path = resolvedPath.get();
-            toolsAvailable = true;
-        } else {
-            toolsAvailable = false;
-        }
-    }
-
     @Test
     void testDeepNesting(@TempDir Path tempDir) throws Exception {
-        Assumptions.assumeTrue(toolsAvailable, "Skipping: ucon64 not available");
 
         Path inputRoot = tempDir.resolve("input");
         Path outputRoot = tempDir.resolve("output");
@@ -63,7 +42,6 @@ class FloppyConvertRecursionTest {
                 .execute(
                         inputRoot.toString(),
                         "--output-dir", outputRoot.toString(),
-                        "--ucon64-path", ucon64Path,
                         "--format", "fig"
                 );
         assertEquals(0, exitCode, "Conversion should succeed");
@@ -85,7 +63,6 @@ class FloppyConvertRecursionTest {
 
     @Test
     void testSiblingDirectories(@TempDir Path tempDir) throws Exception {
-        Assumptions.assumeTrue(toolsAvailable, "Skipping: ucon64 not available");
 
         Path inputRoot = tempDir.resolve("input");
         Path outputRoot = tempDir.resolve("output");
@@ -111,7 +88,6 @@ class FloppyConvertRecursionTest {
                 .execute(
                         inputRoot.toString(),
                         "--output-dir", outputRoot.toString(),
-                        "--ucon64-path", ucon64Path,
                         "--format", "fig"
                 );
         assertEquals(0, exitCode, "Conversion should succeed");
@@ -138,7 +114,6 @@ class FloppyConvertRecursionTest {
 
     @Test
     void testRootLevelFile(@TempDir Path tempDir) throws Exception {
-        Assumptions.assumeTrue(toolsAvailable, "Skipping: ucon64 not available");
 
         Path inputRoot = tempDir.resolve("input");
         Path outputRoot = tempDir.resolve("output");
@@ -155,7 +130,6 @@ class FloppyConvertRecursionTest {
                 .execute(
                         inputRoot.toString(),
                         "--output-dir", outputRoot.toString(),
-                        "--ucon64-path", ucon64Path,
                         "--format", "fig"
                 );
         assertEquals(0, exitCode, "Conversion should succeed");
@@ -176,7 +150,6 @@ class FloppyConvertRecursionTest {
 
     @Test
     void testSymlinkNotFollowed(@TempDir Path tempDir) throws Exception {
-        Assumptions.assumeTrue(toolsAvailable, "Skipping: ucon64 not available");
 
         Path inputRoot = tempDir.resolve("input");
         Path outputRoot = tempDir.resolve("output");
@@ -202,7 +175,6 @@ class FloppyConvertRecursionTest {
                 .execute(
                         inputRoot.toString(),
                         "--output-dir", outputRoot.toString(),
-                        "--ucon64-path", ucon64Path,
                         "--format", "fig"
                 );
         assertEquals(0, exitCode, "Conversion should succeed");

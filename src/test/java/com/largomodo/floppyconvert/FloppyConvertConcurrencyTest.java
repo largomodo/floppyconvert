@@ -1,6 +1,5 @@
 package com.largomodo.floppyconvert;
 
-import com.largomodo.floppyconvert.util.TestUcon64PathResolver;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,7 +11,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashSet;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -34,18 +32,10 @@ class FloppyConvertConcurrencyTest {
     @TempDir
     Path tempDir;
 
-    private String ucon64Path;
     private byte[] templateRomData;
 
     @BeforeEach
     void setUp() throws IOException {
-        Optional<String> resolvedPath = TestUcon64PathResolver.resolveUcon64Path();
-        if (resolvedPath.isEmpty()) {
-            // Skip test if ucon64 not available
-            Assumptions.assumeTrue(false, "ucon64 not available");
-        }
-        ucon64Path = resolvedPath.get();
-
         // Load real ROM file from test resources
         Path templateRom = Paths.get("src/test/resources/snes/Super Mario World (USA).sfc");
         if (!Files.exists(templateRom)) {
@@ -85,7 +75,6 @@ class FloppyConvertConcurrencyTest {
                 .execute(
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
-                        "--ucon64-path", ucon64Path,
                         "--format", "fig"
                 );
 
@@ -145,7 +134,6 @@ class FloppyConvertConcurrencyTest {
                 .execute(
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
-                        "--ucon64-path", ucon64Path,
                         "--format", "swc"
                 );
 
@@ -190,7 +178,6 @@ class FloppyConvertConcurrencyTest {
                 .execute(
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
-                        "--ucon64-path", ucon64Path,
                         "--format", "ufo"
                 );
 
@@ -230,7 +217,6 @@ class FloppyConvertConcurrencyTest {
                 .execute(
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
-                        "--ucon64-path", ucon64Path,
                         "--format", "gd3"
                 );
 
@@ -275,7 +261,6 @@ class FloppyConvertConcurrencyTest {
                 .execute(
                         inputDir.toString(),
                         "--output-dir", outputDir.toString(),
-                        "--ucon64-path", ucon64Path,
                         "--format", "fig"
                 );
 
