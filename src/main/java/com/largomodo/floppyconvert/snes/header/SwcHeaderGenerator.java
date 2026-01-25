@@ -7,10 +7,7 @@ import java.util.Arrays;
 /**
  * Header generator for Super Wild Card (SWC) format.
  * <p>
- * Logic ported from {@code snes.c} (snes_swc) and {@code backup/swc.c}.
- * SWC headers are 512 bytes, usually only attached to the first file.
- * However, uCON64's {@code snes_split_smc} adds headers to ALL parts for SWC splitting.
- * We will follow the uCON64 split logic here: Header on EVERY part.
+ * SWC headers are 512 bytes and are generated for ALL split parts.
  */
 public class SwcHeaderGenerator implements HeaderGenerator {
 
@@ -19,36 +16,7 @@ public class SwcHeaderGenerator implements HeaderGenerator {
         byte[] header = new byte[HEADER_SIZE];
         Arrays.fill(header, (byte) 0);
 
-        // Size is total ROM size (not just this part) in 8KB blocks
-        // ucon64 sets the size of the *part* in the header when splitting (see snes_split_smc)
-        // But for the initial header generation (snes_swc), it sets total size.
-        // Since we are generating headers for split parts, we need to decide context.
-        // The architecture plan says: "Standard Copiers (SWC/FIG/UFO): Split typically at 4Mbit".
-        // uCON64 snes_split_smc writes a header for EVERY part with the size OF THAT PART.
-
-        // However, the standard .swc file (unsplit) has total size.
-        // Let's assume standard 4Mbit (524288 bytes) or 8Mbit (1048576 bytes) splits for now.
-        // Ideally, the splitter would tell us the size of the part.
-        // Limitation: This interface doesn't pass part size.
-        // Assumption: We are generating the header for the *Total* ROM if index == 0,
-        // or the splitter handles re-writing size fields.
-        //
-        // Correction based on ucon64 `snes_swc`:
-        // "header.size_low = (unsigned char) (size / 8192);"
-        // "header.emulation = snes_hirom ? 0x30 : 0;"
-        //
-        // In `snes_split_smc`:
-        // "header.size_low = (unsigned char) (part_size / 8192);"
-        // "header.emulation |= 0x40;" (Multi-file flag)
-        // if last part: "header.emulation &= ~0x40;"
-
-        // Since we can't know the exact part size here easily without changing interface,
-        // we will implement the standard header logic. The Splitter service usually
-        // overrides the size bytes if it chops the file.
-        // But wait, the Splitter service in Phase 4 *calls* this.
-        // Let's use the total ROM size here. If the splitter needs part-specific sizes,
-        // it might need to patch the returned header.
-
+        // Size in 8KB blocks (total ROM size)
         int blocks = rom.rawData().length / 8192;
         header[0] = (byte) (blocks & 0xFF);
         header[1] = (byte) ((blocks >> 8) & 0xFF);

@@ -5,8 +5,11 @@ import com.largomodo.floppyconvert.core.domain.DiskPacker;
 import com.largomodo.floppyconvert.core.domain.GreedyDiskPacker;
 import com.largomodo.floppyconvert.service.FloppyImageWriter;
 import com.largomodo.floppyconvert.service.RomSplitter;
-import com.largomodo.floppyconvert.service.Ucon64Driver;
+import com.largomodo.floppyconvert.service.NativeRomSplitter;
 import com.largomodo.floppyconvert.service.fat.Fat12ImageWriter;
+import com.largomodo.floppyconvert.snes.SnesRomReader;
+import com.largomodo.floppyconvert.snes.SnesInterleaver;
+import com.largomodo.floppyconvert.snes.header.HeaderGeneratorFactory;
 import com.largomodo.floppyconvert.util.SnesRomMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +24,6 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -98,13 +100,6 @@ public class FloppyConvert implements Callable<Integer> {
     CommandSpec spec;
     @Option(names = {"-v", "--verbose"}, description = "Enable verbose output")
     private boolean verbose;
-    @Option(names = "--ucon64-path", defaultValue = "ucon64",
-            description = {
-                    "Path to the 'ucon64' executable used for ROM splitting.",
-                    "Can be a full path or just the command name if it is in your system PATH.",
-                    "Default: ${DEFAULT-VALUE}"
-            })
-    private String ucon64Path;
 
 
     public static void main(String[] args) {
@@ -112,6 +107,19 @@ public class FloppyConvert implements Callable<Integer> {
         cmd.setCaseInsensitiveEnumValuesAllowed(true);
         int exitCode = cmd.execute(args);
         System.exit(exitCode);
+    }
+
+    /**
+     * Factory method for creating ROM splitter with native Java implementation.
+     * Instantiates NativeRomSplitter with required dependencies.
+     *
+     * @return configured NativeRomSplitter instance
+     */
+    private static RomSplitter createRomSplitter() {
+        SnesRomReader reader = new SnesRomReader();
+        SnesInterleaver interleaver = new SnesInterleaver();
+        HeaderGeneratorFactory headerFactory = new HeaderGeneratorFactory();
+        return new NativeRomSplitter(reader, interleaver, headerFactory);
     }
 
     /**
@@ -129,11 +137,9 @@ public class FloppyConvert implements Callable<Integer> {
         Path inputRoot = Paths.get(config.inputDir);
         Path outputRoot = Paths.get(config.outputDir);
 
-        validateUcon64(config);
-
         // Dependency injection: instantiate service implementations
         DiskPacker packer = new GreedyDiskPacker();
-        RomSplitter splitter = new Ucon64Driver(config.ucon64Path);
+        RomSplitter splitter = createRomSplitter();
         // Native Java FAT12 engine with no external dependencies (comprehensive E2E test coverage validates safety)
         FloppyImageWriter writer = new Fat12ImageWriter();
         DiskTemplateFactory templateFactory = new ResourceDiskTemplateFactory();
@@ -289,11 +295,9 @@ public class FloppyConvert implements Callable<Integer> {
             throw new IOException("Input file is not a recognized SNES ROM format: " + inputPath);
         }
 
-        validateUcon64(config);
-
         // Dependency injection: instantiate service implementations
         DiskPacker packer = new GreedyDiskPacker();
-        RomSplitter splitter = new Ucon64Driver(config.ucon64Path);
+        RomSplitter splitter = createRomSplitter();
         // Native Java FAT12 engine with no external dependencies (comprehensive E2E test coverage validates safety)
         FloppyImageWriter writer = new Fat12ImageWriter();
         DiskTemplateFactory templateFactory = new ResourceDiskTemplateFactory();
@@ -310,31 +314,6 @@ public class FloppyConvert implements Callable<Integer> {
         );
 
         log.info("Conversion complete: {}", inputPath.getFileName());
-    }
-
-    /**
-     * Check if command exists in system PATH.
-     */
-    private static boolean commandExistsInPath(String command) {
-        String pathEnv = System.getenv("PATH");
-        if (pathEnv == null || pathEnv.isEmpty()) {
-            return false;  // Fail-fast validation will catch missing tools
-        }
-        return Arrays.stream(pathEnv.split(File.pathSeparator))
-                .map(dir -> new File(dir, command))
-                .anyMatch(File::canExecute);
-    }
-
-    /**
-     * Validate ucon64 availability.
-     * Fail-fast validation prevents processing attempts when tool is missing.
-     * Fat12ImageWriter provides native Java FAT12 manipulation.
-     */
-    private static void validateUcon64(Config config) throws IOException {
-        File ucon64 = new File(config.ucon64Path);
-        if (!ucon64.canExecute() && !commandExistsInPath(config.ucon64Path)) {
-            throw new IOException("ucon64 not found: install via package manager or specify --ucon64-path");
-        }
     }
 
     @Override
@@ -377,13 +356,13 @@ public class FloppyConvert implements Callable<Integer> {
         if (inputPath.isFile()) {
             runSingleFile(
                     new Config(null, outputDir.getAbsolutePath(),
-                            ucon64Path, format, inputPath.getAbsolutePath()),
+                            format, inputPath.getAbsolutePath()),
                     outputDir.toPath()
             );
         } else {
             runBatch(
                     new Config(inputPath.getAbsolutePath(), outputDir.getAbsolutePath(),
-                            ucon64Path, format, null)
+                            format, null)
             );
         }
 
@@ -395,6 +374,6 @@ public class FloppyConvert implements Callable<Integer> {
      * signatures (avoids cascading changes to RomProcessor integration points).
      */
     private record Config(String inputDir, String outputDir,
-                          String ucon64Path, CopierFormat format, String inputFile) {
+                          CopierFormat format, String inputFile) {
     }
 }

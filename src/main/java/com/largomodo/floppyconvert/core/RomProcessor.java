@@ -48,7 +48,7 @@ public class RomProcessor {
      * enabling immutability, thread-safety, and fail-fast validation.
      *
      * @param packer          Disk packing strategy (e.g., GreedyDiskPacker)
-     * @param splitter        ROM splitting service (e.g., Ucon64Driver)
+     * @param splitter        ROM splitting service (e.g., NativeSnesSplitter)
      * @param writer          Floppy image writer (e.g., Fat12ImageWriter)
      * @param templateFactory Floppy disk template provider (mockable for testing)
      * @param normalizer      ROM part filename normalizer (stateless utility)
