@@ -98,13 +98,21 @@ class FloppyConvertE2ETest {
             }
         }
 
-        // Verify cleanup: no split parts (.1, .2, .3, etc) should remain
+        // Verify cleanup: no split parts should remain
+        // Format-specific patterns: SWC/FIG use .1, .2, .3; UFO uses .1gm, .2gm, .3gm; GD3 uses .078
         try (var stream = Files.list(gameOutputDir)) {
+            String formatPattern = switch (format) {
+                case UFO -> ".*\\.(\\d+)gm$";
+                case GD3 -> "SF\\d+[A-Z_]+\\.078$";
+                default -> ".*\\.\\d+$";
+            };
+
             long partFileCount = stream
-                    .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
+                    .filter(p -> p.getFileName().toString().matches(formatPattern))
                     .count();
             assertEquals(0, partFileCount,
-                    "Split parts (.1, .2, .3) must not remain in output for " + format + " / " + baseName);
+                    "Split parts must not remain in output for " + format + " / " + baseName +
+                    " (pattern: " + formatPattern + ")");
         }
 
         // Verify cleanup removed intermediate format files (only for large ROMs that were split)
@@ -168,7 +176,8 @@ class FloppyConvertE2ETest {
         assertTrue(imageSize < 800_000,
                 "Should use 720K template (~737KB) for 512KB ROM, got " + imageSize + " bytes");
 
-        // Verify cleanup: no split parts (.1, .2, .3) should remain (small ROM doesn't split)
+        // Verify cleanup: no split parts should remain (small ROM doesn't split)
+        // FIG format uses .1, .2, .3 extensions
         try (var stream = Files.list(gameOutputDir)) {
             long partFileCount = stream
                     .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
@@ -233,7 +242,8 @@ class FloppyConvertE2ETest {
                 .collect(Collectors.toList());
         assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
 
-        // Verify cleanup: no split parts or intermediate files remain
+        // Verify cleanup: no split parts should remain
+        // FIG format uses .1, .2, .3 extensions
         try (var stream = Files.list(gameOutputDir)) {
             long partFileCount = stream
                     .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
@@ -297,7 +307,8 @@ class FloppyConvertE2ETest {
                 .collect(Collectors.toList());
         assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
 
-        // Verify cleanup: no split parts or intermediate files remain
+        // Verify cleanup: no split parts should remain
+        // FIG format uses .1, .2, .3 extensions
         try (var stream = Files.list(gameOutputDir)) {
             long partFileCount = stream
                     .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
@@ -417,9 +428,9 @@ class FloppyConvertE2ETest {
 
         try (var stream = Files.list(gameOutputDir)) {
             long partFileCount = stream
-                    .filter(p -> p.getFileName().toString().matches(".*\\.(078|\\d+)$"))
+                    .filter(p -> p.getFileName().toString().matches("SF\\d+[A-Z_]+\\.078$"))
                     .count();
-            assertEquals(0, partFileCount, "Split parts (.078, .1, .2, etc) should be cleaned up");
+            assertEquals(0, partFileCount, "GD3 split parts (SF*.078) should be cleaned up");
         }
     }
 

@@ -15,12 +15,12 @@ import java.util.Arrays;
 public class UfoHeaderGenerator implements HeaderGenerator {
 
     @Override
-    public byte[] generateHeader(SnesRom rom, int splitPartIndex, boolean isLastPart) {
+    public byte[] generateHeader(SnesRom rom, int partSize, int splitPartIndex, boolean isLastPart) {
         byte[] header = new byte[HEADER_SIZE];
         Arrays.fill(header, (byte) 0);
 
-        // 0-1: Size in 8KB blocks (filled by splitter usually, using total for now)
-        int blocks = rom.rawData().length / 8192;
+        // Bytes 0-1 encode THIS part size (hardware reads header for sector count)
+        int blocks = partSize / 8192;
         header[0] = (byte) (blocks & 0xFF);
         header[1] = (byte) ((blocks >> 8) & 0xFF);
 
@@ -39,7 +39,7 @@ public class UfoHeaderGenerator implements HeaderGenerator {
         // 16: Uses SRAM
         header[16] = (byte) (rom.sramSize() > 0 ? 1 : 0);
 
-        // 17: Size code (Mbit)
+        // Byte 17 encodes TOTAL ROM size (hardware uses for memory map selection)
         int sizeMbit = rom.rawData().length / 131072;
         header[17] = (byte) sizeMbit;
 

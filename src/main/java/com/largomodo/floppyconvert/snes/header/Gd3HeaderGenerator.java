@@ -16,8 +16,8 @@ import java.util.Arrays;
 public class Gd3HeaderGenerator implements HeaderGenerator {
 
     @Override
-    public byte[] generateHeader(SnesRom rom, int splitPartIndex, boolean isLastPart) {
-        // GD3 only puts header on the first part
+    public byte[] generateHeader(SnesRom rom, int partSize, int splitPartIndex, boolean isLastPart) {
+        // GD3 headers only on first part, describe entire ROM layout. partSize is ignored.
         if (splitPartIndex != 0) {
             return new byte[0];
         }
@@ -80,6 +80,7 @@ public class Gd3HeaderGenerator implements HeaderGenerator {
     }
 
     private void setHiRomMap(byte[] header, int parts, SnesRom rom) {
+        // Memory map based on TOTAL ROM size, not part size. Hardware decodes entire game layout from first part header.
         byte[] map;
         if (parts <= 2) map = MAP_HI_8MB;
         else if (parts <= 4) map = MAP_HI_16MB;

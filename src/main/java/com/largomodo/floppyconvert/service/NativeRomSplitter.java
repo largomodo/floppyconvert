@@ -87,13 +87,13 @@ public class NativeRomSplitter implements RomSplitter {
         List<File> parts = new ArrayList<>(chunkCount);
 
         for (int i = 0; i < chunkCount; i++) {
-            boolean isLastPart = (i == chunkCount - 1);
-            byte[] header = headerGen.generateHeader(rom, i, isLastPart);
-
             int offset = i * chunkSize;
             int length = Math.min(chunkSize, data.length - offset);
+            boolean isLastPart = (i == chunkCount - 1);
 
-            File outputFile = createFilename(workDir, baseName, format, i, chunkCount);
+            byte[] header = headerGen.generateHeader(rom, length, i, isLastPart);
+
+            File outputFile = createFilename(workDir, baseName, format, i, chunkCount, rom);
             writeChunk(outputFile, header, data, offset, length);
 
             parts.add(outputFile);
@@ -108,39 +108,53 @@ public class NativeRomSplitter implements RomSplitter {
      * <p>
      * Naming conventions:
      * <ul>
-     *   <li>FIG/SWC/UFO: baseName.1, baseName.2, ...</li>
-     *   <li>GD3: Sanitized 8-char uppercase baseName + .078 (single)
-     *       or baseName + A/B/C + .078 (multi-file).
-     *       Follows ucon64 `gd_make_name` logic to ensure hardware compatibility.</li>
+     *   <li>FIG/SWC: baseName.1, baseName.2, ...</li>
+     *   <li>UFO: baseName.1gm, baseName.2gm, ...</li>
+     *   <li>GD3: SF-Code format (SF + Mbit + 3-char name + suffix + .078).
+     *       Single-file: underscore-padded to 8 chars (e.g., SF4SUP__.078).
+     *       Multi-file: sequence letters A, B, C... (e.g., SF16STRA.078).
+     *       HiROM ≤16Mbit: X-padding before sequence letter (e.g., SF16CHRXA.078).
+     *       Follows ucon64 `snes_gd_make_names` logic for hardware compatibility.</li>
      * </ul>
      */
-    private File createFilename(Path workDir, String baseName, CopierFormat format, int partIndex, int totalParts) {
+    private File createFilename(Path workDir, String baseName, CopierFormat format, int partIndex, int totalParts, SnesRom rom) {
         String filename;
 
         switch (format) {
-            case FIG, SWC, UFO -> filename = baseName + "." + (partIndex + 1);
+            case FIG, SWC -> filename = baseName + "." + (partIndex + 1);
+            case UFO -> {
+                String ext = (partIndex + 1) + "gm";
+                filename = baseName + "." + ext;
+            }
             case GD3 -> {
-                // GD3 requires strict 8.3 naming (8 char basename + 3 char extension)
-                // We must sanitize the basename to be safe for the copier filesystem
-                // 1. Remove non-alphanumeric (simple sanitization)
-                // 2. Truncate to 7 chars if multi-part (to leave room for A, B, C...)
-                //    or 8 chars if single part.
-                // 3. Convert to Uppercase
-                String safeName = baseName.replaceAll("[^a-zA-Z0-9]", "").toUpperCase(Locale.ROOT);
-                
-                if (totalParts == 1) {
-                    if (safeName.length() > 8) {
-                        safeName = safeName.substring(0, 8);
-                    }
-                    filename = safeName + ".078";
+                // GD3 SF-Code format: SF + Mbit + 3-char name + suffix
+                int sizeMbit = rom.rawData().length / 131072;
+                String cleanName = baseName.replaceAll("[^a-zA-Z0-9]", "").toUpperCase(Locale.ROOT);
+
+                String shortName;
+                if (cleanName.length() >= 3) {
+                    shortName = cleanName.substring(0, 3);
                 } else {
-                    // Multi-part: Truncate to 7 chars to append suffix letter
-                    if (safeName.length() > 7) {
-                        safeName = safeName.substring(0, 7);
-                    }
-                    char suffix = (char) ('A' + partIndex);
-                    filename = safeName + suffix + ".078";
+                    shortName = String.format("%-3s", cleanName).replace(' ', '_');
                 }
+
+                String sfBase = "SF" + sizeMbit + shortName;
+                StringBuilder sb = new StringBuilder(sfBase);
+
+                if (totalParts == 1) {
+                    // Single-file names padded to 8 chars with underscores
+                    while (sb.length() < 8) {
+                        sb.append('_');
+                    }
+                } else {
+                    // ucon64 snes_gd_make_names inserts X for HiROM ≤16Mbit (hardware firmware checks this pattern)
+                    if (rom.isHiRom() && sizeMbit <= 16) {
+                        sb.append('X');
+                    }
+                    sb.append((char) ('A' + partIndex));
+                }
+
+                filename = sb.toString() + ".078";
             }
             default -> throw new IllegalArgumentException("Unsupported format: " + format);
         }

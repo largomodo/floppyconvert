@@ -13,12 +13,12 @@ import java.util.Arrays;
 public class FigHeaderGenerator implements HeaderGenerator {
 
     @Override
-    public byte[] generateHeader(SnesRom rom, int splitPartIndex, boolean isLastPart) {
+    public byte[] generateHeader(SnesRom rom, int partSize, int splitPartIndex, boolean isLastPart) {
         byte[] header = new byte[HEADER_SIZE];
         Arrays.fill(header, (byte) 0);
 
-        // 0-1: Size in 8KB blocks
-        int blocks = rom.rawData().length / 8192;
+        // Hardware reads bytes 0-1 to determine sector count for this part
+        int blocks = partSize / 8192;
         header[0] = (byte) (blocks & 0xFF);
         header[1] = (byte) ((blocks >> 8) & 0xFF);
 
