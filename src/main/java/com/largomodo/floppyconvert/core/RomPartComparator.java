@@ -51,8 +51,40 @@ public class RomPartComparator implements Comparator<File> {
             // Numeric extensions: parse as integers to handle .1 < .2 < .10 correctly
             return Integer.compare(Integer.parseInt(ext1), Integer.parseInt(ext2));
         } catch (NumberFormatException e) {
+            // UFO format: extract numeric prefix from "1gm", "2gm", etc.
+            Integer num1 = extractNumericPrefix(ext1);
+            Integer num2 = extractNumericPrefix(ext2);
+
+            if (num1 != null && num2 != null) {
+                return Integer.compare(num1, num2);
+            }
+
             // Non-numeric extensions: fallback to string comparison (GD3 edge cases)
             return ext1.compareToIgnoreCase(ext2);
         }
+    }
+
+    private Integer extractNumericPrefix(String ext) {
+        if (ext == null || ext.isEmpty()) {
+            return null;
+        }
+
+        StringBuilder numStr = new StringBuilder();
+        for (char c : ext.toCharArray()) {
+            if (Character.isDigit(c)) {
+                numStr.append(c);
+            } else {
+                break;
+            }
+        }
+
+        if (numStr.length() > 0) {
+            try {
+                return Integer.parseInt(numStr.toString());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
     }
 }

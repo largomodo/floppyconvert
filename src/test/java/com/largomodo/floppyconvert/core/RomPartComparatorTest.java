@@ -88,6 +88,21 @@ class RomPartComparatorTest {
     }
 
     @Test
+    void testUfoGmExtensionOrdering() {
+        File game1gm = new File("Game.1gm");
+        File game2gm = new File("Game.2gm");
+        File game10gm = new File("Game.10gm");
+
+        assertTrue(comparator.compare(game1gm, game2gm) < 0, "Game.1gm should come before Game.2gm");
+        assertTrue(comparator.compare(game2gm, game10gm) < 0, "Game.2gm should come before Game.10gm");
+        assertTrue(comparator.compare(game1gm, game10gm) < 0, "Game.1gm should come before Game.10gm");
+
+        List<File> files = Arrays.asList(game10gm, game1gm, game2gm);
+        files.sort(comparator);
+        assertEquals(Arrays.asList(game1gm, game2gm, game10gm), files, "Should sort lexicographically: .1gm, .2gm, .10gm");
+    }
+
+    @Test
     void testCopierFormatFromCliArgument() {
         // Case-insensitive lookup
         assertEquals(CopierFormat.GD3, CopierFormat.fromCliArgument("gd3"));

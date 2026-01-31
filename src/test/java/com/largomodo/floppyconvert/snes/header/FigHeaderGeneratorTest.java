@@ -16,47 +16,48 @@ class FigHeaderGeneratorTest {
     void headerSizeIsAlways512Bytes(@ForAll("anyRom") SnesRom rom,
                                     @ForAll int splitPartIndex,
                                     @ForAll boolean isLastPart) {
-        byte[] header = generator.generateHeader(rom, splitPartIndex, isLastPart);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, splitPartIndex, isLastPart);
         assertEquals(512, header.length, "FIG header must always be exactly 512 bytes");
     }
 
     @Property(tries = 100)
     void hiRomFlagIsSetForHiRomRoms(@ForAll("hiRomRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
         assertEquals((byte) 0x80, header[3], "HiROM flag should be 0x80 at offset 3");
     }
 
     @Property(tries = 100)
     void hiRomFlagIsNotSetForLoRomRoms(@ForAll("loRomRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
         assertEquals((byte) 0x00, header[3], "HiROM flag should be 0x00 for LoROM at offset 3");
     }
 
     @Property(tries = 100)
     void multiFileFlag0x40WhenNotLastPart(@ForAll("anyRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 0, false);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, false);
         assertEquals((byte) 0x40, header[2], "Multi-file flag should be 0x40 when not last part");
     }
 
     @Property(tries = 100)
     void multiFileFlag0x00WhenLastPart(@ForAll("anyRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
         assertEquals((byte) 0x00, header[2], "Multi-file flag should be 0x00 when last part");
     }
 
     @Property(tries = 100)
     void sizeFieldContainsCorrectBlockCount(@ForAll("anyRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 0, true);
+        int partSize = 512 * 1024;
+        byte[] header = generator.generateHeader(rom, partSize, 0, true);
 
-        int blocks = rom.rawData().length / 8192;
+        int blocks = partSize / 8192;
         int headerBlocks = (header[0] & 0xFF) | ((header[1] & 0xFF) << 8);
 
-        assertEquals(blocks, headerBlocks, "Size field should contain ROM size in 8KB blocks");
+        assertEquals(blocks, headerBlocks, "Size field should contain part size in 8KB blocks");
     }
 
     @Property(tries = 100)
     void dspFlagIsSetInEmulationBytesForDspRoms(@ForAll("dspRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
 
         int emu1 = header[4] & 0xFF;
 
@@ -71,7 +72,7 @@ class FigHeaderGeneratorTest {
 
     @Property(tries = 100)
     void loRomWithNoSramHasCorrectEmulationBytes(@ForAll("loRomNoSram") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
 
         assertEquals((byte) 0x77, header[4], "LoROM without SRAM should have emu1 = 0x77");
         assertEquals((byte) 0x83, header[5], "LoROM without SRAM should have emu2 = 0x83");
@@ -79,14 +80,14 @@ class FigHeaderGeneratorTest {
 
     @Property(tries = 100)
     void loRomWithSmallSramHasCorrectEmu2(@ForAll("loRomSmallSram") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
 
         assertEquals((byte) 0x80, header[5], "LoROM with SRAM <= 8KB should have emu2 = 0x80");
     }
 
     @Property(tries = 100)
     void hiRomWithSramHasCorrectEmu1(@ForAll("hiRomWithSram") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
 
         int emu1 = header[4] & 0xFF;
         assertTrue((emu1 & 0xDD) == 0xDD,
@@ -95,7 +96,7 @@ class FigHeaderGeneratorTest {
 
     @Property(tries = 100)
     void hiRomHasEmu2Bit0x02Set(@ForAll("hiRomRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
 
         int emu2 = header[5] & 0xFF;
         assertTrue((emu2 & 0x02) == 0x02,
@@ -105,7 +106,7 @@ class FigHeaderGeneratorTest {
     @Property(tries = 100)
     void headerGeneratedForAllSplitParts(@ForAll("anyRom") SnesRom rom,
                                          @ForAll("splitPartIndex") int splitPartIndex) {
-        byte[] header = generator.generateHeader(rom, splitPartIndex, false);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, splitPartIndex, false);
 
         assertEquals(512, header.length,
             "FIG header should be generated for ALL parts (index " + splitPartIndex + ")");
@@ -117,16 +118,17 @@ class FigHeaderGeneratorTest {
     @Test
     void chronoTriggerHeaderHasCorrectSize() {
         byte[] romData = new byte[4 * 1024 * 1024];
+        int partSize = 512 * 1024;
         SnesRom rom = new SnesRom(romData, RomType.HiROM, 8192, "CHRONO TRIGGER",
             false, 0x01, 0x00, 0x00, 0, 0);
 
-        byte[] header = generator.generateHeader(rom, 0, true);
+        byte[] header = generator.generateHeader(rom, partSize, 0, true);
 
         assertEquals(512, header.length);
 
-        int blocks = 4 * 1024 * 1024 / 8192;
+        int blocks = partSize / 8192;
         int headerBlocks = (header[0] & 0xFF) | ((header[1] & 0xFF) << 8);
-        assertEquals(blocks, headerBlocks, "4 Mbit ROM should have 512 blocks (4MB / 8KB)");
+        assertEquals(blocks, headerBlocks, "512KB part should have 64 blocks (512KB / 8KB)");
     }
 
     @Test
@@ -135,7 +137,7 @@ class FigHeaderGeneratorTest {
         SnesRom rom = new SnesRom(romData, RomType.LoROM, 0, "TEST ROM",
             false, 0x01, 0x00, 0x00, 0, 0);
 
-        byte[] header = generator.generateHeader(rom, 0, false);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, false);
 
         assertEquals(512, header.length);
         assertEquals((byte) 0x40, header[2], "First part should have multi-file flag");
@@ -148,7 +150,7 @@ class FigHeaderGeneratorTest {
         SnesRom rom = new SnesRom(romData, RomType.HiROM, 8192, "TEST ROM",
             false, 0x01, 0x00, 0x00, 0, 0);
 
-        byte[] header = generator.generateHeader(rom, 2, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 2, true);
 
         assertEquals(512, header.length);
         assertEquals((byte) 0x00, header[2], "Last part should have multi-file flag = 0x00");
