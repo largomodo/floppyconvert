@@ -16,13 +16,13 @@ class SwcHeaderGeneratorTest {
     void headerSizeIsAlways512Bytes(@ForAll("anyRom") SnesRom rom,
                                      @ForAll int partIndex,
                                      @ForAll boolean isLastPart) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, partIndex, isLastPart);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, partIndex, isLastPart, (byte) 0x00);
         assertEquals(512, header.length, "SWC header must always be exactly 512 bytes");
     }
 
     @Property
     void hiRomProducesEmulationByte0x30(@ForAll("hiRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
         int emulationByte = header[2] & 0xFF;
         assertEquals(0x30, emulationByte & 0x30,
                 "HiROM should have emulation mode bits 0x30 set");
@@ -30,7 +30,7 @@ class SwcHeaderGeneratorTest {
 
     @Property
     void loRomProducesEmulationByteWithout0x30(@ForAll("loRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
         int emulationByte = header[2] & 0xFF;
         assertEquals(0, emulationByte & 0x30,
                 "LoROM should not have emulation mode bits 0x30 set");
@@ -38,7 +38,7 @@ class SwcHeaderGeneratorTest {
 
     @Property
     void sramSize0ProducesEncoding0x0C(@ForAll("romWithSramSize0") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
         int emulationByte = header[2] & 0xFF;
         assertEquals(0x0C, emulationByte & 0x0C,
                 "SRAM size 0 should encode as 0x0C");
@@ -46,7 +46,7 @@ class SwcHeaderGeneratorTest {
 
     @Property
     void sramSize2KBProducesEncoding0x08(@ForAll("romWithSramSize2KB") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
         int emulationByte = header[2] & 0xFF;
         assertEquals(0x08, emulationByte & 0x0C,
                 "SRAM size <= 2KB should encode as 0x08");
@@ -54,7 +54,7 @@ class SwcHeaderGeneratorTest {
 
     @Property
     void sramSize8KBProducesEncoding0x04(@ForAll("romWithSramSize8KB") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
         int emulationByte = header[2] & 0xFF;
         assertEquals(0x04, emulationByte & 0x0C,
                 "SRAM size <= 8KB should encode as 0x04");
@@ -62,7 +62,7 @@ class SwcHeaderGeneratorTest {
 
     @Property
     void sramSize32KBProducesEncoding0x00(@ForAll("romWithSramSize32KB") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
         int emulationByte = header[2] & 0xFF;
         assertEquals(0x00, emulationByte & 0x0C,
                 "SRAM size > 8KB should encode as 0x00");
@@ -70,7 +70,7 @@ class SwcHeaderGeneratorTest {
 
     @Property
     void multiFileFlagSetWhenNotLastPart(@ForAll("anyRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, false, (byte) 0x00);
         int emulationByte = header[2] & 0xFF;
         assertEquals(0x40, emulationByte & 0x40,
                 "Multi-file flag (0x40) should be set when not last part");
@@ -78,7 +78,7 @@ class SwcHeaderGeneratorTest {
 
     @Property
     void multiFileFlagNotSetWhenLastPart(@ForAll("anyRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
         int emulationByte = header[2] & 0xFF;
         assertEquals(0x00, emulationByte & 0x40,
                 "Multi-file flag (0x40) should not be set when last part");
@@ -87,7 +87,7 @@ class SwcHeaderGeneratorTest {
     @Test
     void fixedIDsArePresentAtCorrectOffsets() {
         SnesRom rom = createTestRom(RomType.LoROM, 0, 1024 * 1024);
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         assertEquals((byte) 0xAA, header[8], "Fixed ID 0xAA should be at offset 8");
         assertEquals((byte) 0xBB, header[9], "Fixed ID 0xBB should be at offset 9");
@@ -99,7 +99,7 @@ class SwcHeaderGeneratorTest {
         int romSize = 4 * 1024 * 1024;
         int partSize = 512 * 1024;
         SnesRom rom = createTestRom(RomType.LoROM, 0, romSize);
-        byte[] header = generator.generateHeader(rom, partSize, 0, true);
+        byte[] header = generator.generateHeader(rom, partSize, 0, true, (byte) 0x00);
 
         int expectedBlocks = partSize / 8192;
         int actualBlocks = (header[0] & 0xFF) | ((header[1] & 0xFF) << 8);
@@ -114,7 +114,7 @@ class SwcHeaderGeneratorTest {
         int romSize = 8 * 1024 * 1024;
         int partSize = 512 * 1024;
         SnesRom rom = createTestRom(RomType.LoROM, 0, romSize);
-        byte[] header = generator.generateHeader(rom, partSize, 0, true);
+        byte[] header = generator.generateHeader(rom, partSize, 0, true, (byte) 0x00);
 
         int expectedBlocks = partSize / 8192;
         int actualBlocks = (header[0] & 0xFF) | ((header[1] & 0xFF) << 8);

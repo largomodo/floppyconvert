@@ -17,7 +17,7 @@ class Gd3HeaderGeneratorTest {
     void headerNotGeneratedForNonZeroSplitPartIndex(@ForAll("nonZeroSplitPartIndex") int splitPartIndex) {
         SnesRom rom = createTestRom(RomType.LoROM, 4 * 1024 * 1024, 0, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, splitPartIndex, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, splitPartIndex, false, (byte) 0x00);
 
         assertEquals(0, header.length, "Header should be empty for splitPartIndex > 0");
     }
@@ -29,7 +29,7 @@ class Gd3HeaderGeneratorTest {
     ) {
         SnesRom rom = createTestRom(romType, megabytes * 1024 * 1024, 0, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         assertEquals(512, header.length, "Header should be 512 bytes for splitPartIndex == 0");
     }
@@ -41,7 +41,7 @@ class Gd3HeaderGeneratorTest {
     ) {
         SnesRom rom = createTestRom(romType, megabytes * 1024 * 1024, 0, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] idBytes = Arrays.copyOfRange(header, 0, 16);
         String id = new String(idBytes, StandardCharsets.US_ASCII);
@@ -52,7 +52,7 @@ class Gd3HeaderGeneratorTest {
     void sramSizeCodeCorrectFor64KB() {
         SnesRom rom = createTestRom(RomType.LoROM, 4 * 1024 * 1024, 8192, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         assertEquals((byte) 0x81, header[16], "SRAM size code should be 0x81 for 64KB (8192 bytes)");
     }
@@ -61,7 +61,7 @@ class Gd3HeaderGeneratorTest {
     void sramSizeCodeCorrectFor16KB() {
         SnesRom rom = createTestRom(RomType.LoROM, 4 * 1024 * 1024, 2048, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         assertEquals((byte) 0x82, header[16], "SRAM size code should be 0x82 for 16KB (2048 bytes)");
     }
@@ -70,7 +70,7 @@ class Gd3HeaderGeneratorTest {
     void sramSizeCodeDefaultForOtherSizes(@ForAll("sramSizesOther") int sramSize) {
         SnesRom rom = createTestRom(RomType.LoROM, 4 * 1024 * 1024, sramSize, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         assertEquals((byte) 0x80, header[16], "SRAM size code should be 0x80 for other sizes");
     }
@@ -80,7 +80,7 @@ class Gd3HeaderGeneratorTest {
         int size = 1 * 1024 * 1024;
         SnesRom rom = createTestRom(RomType.HiROM, size, 0, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] expectedMap = new byte[]{
             0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
@@ -96,7 +96,7 @@ class Gd3HeaderGeneratorTest {
         int size = 2 * 1024 * 1024;
         SnesRom rom = createTestRom(RomType.HiROM, size, 0, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] expectedMap = new byte[]{
             0x20, 0x21, 0x20, 0x21, 0x20, 0x21, 0x20, 0x21,
@@ -112,7 +112,7 @@ class Gd3HeaderGeneratorTest {
         int size = 3 * 1024 * 1024;
         SnesRom rom = createTestRom(RomType.HiROM, size, 0, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] expectedMap = new byte[]{
             0x20, 0x21, 0x22, 0x00, 0x20, 0x21, 0x22, 0x00,
@@ -129,7 +129,7 @@ class Gd3HeaderGeneratorTest {
         int size = 4 * 1024 * 1024;
         SnesRom rom = createTestRom(RomType.HiROM, size, 0, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] expectedMap = new byte[]{
             0x20, 0x21, 0x22, 0x23, 0x20, 0x21, 0x22, 0x23,
@@ -145,7 +145,7 @@ class Gd3HeaderGeneratorTest {
         int size = 512 * 1024;
         SnesRom rom = createTestRom(RomType.LoROM, size, 0, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] expectedMap = new byte[]{
             0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
@@ -161,7 +161,7 @@ class Gd3HeaderGeneratorTest {
         int size = 1 * 1024 * 1024;
         SnesRom rom = createTestRom(RomType.LoROM, size, 0, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] expectedMap = new byte[]{
             0x20, 0x21, 0x20, 0x21, 0x20, 0x21, 0x20, 0x21,
@@ -177,7 +177,7 @@ class Gd3HeaderGeneratorTest {
         int size = 2 * 1024 * 1024;
         SnesRom rom = createTestRom(RomType.LoROM, size, 0, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] expectedMap = new byte[]{
             0x20, 0x21, 0x22, 0x23, 0x20, 0x21, 0x22, 0x23,
@@ -194,7 +194,7 @@ class Gd3HeaderGeneratorTest {
         int size = 4 * 1024 * 1024;
         SnesRom rom = createTestRom(RomType.LoROM, size, 0, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] expectedMap = new byte[]{
             0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
@@ -209,7 +209,7 @@ class Gd3HeaderGeneratorTest {
     void hiRomSramMappingSetWhenSramPresent(@ForAll("positiveSramSize") int sramSize) {
         SnesRom rom = createTestRom(RomType.HiROM, 2 * 1024 * 1024, sramSize, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         assertEquals((byte) 0x0C, header[0x29], "HiROM SRAM mapping should be 0x0C at offset 0x29");
         assertEquals((byte) 0x0C, header[0x2A], "HiROM SRAM mapping should be 0x0C at offset 0x2A");
@@ -219,7 +219,7 @@ class Gd3HeaderGeneratorTest {
     void hiRomSramMappingNotSetWhenNoSram() {
         SnesRom rom = createTestRom(RomType.HiROM, 2 * 1024 * 1024, 0, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         assertEquals((byte) 0x00, header[0x29], "HiROM SRAM mapping should be 0x00 at offset 0x29 when no SRAM");
         assertEquals((byte) 0x00, header[0x2A], "HiROM SRAM mapping should be 0x00 at offset 0x2A when no SRAM");
@@ -229,7 +229,7 @@ class Gd3HeaderGeneratorTest {
     void loRomDspFlagSetWhenHasDsp() {
         SnesRom rom = createTestRom(RomType.LoROM, 1 * 1024 * 1024, 0, true);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         assertEquals((byte) 0x60, header[0x14], "LoROM DSP flag should be 0x60 at offset 0x14");
         assertEquals((byte) 0x60, header[0x1C], "LoROM DSP flag should be 0x60 at offset 0x1C");
@@ -239,7 +239,7 @@ class Gd3HeaderGeneratorTest {
     void loRomDspFlagNotSetWhenNoDsp() {
         SnesRom rom = createTestRom(RomType.LoROM, 1 * 1024 * 1024, 0, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         assertNotEquals((byte) 0x60, header[0x14], "LoROM DSP flag should not be 0x60 at offset 0x14 when no DSP");
         assertNotEquals((byte) 0x60, header[0x1C], "LoROM DSP flag should not be 0x60 at offset 0x1C when no DSP");
@@ -249,7 +249,7 @@ class Gd3HeaderGeneratorTest {
     void loRomSramMappingSetWhenSramPresent(@ForAll("positiveSramSize") int sramSize) {
         SnesRom rom = createTestRom(RomType.LoROM, 1 * 1024 * 1024, sramSize, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         assertEquals((byte) 0x40, header[0x24], "LoROM SRAM mapping should be 0x40 at offset 0x24");
         assertEquals((byte) 0x40, header[0x28], "LoROM SRAM mapping should be 0x40 at offset 0x28");
@@ -259,7 +259,7 @@ class Gd3HeaderGeneratorTest {
     void loRomSramMappingNotSetWhenNoSram() {
         SnesRom rom = createTestRom(RomType.LoROM, 1 * 1024 * 1024, 0, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         assertNotEquals((byte) 0x40, header[0x24], "LoROM SRAM mapping should not be 0x40 at offset 0x24 when no SRAM");
         assertNotEquals((byte) 0x40, header[0x28], "LoROM SRAM mapping should not be 0x40 at offset 0x28 when no SRAM");
@@ -271,7 +271,7 @@ class Gd3HeaderGeneratorTest {
         int chronoTriggerSize = 4 * 1024 * 1024;
         SnesRom rom = createTestRom(RomType.HiROM, chronoTriggerSize, 8192, false);
 
-        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         assertEquals(512, header.length, "Header should be 512 bytes");
 

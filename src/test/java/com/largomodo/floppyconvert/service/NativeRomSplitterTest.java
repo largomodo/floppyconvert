@@ -59,13 +59,13 @@ class NativeRomSplitterTest {
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockHeaderFactory.get(CopierFormat.SWC)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.SWC);
 
         verify(mockReader, times(1)).load(inputRom.toPath());
         verify(mockHeaderFactory, times(1)).get(CopierFormat.SWC);
-        verify(mockHeaderGenerator, times(1)).generateHeader(eq(rom), eq(512 * 1024), eq(0), eq(true));
+        verify(mockHeaderGenerator, times(1)).generateHeader(eq(rom), eq(512 * 1024), eq(0), eq(true), anyByte());
         verifyNoInteractions(mockInterleaver);
 
         assertEquals(1, parts.size());
@@ -80,13 +80,13 @@ class NativeRomSplitterTest {
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockHeaderFactory.get(CopierFormat.SWC)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.SWC);
 
         verify(mockReader, times(1)).load(inputRom.toPath());
         verify(mockHeaderFactory, times(1)).get(CopierFormat.SWC);
-        verify(mockHeaderGenerator, times(8)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean());
+        verify(mockHeaderGenerator, times(8)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte());
         verifyNoInteractions(mockInterleaver);
 
         assertEquals(8, parts.size());
@@ -105,14 +105,14 @@ class NativeRomSplitterTest {
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockInterleaver.interleave(romData)).thenReturn(interleavedData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
         verify(mockReader, times(1)).load(inputRom.toPath());
         verify(mockInterleaver, times(1)).interleave(romData);
         verify(mockHeaderFactory, times(1)).get(CopierFormat.GD3);
-        verify(mockHeaderGenerator, times(4)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean());
+        verify(mockHeaderGenerator, times(4)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte());
 
         assertEquals(4, parts.size());
         assertEquals("SF32TESA.078", parts.get(0).getName());
@@ -129,13 +129,13 @@ class NativeRomSplitterTest {
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockHeaderFactory.get(CopierFormat.SWC)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.SWC);
 
         verify(mockReader, times(1)).load(inputRom.toPath());
         verify(mockHeaderFactory, times(1)).get(CopierFormat.SWC);
-        verify(mockHeaderGenerator, times(3)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean());
+        verify(mockHeaderGenerator, times(3)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte());
         verifyNoInteractions(mockInterleaver);
 
         assertEquals(3, parts.size());
@@ -154,7 +154,7 @@ class NativeRomSplitterTest {
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockInterleaver.interleave(romData)).thenReturn(interleavedData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
@@ -169,7 +169,7 @@ class NativeRomSplitterTest {
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
@@ -184,7 +184,7 @@ class NativeRomSplitterTest {
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockHeaderFactory.get(CopierFormat.SWC)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         splitter.split(inputRom, tempDir, CopierFormat.SWC);
 
@@ -199,7 +199,7 @@ class NativeRomSplitterTest {
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockHeaderFactory.get(CopierFormat.FIG)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         splitter.split(inputRom, tempDir, CopierFormat.FIG);
 
@@ -214,7 +214,7 @@ class NativeRomSplitterTest {
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockHeaderFactory.get(CopierFormat.UFO)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         splitter.split(inputRom, tempDir, CopierFormat.UFO);
 
@@ -229,13 +229,13 @@ class NativeRomSplitterTest {
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockHeaderFactory.get(CopierFormat.SWC)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         splitter.split(inputRom, tempDir, CopierFormat.SWC);
 
-        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(0), eq(false));
-        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(1), eq(false));
-        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(2), eq(true));
+        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(0), eq(false), anyByte());
+        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(1), eq(false), anyByte());
+        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(2), eq(true), anyByte());
     }
 
     @Test
@@ -264,7 +264,7 @@ class NativeRomSplitterTest {
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockInterleaver.interleave(romData)).thenReturn(interleavedData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
@@ -280,7 +280,7 @@ class NativeRomSplitterTest {
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockHeaderFactory.get(CopierFormat.FIG)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.FIG);
 
@@ -297,7 +297,7 @@ class NativeRomSplitterTest {
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockHeaderFactory.get(CopierFormat.UFO)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.UFO);
 
@@ -316,7 +316,7 @@ class NativeRomSplitterTest {
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockInterleaver.interleave(romData)).thenReturn(interleavedData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
@@ -333,7 +333,7 @@ class NativeRomSplitterTest {
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
@@ -351,13 +351,15 @@ class NativeRomSplitterTest {
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockInterleaver.interleave(romData)).thenReturn(romData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
-        assertEquals(2, parts.size());
+        assertEquals(4, parts.size());
         assertEquals("SF16CHRXA.078", parts.get(0).getName());
         assertEquals("SF16CHRXB.078", parts.get(1).getName());
+        assertEquals("SF16CHRXC.078", parts.get(2).getName());
+        assertEquals("SF16CHRXD.078", parts.get(3).getName());
     }
 
     @Test
@@ -369,7 +371,7 @@ class NativeRomSplitterTest {
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockInterleaver.interleave(romData)).thenReturn(romData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
@@ -389,7 +391,7 @@ class NativeRomSplitterTest {
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
         when(mockInterleaver.interleave(romData)).thenReturn(interleavedData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean())).thenReturn(new byte[512]);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
@@ -483,5 +485,156 @@ class NativeRomSplitterTest {
                 0,
                 0
         );
+    }
+
+    @Test
+    void testGd3_8MbitHiRom_ForceSplitTo4Mbit() throws IOException {
+        File inputRom = createRomFile("test.sfc");
+        byte[] romData = createRomData(1024 * 1024);
+        byte[] interleavedData = new byte[romData.length];
+        SnesRom rom = createHiRom(romData);
+
+        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
+        when(mockInterleaver.interleave(romData)).thenReturn(interleavedData);
+        when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
+
+        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
+
+        verify(mockHeaderGenerator, times(2)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte());
+        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(0), eq(false), anyByte());
+        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(1), eq(true), anyByte());
+
+        assertEquals(2, parts.size());
+        assertEquals("SF8TESXA.078", parts.get(0).getName());
+        assertEquals("SF8TESXB.078", parts.get(1).getName());
+    }
+
+    @Test
+    void testGd3_8MbitLoRom_NoForceSplit() throws IOException {
+        File inputRom = createRomFile("test.sfc");
+        byte[] romData = createRomData(1024 * 1024);
+        SnesRom rom = createLoRom(romData);
+
+        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
+        when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
+
+        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
+
+        verify(mockHeaderGenerator, times(1)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte());
+        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(1024 * 1024), eq(0), eq(true), anyByte());
+
+        assertEquals(1, parts.size());
+        assertEquals("SF8TES__.078", parts.get(0).getName());
+    }
+
+    @Test
+    void testGd3_16MbitHiRom_BoundaryCase() throws IOException {
+        File inputRom = createRomFile("test.sfc");
+        byte[] romData = createRomData(2 * 1024 * 1024);
+        byte[] interleavedData = new byte[romData.length];
+        SnesRom rom = createHiRom(romData);
+
+        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
+        when(mockInterleaver.interleave(romData)).thenReturn(interleavedData);
+        when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
+
+        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
+
+        verify(mockHeaderGenerator, times(4)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte());
+        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(0), eq(false), anyByte());
+        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(1), eq(false), anyByte());
+        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(2), eq(false), anyByte());
+        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(3), eq(true), anyByte());
+
+        assertEquals(4, parts.size());
+        assertEquals("SF16TESXA.078", parts.get(0).getName());
+        assertEquals("SF16TESXB.078", parts.get(1).getName());
+        assertEquals("SF16TESXC.078", parts.get(2).getName());
+        assertEquals("SF16TESXD.078", parts.get(3).getName());
+    }
+
+    @Test
+    void testGd3_20MbitHiRom_NoForceSplit() throws IOException {
+        File inputRom = createRomFile("test.sfc");
+        byte[] romData = createRomData(2560 * 1024);
+        byte[] interleavedData = new byte[romData.length];
+        SnesRom rom = createHiRom(romData);
+
+        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
+        when(mockInterleaver.interleave(romData)).thenReturn(interleavedData);
+        when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
+
+        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
+
+        verify(mockHeaderGenerator, times(3)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte());
+        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(1024 * 1024), eq(0), eq(false), anyByte());
+        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(1024 * 1024), eq(1), eq(false), anyByte());
+        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(2), eq(true), anyByte());
+
+        assertEquals(3, parts.size());
+        assertEquals("SF20TESA.078", parts.get(0).getName());
+        assertEquals("SF20TESB.078", parts.get(1).getName());
+        assertEquals("SF20TESC.078", parts.get(2).getName());
+    }
+
+    @Test
+    void testUfo_12MbitHiRom_IrregularChunks() throws IOException {
+        File inputRom = createRomFile("test.sfc");
+        byte[] romData = createRomData(1536 * 1024);
+        SnesRom rom = createHiRom(romData);
+
+        HeaderGenerator spyHeaderGen = spy(HeaderGenerator.class);
+
+        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
+        when(mockHeaderFactory.get(CopierFormat.UFO)).thenReturn(spyHeaderGen);
+        when(spyHeaderGen.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
+
+        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.UFO);
+
+        assertEquals(4, parts.size(), "12Mbit HiROM UFO should produce 4 parts");
+
+        assertEquals("test.1gm", parts.get(0).getName());
+        assertEquals("test.2gm", parts.get(1).getName());
+        assertEquals("test.3gm", parts.get(2).getName());
+        assertEquals("test.4gm", parts.get(3).getName());
+
+        verify(spyHeaderGen).generateHeader(eq(rom), eq(512 * 1024), eq(0), eq(false), eq((byte) 0x40));
+        verify(spyHeaderGen).generateHeader(eq(rom), eq(256 * 1024), eq(1), eq(false), eq((byte) 0x10));
+        verify(spyHeaderGen).generateHeader(eq(rom), eq(512 * 1024), eq(2), eq(false), eq((byte) 0x10));
+        verify(spyHeaderGen).generateHeader(eq(rom), eq(256 * 1024), eq(3), eq(true), eq((byte) 0x00));
+
+        assertEquals(512 * 1024 + 512, parts.get(0).length(), "Part 1: 4Mbit + 512-byte header");
+        assertEquals(256 * 1024 + 512, parts.get(1).length(), "Part 2: 2Mbit + 512-byte header");
+        assertEquals(512 * 1024 + 512, parts.get(2).length(), "Part 3: 4Mbit + 512-byte header");
+        assertEquals(256 * 1024 + 512, parts.get(3).length(), "Part 4: 2Mbit + 512-byte header");
+    }
+
+    @Test
+    void testUfo_12MbitLoRom_StandardChunks() throws IOException {
+        File inputRom = createRomFile("test.sfc");
+        byte[] romData = createRomData(1536 * 1024);
+        SnesRom rom = createLoRom(romData);
+
+        HeaderGenerator spyHeaderGen = spy(HeaderGenerator.class);
+
+        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
+        when(mockHeaderFactory.get(CopierFormat.UFO)).thenReturn(spyHeaderGen);
+        when(spyHeaderGen.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
+
+        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.UFO);
+
+        assertEquals(3, parts.size(), "12Mbit LoROM UFO should produce 3 parts (standard 4Mbit chunks)");
+
+        assertEquals("test.1gm", parts.get(0).getName());
+        assertEquals("test.2gm", parts.get(1).getName());
+        assertEquals("test.3gm", parts.get(2).getName());
+
+        verify(spyHeaderGen).generateHeader(eq(rom), eq(512 * 1024), eq(0), eq(false), anyByte());
+        verify(spyHeaderGen).generateHeader(eq(rom), eq(512 * 1024), eq(1), eq(false), anyByte());
+        verify(spyHeaderGen).generateHeader(eq(rom), eq(512 * 1024), eq(2), eq(true), anyByte());
     }
 }

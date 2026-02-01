@@ -39,11 +39,13 @@ class SnesInterleaverTest {
     void interleavingSwapsBlocksCorrectly_FirstChunk(@ForAll("data8Mbit") byte[] input) {
         byte[] output = interleaver.interleave(input);
 
-        int halfChunk = CHUNK_8MBIT / 2;
-        for (int i = 0; i < 16; i++) {
+        int halfSize = input.length / 2;
+        int numBlocks = input.length / (BLOCK_32KB * 2);
+
+        for (int i = 0; i < numBlocks; i++) {
             int srcBlockOffset = i * (BLOCK_32KB * 2);
             int destLowerOffset = i * BLOCK_32KB;
-            int destUpperOffset = halfChunk + (i * BLOCK_32KB);
+            int destUpperOffset = halfSize + (i * BLOCK_32KB);
 
             byte[] srcLower32K = Arrays.copyOfRange(input, srcBlockOffset, srcBlockOffset + BLOCK_32KB);
             byte[] srcUpper32K = Arrays.copyOfRange(input, srcBlockOffset + BLOCK_32KB, srcBlockOffset + (BLOCK_32KB * 2));
@@ -58,41 +60,107 @@ class SnesInterleaverTest {
         }
     }
 
+    @Property
+    void testGlobalInterleavingPreservesAllData(@ForAll("romData8MbitMultiple") byte[] input) {
+        byte[] output = interleaver.interleave(input);
+
+        assertEquals(input.length, output.length,
+                "Output length should equal input length for 8Mbit-aligned input");
+
+        long inputSum = 0;
+        long outputSum = 0;
+        for (int i = 0; i < input.length; i++) {
+            inputSum += input[i] & 0xFF;
+            outputSum += output[i] & 0xFF;
+        }
+        assertEquals(inputSum, outputSum,
+                "Sum of all bytes should be equal - no data corruption");
+
+        Map<Byte, Integer> inputCounts = new HashMap<>();
+        Map<Byte, Integer> outputCounts = new HashMap<>();
+        for (int i = 0; i < input.length; i++) {
+            inputCounts.merge(input[i], 1, Integer::sum);
+            outputCounts.merge(output[i], 1, Integer::sum);
+        }
+        assertEquals(inputCounts, outputCounts,
+                "Every input byte should appear in output with same frequency");
+    }
+
+    @Property
+    void testBlockPairMappingCorrect(@ForAll("romData8MbitMultiple") byte[] input) {
+        byte[] output = interleaver.interleave(input);
+
+        int halfSize = input.length / 2;
+        int numBlocks = input.length / (BLOCK_32KB * 2);
+
+        for (int i = 0; i < numBlocks; i++) {
+            int srcBlockOffset = i * (BLOCK_32KB * 2);
+            int destLowerOffset = i * BLOCK_32KB;
+            int destUpperOffset = halfSize + (i * BLOCK_32KB);
+
+            byte[] srcLower32K = Arrays.copyOfRange(input, srcBlockOffset, srcBlockOffset + BLOCK_32KB);
+            byte[] srcUpper32K = Arrays.copyOfRange(input, srcBlockOffset + BLOCK_32KB, srcBlockOffset + (BLOCK_32KB * 2));
+
+            byte[] destUpper32K = Arrays.copyOfRange(output, destUpperOffset, destUpperOffset + BLOCK_32KB);
+            byte[] destLower32K = Arrays.copyOfRange(output, destLowerOffset, destLowerOffset + BLOCK_32KB);
+
+            assertArrayEquals(srcUpper32K, destLower32K,
+                    "Block " + i + ": output[i*32KB] should come from input[i*64KB+32KB]");
+            assertArrayEquals(srcLower32K, destUpper32K,
+                    "Block " + i + ": output[n + i*32KB] should come from input[i*64KB] where n = size/2");
+        }
+    }
+
     @Test
     void twelvesMbitMirrorsToSixteen() {
         int size12Mbit = CHUNK_8MBIT + (CHUNK_8MBIT / 2); // 12 Mbit = 1.5 MB
         byte[] input = new byte[size12Mbit];
-        
+
         // Fill first 8Mbit with A
         Arrays.fill(input, 0, CHUNK_8MBIT, (byte) 0xAA);
         // Fill next 4Mbit with B
         Arrays.fill(input, CHUNK_8MBIT, size12Mbit, (byte) 0xBB);
 
-        // When mirroring 12->16, the last 4Mbit (0xBB) should be repeated into the gap
-        
         byte[] output = interleaver.interleave(input);
         int size16Mbit = 2 * CHUNK_8MBIT;
 
         assertEquals(size16Mbit, output.length,
                 "12 Mbit input should be extended to 16 Mbit");
-        
-        // We need to de-interleave mentally or check specific offsets to verify mirroring
-        // The mirroring happens BEFORE interleaving.
-        // Pre-interleave state:
-        // 0.0 - 1.0 MB: 0xAA
-        // 1.0 - 1.5 MB: 0xBB
-        // 1.5 - 2.0 MB: 0xBB (Mirrored from 1.0-1.5)
-        
-        // Check the second chunk (1.0 - 2.0 MB) of the OUTPUT
-        // In the output, the second chunk (indexes 1MB to 2MB) corresponds to the
-        // interleaved version of (0xBB....0xBB).
-        // Since the source for the second chunk is all 0xBBs (due to mirroring), 
-        // the interleaved output should also be all 0xBBs.
-        
-        byte[] secondChunk = Arrays.copyOfRange(output, CHUNK_8MBIT, size16Mbit);
-        for(byte b : secondChunk) {
-            assertEquals((byte) 0xBB, b, "Mirrored section should contain repeated data (0xBB), not zeros");
+
+        // Global interleaving redistributes blocks across the entire ROM.
+        // After mirroring: [0xAA (8Mbit), 0xBB (4Mbit), 0xBB (4Mbit mirrored)]
+        // The algorithm uses halfSize = totalSize / 2 = 1MB as the global split point.
+        //
+        // For the first 64KB block (all 0xAA):
+        //   - Lower 32KB (0xAA) -> output[1MB] (second half start)
+        //   - Upper 32KB (0xAA) -> output[0] (first half start)
+        //
+        // This means output will contain BOTH 0xAA and 0xBB data mixed across the address space.
+        // We verify that all data is preserved (no loss) and both values are present.
+
+        Map<Byte, Integer> counts = new HashMap<>();
+        for (byte b : output) {
+            counts.merge(b, 1, Integer::sum);
         }
+
+        // After mirroring, we have:
+        // - 8Mbit of 0xAA = 1MB = 1048576 bytes
+        // - 8Mbit of 0xBB (4Mbit original + 4Mbit mirrored) = 1MB = 1048576 bytes
+        assertEquals(CHUNK_8MBIT, counts.get((byte) 0xAA),
+                "Should have exactly 1MB of 0xAA data after global interleaving");
+        assertEquals(CHUNK_8MBIT, counts.get((byte) 0xBB),
+                "Should have exactly 1MB of 0xBB data (including mirrored section)");
+
+        // Verify global interleaving mixed the data (not per-chunk isolated)
+        // The second chunk should contain BOTH 0xAA and 0xBB
+        byte[] secondChunk = Arrays.copyOfRange(output, CHUNK_8MBIT, size16Mbit);
+        boolean hasAA = false, hasBB = false;
+        for (byte b : secondChunk) {
+            if (b == (byte) 0xAA) hasAA = true;
+            if (b == (byte) 0xBB) hasBB = true;
+        }
+        assertTrue(hasAA, "Global interleaving should place some 0xAA data in second half");
+        assertTrue(hasBB, "Global interleaving should place some 0xBB data in second half");
     }
 
     @Test
@@ -130,6 +198,14 @@ class SnesInterleaverTest {
         return Arbitraries.integers()
                 .between(1, CHUNK_8MBIT - 1)
                 .map(size -> new byte[size])
+                .map(this::fillWithRandomPattern);
+    }
+
+    @Provide
+    Arbitrary<byte[]> romData8MbitMultiple() {
+        return Arbitraries.integers()
+                .between(1, 4)
+                .map(chunks -> new byte[chunks * CHUNK_8MBIT])
                 .map(this::fillWithRandomPattern);
     }
 
