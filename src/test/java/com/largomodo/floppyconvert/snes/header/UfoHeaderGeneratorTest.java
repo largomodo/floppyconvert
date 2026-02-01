@@ -24,7 +24,7 @@ class UfoHeaderGeneratorTest {
     void headerSizeIsAlways512Bytes(@ForAll("snesRom") SnesRom rom,
                                      @ForAll int splitPartIndex,
                                      @ForAll boolean isLastPart) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, splitPartIndex, isLastPart);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, splitPartIndex, isLastPart, (byte) 0x00);
 
         assertEquals(512, header.length, "Header must always be exactly 512 bytes");
     }
@@ -33,7 +33,7 @@ class UfoHeaderGeneratorTest {
     void headerContainsSuperUfoId(@ForAll("snesRom") SnesRom rom,
                                    @ForAll int splitPartIndex,
                                    @ForAll boolean isLastPart) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, splitPartIndex, isLastPart);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, splitPartIndex, isLastPart, (byte) 0x00);
 
         byte[] expected = "SUPERUFO".getBytes(StandardCharsets.US_ASCII);
         byte[] actual = Arrays.copyOfRange(header, 8, 16);
@@ -43,56 +43,56 @@ class UfoHeaderGeneratorTest {
 
     @Property
     void hiRomProducesBankTypeZero(@ForAll("hiRomRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         assertEquals(0, header[18] & 0xFF, "HiROM must have bank type 0");
     }
 
     @Property
     void loRomProducesBankTypeOne(@ForAll("loRomRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         assertEquals(1, header[18] & 0xFF, "LoROM must have bank type 1");
     }
 
     @Property
     void sramSizeCodeZeroForNoSram(@ForAll("romWithNoSram") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         assertEquals(0, header[19] & 0xFF, "SRAM size 0 must produce code 0");
     }
 
     @Property
     void sramSizeCodeOneForSmallSram(@ForAll("romWithSmallSram") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         assertEquals(1, header[19] & 0xFF, "SRAM size > 0 and <= 2048 (16kbit) must produce code 1");
     }
 
     @Property
     void sramSizeCodeTwoForMediumSram(@ForAll("romWithMediumSram") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         assertEquals(2, header[19] & 0xFF, "SRAM size > 2048 and <= 8192 (64kbit) must produce code 2");
     }
 
     @Property
     void sramSizeCodeThreeForLargeSram(@ForAll("romWithLargeSram") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         assertEquals(3, header[19] & 0xFF, "SRAM size > 8192 and <= 32768 (256kbit) must produce code 3");
     }
 
     @Property
     void sramSizeCodeEightForVeryLargeSram(@ForAll("romWithVeryLargeSram") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         assertEquals(8, header[19] & 0xFF, "SRAM size > 32768 (>256kbit) must produce code 8");
     }
 
     @Property
     void hiRomSramMappingControlsSetCorrectly(@ForAll("hiRomWithSram") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         assertEquals(0, header[23] & 0xFF, "HiROM SRAM type must be 0");
         assertEquals(0x0C, header[21] & 0xFF, "HiROM A20/A21 mapping must be 0x0C when SRAM present");
@@ -101,7 +101,7 @@ class UfoHeaderGeneratorTest {
 
     @Property
     void loRomWithSramMappingControlsSetCorrectly(@ForAll("loRomWithSram") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         assertEquals(3, header[23] & 0xFF, "LoROM SRAM type must be 3");
         assertEquals(2, header[20] & 0xFF, "LoROM A15 mapping must be 2 when SRAM present");
@@ -111,7 +111,7 @@ class UfoHeaderGeneratorTest {
 
     @Property
     void loRomWithoutSramAndWithDspMappingControlsSetCorrectly(@ForAll("loRomWithDspNoSram") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         assertEquals(1, header[20] & 0xFF, "LoROM A15 mapping must be 1 when DSP present and no SRAM");
         assertEquals(0x0C, header[21] & 0xFF, "LoROM A20/A21 mapping must be 0x0C when DSP present and no SRAM");
@@ -119,7 +119,7 @@ class UfoHeaderGeneratorTest {
 
     @Property
     void loRomWithoutSramAndWithoutDspMappingControlsSetCorrectly(@ForAll("loRomWithoutSramOrDsp") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         assertEquals(2, header[22] & 0xFF, "LoROM A22/A23 mapping must be 2 when no SRAM and no DSP");
         assertEquals(0, header[23] & 0xFF, "LoROM SRAM type must be 0 when no SRAM and no DSP");
@@ -127,7 +127,7 @@ class UfoHeaderGeneratorTest {
 
     @Property
     void sizeMbitIsCalculatedCorrectly(@ForAll("snesRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         int expectedMbit = rom.rawData().length / 131072;
         int actualMbit = header[17] & 0xFF;
@@ -137,21 +137,21 @@ class UfoHeaderGeneratorTest {
 
     @Property
     void multiSplitFlagSetWhenNotLastPart(@ForAll("snesRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, false);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, false, (byte) 0x40);
 
         assertEquals(0x40, header[2] & 0xFF, "Multi/split flag must be 0x40 when not last part");
     }
 
     @Property
     void multiSplitFlagNotSetWhenLastPart(@ForAll("snesRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         assertEquals(0, header[2] & 0xFF, "Multi/split flag must be 0 when last part");
     }
 
     @Property
     void usesSramFlagSetCorrectly(@ForAll("snesRom") SnesRom rom) {
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         int expectedFlag = rom.sramSize() > 0 ? 1 : 0;
         int actualFlag = header[16] & 0xFF;
@@ -162,7 +162,7 @@ class UfoHeaderGeneratorTest {
     @Property
     void sizeIn8KBBlocksCalculatedCorrectly(@ForAll("snesRom") SnesRom rom) {
         int partSize = 512 * 1024;
-        byte[] header = generator.generateHeader(rom, partSize, 0, true);
+        byte[] header = generator.generateHeader(rom, partSize, 0, true, (byte) 0x00);
 
         int expectedBlocks = partSize / 8192;
         int actualBlocks = (header[0] & 0xFF) | ((header[1] & 0xFF) << 8);
@@ -176,7 +176,7 @@ class UfoHeaderGeneratorTest {
         byte[] data = new byte[chronoTriggerSize];
         SnesRom rom = new SnesRom(data, RomType.HiROM, 0, "CHRONO TRIGGER", false, (byte) 0, (byte) 0, (byte) 0, 0, 0);
 
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         int sizeMbit = header[17] & 0xFF;
         assertEquals(32, sizeMbit, "32 Mbit ROM (4MB) should have size code 32");
@@ -188,7 +188,7 @@ class UfoHeaderGeneratorTest {
         byte[] data = new byte[size8Mbit];
         SnesRom rom = new SnesRom(data, RomType.LoROM, 0, "TEST ROM", false, (byte) 0, (byte) 0, (byte) 0, 0, 0);
 
-        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true);
+        byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         int sizeMbit = header[17] & 0xFF;
         assertEquals(8, sizeMbit, "8 Mbit ROM (1MB) should have size code 8");

@@ -16,7 +16,7 @@ import java.util.Arrays;
 public class Gd3HeaderGenerator implements HeaderGenerator {
 
     @Override
-    public byte[] generateHeader(SnesRom rom, int partSize, int splitPartIndex, boolean isLastPart) {
+    public byte[] generateHeader(SnesRom rom, int partSize, int splitPartIndex, boolean isLastPart, byte chunkFlag) {
         // GD3 headers only on first part, describe entire ROM layout. partSize is ignored.
         if (splitPartIndex != 0) {
             return new byte[0];

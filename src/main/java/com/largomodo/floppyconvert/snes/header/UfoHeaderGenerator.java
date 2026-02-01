@@ -15,7 +15,7 @@ import java.util.Arrays;
 public class UfoHeaderGenerator implements HeaderGenerator {
 
     @Override
-    public byte[] generateHeader(SnesRom rom, int partSize, int splitPartIndex, boolean isLastPart) {
+    public byte[] generateHeader(SnesRom rom, int partSize, int splitPartIndex, boolean isLastPart, byte chunkFlag) {
         byte[] header = new byte[HEADER_SIZE];
         Arrays.fill(header, (byte) 0);
 
@@ -24,13 +24,9 @@ public class UfoHeaderGenerator implements HeaderGenerator {
         header[0] = (byte) (blocks & 0xFF);
         header[1] = (byte) ((blocks >> 8) & 0xFF);
 
-        // 2: Multi / Split flag
-        // HiROM splits are complex in UFO (see snes_split_ufo size_to_flags),
-        // but LoROM uses 0x40 for multi.
-        // Simplified logic:
-        if (!isLastPart) {
-            header[2] = 0x40;
-        }
+        // 2: Multi-file flag from lookup table (UFO HiROM irregular chunk support)
+        // 0x40 = multi-start (4Mbit bank), 0x10 = multi-continue (2Mbit bank), 0x00 = last
+        header[2] = chunkFlag;
 
         // 8-15: "SUPERUFO"
         byte[] id = "SUPERUFO".getBytes(StandardCharsets.US_ASCII);

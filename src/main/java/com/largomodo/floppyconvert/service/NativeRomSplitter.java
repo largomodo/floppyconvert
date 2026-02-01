@@ -1,6 +1,7 @@
 package com.largomodo.floppyconvert.service;
 
 import com.largomodo.floppyconvert.core.CopierFormat;
+import com.largomodo.floppyconvert.service.UfoHiRomChunker.UfoChunk;
 import com.largomodo.floppyconvert.snes.SnesInterleaver;
 import com.largomodo.floppyconvert.snes.SnesRom;
 import com.largomodo.floppyconvert.snes.SnesRomReader;
@@ -78,7 +79,12 @@ public class NativeRomSplitter implements RomSplitter {
             data = interleaver.interleave(data);
         }
 
+        // Force 4Mbit chunks for GD3 HiROM <= 16Mbit to trigger X-padding
+        // Matches ucon64 condition (size <= 16 * MBIT) for copier naming compatibility
         int chunkSize = (format == CopierFormat.GD3) ? MBIT_8 : MBIT_4;
+        if (format == CopierFormat.GD3 && rom.isHiRom() && data.length <= 2 * 1024 * 1024) {
+            chunkSize = MBIT_4;
+        }
         int chunkCount = (int) Math.ceil((double) data.length / chunkSize);
 
         HeaderGenerator headerGen = headerFactory.get(format);
@@ -86,18 +92,43 @@ public class NativeRomSplitter implements RomSplitter {
 
         List<File> parts = new ArrayList<>(chunkCount);
 
-        for (int i = 0; i < chunkCount; i++) {
-            int offset = i * chunkSize;
-            int length = Math.min(chunkSize, data.length - offset);
-            boolean isLastPart = (i == chunkCount - 1);
+        // UFO HiROM requires irregular chunk sizes from lookup table
+        // Matches ucon64 size_to_partsizes for copier bank allocation compatibility
+        if (format == CopierFormat.UFO && rom.isHiRom()) {
+            int totalSizeMbit = data.length / 131072;
+            List<UfoChunk> chunks = UfoHiRomChunker.computeChunks(totalSizeMbit);
 
-            byte[] header = headerGen.generateHeader(rom, length, i, isLastPart);
+            int offset = 0;
+            for (int i = 0; i < chunks.size(); i++) {
+                UfoChunk chunk = chunks.get(i);
+                int chunkBytes = chunk.sizeMbit() * 131072;
+                int length = Math.min(chunkBytes, data.length - offset);
+                boolean isLastPart = (i == chunks.size() - 1);
 
-            File outputFile = createFilename(workDir, baseName, format, i, chunkCount, rom);
-            writeChunk(outputFile, header, data, offset, length);
+                byte[] header = headerGen.generateHeader(rom, length, i, isLastPart, chunk.flag());
 
-            parts.add(outputFile);
-            logger.debug("Created split part {}/{}: {}", i + 1, chunkCount, outputFile.getName());
+                File outputFile = createFilename(workDir, baseName, format, i, chunks.size(), rom);
+                writeChunk(outputFile, header, data, offset, length);
+
+                parts.add(outputFile);
+                logger.debug("Created UFO HiROM part {}/{}: {} ({}MB)", i + 1, chunks.size(), outputFile.getName(), chunk.sizeMbit());
+                offset += length;
+            }
+        } else {
+            for (int i = 0; i < chunkCount; i++) {
+                int offset = i * chunkSize;
+                int length = Math.min(chunkSize, data.length - offset);
+                boolean isLastPart = (i == chunkCount - 1);
+                byte chunkFlag = (byte) (isLastPart ? 0x00 : 0x40);
+
+                byte[] header = headerGen.generateHeader(rom, length, i, isLastPart, chunkFlag);
+
+                File outputFile = createFilename(workDir, baseName, format, i, chunkCount, rom);
+                writeChunk(outputFile, header, data, offset, length);
+
+                parts.add(outputFile);
+                logger.debug("Created split part {}/{}: {}", i + 1, chunkCount, outputFile.getName());
+            }
         }
 
         return parts;

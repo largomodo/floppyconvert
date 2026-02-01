@@ -38,33 +38,26 @@ public class SnesInterleaver {
         byte[] source = mirrorTo8Mbit(input);
         byte[] dest = new byte[source.length];
 
-        int num8MbitChunks = source.length / CHUNK_8MBIT;
+        // Global interleaving: process all 64KB blocks in single pass
+        // GD3 copier expects symmetric block swap across entire ROM address space
+        int halfSize = source.length / 2;
+        int numBlocks = source.length / BLOCK_64KB;
 
-        for (int chunk = 0; chunk < num8MbitChunks; chunk++) {
-            int chunkOffset = chunk * CHUNK_8MBIT;
-            int halfChunk = CHUNK_8MBIT / 2; // 512KB
+        for (int i = 0; i < numBlocks; i++) {
+            int srcBlockOffset = i * BLOCK_64KB;
 
-            // Within this 1MB chunk, process 64KB blocks
-            // There are 16 64KB blocks in 1MB
-            for (int i = 0; i < 16; i++) {
-                int srcBlockOffset = chunkOffset + (i * BLOCK_64KB);
+            // Mapping logic matches uCON64 snes_int_blocks global offset (n = size/2):
+            // Src[0..32k] (Lower) -> Dst[n + i*32k]
+            // Src[32k..64k] (Upper) -> Dst[i*32k]
 
-                // Source Lower 32KB -> Dest Upper Half (offset + 512KB)
-                // Source Upper 32KB -> Dest Lower Half (offset + 0)
-                //
-                // Mapping logic matches uCON64 snes_int_blocks:
-                // Src[0..32k] (Lower) -> Dst[Half..]
-                // Src[32k..64k] (Upper) -> Dst[0..]
+            int destLowerOffset = i * BLOCK_32KB;
+            int destUpperOffset = halfSize + (i * BLOCK_32KB);
 
-                int destLowerOffset = chunkOffset + (i * BLOCK_32KB);           // 0..512k range
-                int destUpperOffset = chunkOffset + halfChunk + (i * BLOCK_32KB); // 512k..1MB range
+            // Copy Src Lower 32K to Dest Upper Half
+            System.arraycopy(source, srcBlockOffset, dest, destUpperOffset, BLOCK_32KB);
 
-                // Copy Src Lower 32K to Dest Upper Half
-                System.arraycopy(source, srcBlockOffset, dest, destUpperOffset, BLOCK_32KB);
-
-                // Copy Src Upper 32K to Dest Lower Half
-                System.arraycopy(source, srcBlockOffset + BLOCK_32KB, dest, destLowerOffset, BLOCK_32KB);
-            }
+            // Copy Src Upper 32K to Dest Lower Half
+            System.arraycopy(source, srcBlockOffset + BLOCK_32KB, dest, destLowerOffset, BLOCK_32KB);
         }
 
         return dest;
