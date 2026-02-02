@@ -6,7 +6,8 @@ import net.jqwik.api.Combinators;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
-import static net.jqwik.api.Arbitraries.*;
+import static net.jqwik.api.Arbitraries.bytes;
+import static net.jqwik.api.Arbitraries.strings;
 
 public class RomDataGenerator {
 

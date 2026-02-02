@@ -108,7 +108,7 @@ public class ConversionWorkspace implements AutoCloseable {
             } catch (IOException deleteEx) {
                 // Preserve both move failure and delete failure in exception chain
                 IOException compositeEx = new IOException(
-                    "Atomic move unsupported and cleanup failed for: " + sourceArtifact, e);
+                        "Atomic move unsupported and cleanup failed for: " + sourceArtifact, e);
                 compositeEx.addSuppressed(deleteEx);
                 throw compositeEx;
             }
@@ -156,8 +156,8 @@ public class ConversionWorkspace implements AutoCloseable {
         // Throw exception with all failures as suppressed exceptions
         if (!failures.isEmpty()) {
             throw new CleanupException(
-                "Workspace cleanup encountered " + failures.size() + " failure(s) in: " + workDir,
-                failures);
+                    "Workspace cleanup encountered " + failures.size() + " failure(s) in: " + workDir,
+                    failures);
         }
     }
 

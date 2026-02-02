@@ -15,7 +15,7 @@ public class CleanupException extends RuntimeException {
     /**
      * Create exception with accumulated cleanup failures.
      *
-     * @param message Description of cleanup failure context
+     * @param message  Description of cleanup failure context
      * @param failures List of IOExceptions from cleanup attempts
      */
     public CleanupException(String message, List<IOException> failures) {

@@ -6,7 +6,7 @@ import com.largomodo.floppyconvert.snes.generators.RomDataGenerator;
 import net.jqwik.api.*;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class SwcHeaderGeneratorTest {
 
@@ -14,8 +14,8 @@ class SwcHeaderGeneratorTest {
 
     @Property
     void headerSizeIsAlways512Bytes(@ForAll("anyRom") SnesRom rom,
-                                     @ForAll int partIndex,
-                                     @ForAll boolean isLastPart) {
+                                    @ForAll int partIndex,
+                                    @ForAll boolean isLastPart) {
         byte[] header = generator.generateHeader(rom, 512 * 1024, partIndex, isLastPart, (byte) 0x00);
         assertEquals(512, header.length, "SWC header must always be exactly 512 bytes");
     }

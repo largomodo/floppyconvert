@@ -185,7 +185,7 @@ public class NativeRomSplitter implements RomSplitter {
                     sb.append((char) ('A' + partIndex));
                 }
 
-                filename = sb.toString() + ".078";
+                filename = sb + ".078";
             }
             default -> throw new IllegalArgumentException("Unsupported format: " + format);
         }

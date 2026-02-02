@@ -19,8 +19,7 @@ floppyconvert - Converts SNES ROM files to floppy disk images.
 // tag::picocli-generated-man-section-synopsis[]
 == Synopsis
 
-*floppyconvert* [*-hvV*] [*--format*=_<format>_] [*-o*=_<outputDir>_]
-              [*--ucon64-path*=_<ucon64Path>_] _INPUT_
+*floppyconvert* [*-hvV*] [*--format*=_<format>_] [*-o*=_<outputDir>_] _INPUT_
 
 // end::picocli-generated-man-section-synopsis[]
 
@@ -57,13 +56,6 @@ If omitted, defaults apply:
   - Directory input: Defaults to a folder named 'output' inside the input directory.
 +
 Necessary subdirectories will be created automatically.
-
-*--ucon64-path*=_<ucon64Path>_::
-  Path to the 'ucon64' executable used for ROM splitting.
-+
-Can be a full path or just the command name if it is in your system PATH.
-+
-Default: ucon64
 
 *-v*, *--verbose*::
   Enable verbose output

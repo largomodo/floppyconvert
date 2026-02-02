@@ -3,17 +3,14 @@ package com.largomodo.floppyconvert.snes.header;
 import com.largomodo.floppyconvert.snes.RomType;
 import com.largomodo.floppyconvert.snes.SnesRom;
 import com.largomodo.floppyconvert.snes.SnesRomReader;
-import com.largomodo.floppyconvert.snes.generators.RomDataGenerator;
 import net.jqwik.api.*;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class UfoHeaderGeneratorTest {
 
@@ -22,8 +19,8 @@ class UfoHeaderGeneratorTest {
 
     @Property
     void headerSizeIsAlways512Bytes(@ForAll("snesRom") SnesRom rom,
-                                     @ForAll int splitPartIndex,
-                                     @ForAll boolean isLastPart) {
+                                    @ForAll int splitPartIndex,
+                                    @ForAll boolean isLastPart) {
         byte[] header = generator.generateHeader(rom, 512 * 1024, splitPartIndex, isLastPart, (byte) 0x00);
 
         assertEquals(512, header.length, "Header must always be exactly 512 bytes");
@@ -31,8 +28,8 @@ class UfoHeaderGeneratorTest {
 
     @Property
     void headerContainsSuperUfoId(@ForAll("snesRom") SnesRom rom,
-                                   @ForAll int splitPartIndex,
-                                   @ForAll boolean isLastPart) {
+                                  @ForAll int splitPartIndex,
+                                  @ForAll boolean isLastPart) {
         byte[] header = generator.generateHeader(rom, 512 * 1024, splitPartIndex, isLastPart, (byte) 0x00);
 
         byte[] expected = "SUPERUFO".getBytes(StandardCharsets.US_ASCII);

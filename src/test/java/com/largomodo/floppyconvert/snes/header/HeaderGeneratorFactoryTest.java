@@ -3,7 +3,7 @@ package com.largomodo.floppyconvert.snes.header;
 import com.largomodo.floppyconvert.format.CopierFormat;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 class HeaderGeneratorFactoryTest {
 

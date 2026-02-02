@@ -77,15 +77,15 @@ class Gd3HeaderGeneratorTest {
 
     @Property(tries = 100)
     void hiRom8MBUsesCorrectMemoryMap() {
-        int size = 1 * 1024 * 1024;
+        int size = 1024 * 1024;
         SnesRom rom = createTestRom(RomType.HiROM, size, 0, false);
 
         byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] expectedMap = new byte[]{
-            0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
-            0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
-            0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22
+                0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+                0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+                0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22
         };
         byte[] actualMap = Arrays.copyOfRange(header, 0x11, 0x11 + expectedMap.length);
         assertArrayEquals(expectedMap, actualMap, "HiROM 1MB (<=2 parts) should use MAP_HI_8MB");
@@ -99,9 +99,9 @@ class Gd3HeaderGeneratorTest {
         byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] expectedMap = new byte[]{
-            0x20, 0x21, 0x20, 0x21, 0x20, 0x21, 0x20, 0x21,
-            0x20, 0x21, 0x20, 0x21, 0x20, 0x21, 0x20, 0x21,
-            0x22, 0x23, 0x22, 0x23, 0x22, 0x23, 0x22, 0x23
+                0x20, 0x21, 0x20, 0x21, 0x20, 0x21, 0x20, 0x21,
+                0x20, 0x21, 0x20, 0x21, 0x20, 0x21, 0x20, 0x21,
+                0x22, 0x23, 0x22, 0x23, 0x22, 0x23, 0x22, 0x23
         };
         byte[] actualMap = Arrays.copyOfRange(header, 0x11, 0x11 + expectedMap.length);
         assertArrayEquals(expectedMap, actualMap, "HiROM 2MB (>2, <=4 parts) should use MAP_HI_16MB");
@@ -115,9 +115,9 @@ class Gd3HeaderGeneratorTest {
         byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] expectedMap = new byte[]{
-            0x20, 0x21, 0x22, 0x00, 0x20, 0x21, 0x22, 0x00,
-            0x20, 0x21, 0x22, 0x00, 0x20, 0x21, 0x22, 0x00,
-            0x24, 0x25, 0x23, 0x00, 0x24, 0x25, 0x23, 0x00
+                0x20, 0x21, 0x22, 0x00, 0x20, 0x21, 0x22, 0x00,
+                0x20, 0x21, 0x22, 0x00, 0x20, 0x21, 0x22, 0x00,
+                0x24, 0x25, 0x23, 0x00, 0x24, 0x25, 0x23, 0x00
         };
         byte[] actualMap = Arrays.copyOfRange(header, 0x11, 0x11 + expectedMap.length);
         assertArrayEquals(expectedMap, actualMap, "HiROM 3MB (>4, <=6 parts) should use MAP_HI_24MB");
@@ -132,9 +132,9 @@ class Gd3HeaderGeneratorTest {
         byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] expectedMap = new byte[]{
-            0x20, 0x21, 0x22, 0x23, 0x20, 0x21, 0x22, 0x23,
-            0x20, 0x21, 0x22, 0x23, 0x20, 0x21, 0x22, 0x23,
-            0x24, 0x25, 0x26, 0x27, 0x24, 0x25, 0x26, 0x27
+                0x20, 0x21, 0x22, 0x23, 0x20, 0x21, 0x22, 0x23,
+                0x20, 0x21, 0x22, 0x23, 0x20, 0x21, 0x22, 0x23,
+                0x24, 0x25, 0x26, 0x27, 0x24, 0x25, 0x26, 0x27
         };
         byte[] actualMap = Arrays.copyOfRange(header, 0x11, 0x11 + expectedMap.length);
         assertArrayEquals(expectedMap, actualMap, "HiROM 32Mbit should use MAP_HI_32MB");
@@ -148,9 +148,9 @@ class Gd3HeaderGeneratorTest {
         byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] expectedMap = new byte[]{
-            0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
-            0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
-            0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20
+                0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+                0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+                0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20
         };
         byte[] actualMap = Arrays.copyOfRange(header, 0x11, 0x11 + expectedMap.length);
         assertArrayEquals(expectedMap, actualMap, "LoROM 512KB (<=1 part) should use MAP_LO_4MB");
@@ -158,15 +158,15 @@ class Gd3HeaderGeneratorTest {
 
     @Property(tries = 100)
     void loRom8MBUsesCorrectMemoryMap() {
-        int size = 1 * 1024 * 1024;
+        int size = 1024 * 1024;
         SnesRom rom = createTestRom(RomType.LoROM, size, 0, false);
 
         byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] expectedMap = new byte[]{
-            0x20, 0x21, 0x20, 0x21, 0x20, 0x21, 0x20, 0x21,
-            0x20, 0x21, 0x20, 0x21, 0x20, 0x21, 0x20, 0x21,
-            0x20, 0x21, 0x20, 0x21, 0x20, 0x21, 0x20, 0x21
+                0x20, 0x21, 0x20, 0x21, 0x20, 0x21, 0x20, 0x21,
+                0x20, 0x21, 0x20, 0x21, 0x20, 0x21, 0x20, 0x21,
+                0x20, 0x21, 0x20, 0x21, 0x20, 0x21, 0x20, 0x21
         };
         byte[] actualMap = Arrays.copyOfRange(header, 0x11, 0x11 + expectedMap.length);
         assertArrayEquals(expectedMap, actualMap, "LoROM 1MB (>1, <=2 parts) should use MAP_LO_8MB");
@@ -180,9 +180,9 @@ class Gd3HeaderGeneratorTest {
         byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] expectedMap = new byte[]{
-            0x20, 0x21, 0x22, 0x23, 0x20, 0x21, 0x22, 0x23,
-            0x20, 0x21, 0x22, 0x23, 0x20, 0x21, 0x22, 0x23,
-            0x20, 0x21, 0x22, 0x23, 0x20, 0x21, 0x22, 0x23
+                0x20, 0x21, 0x22, 0x23, 0x20, 0x21, 0x22, 0x23,
+                0x20, 0x21, 0x22, 0x23, 0x20, 0x21, 0x22, 0x23,
+                0x20, 0x21, 0x22, 0x23, 0x20, 0x21, 0x22, 0x23
         };
         byte[] actualMap = Arrays.copyOfRange(header, 0x11, 0x11 + expectedMap.length);
         assertArrayEquals(expectedMap, actualMap, "LoROM 2MB (>2, <=4 parts) should use MAP_LO_16MB");
@@ -197,9 +197,9 @@ class Gd3HeaderGeneratorTest {
         byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
         byte[] expectedMap = new byte[]{
-            0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
-            0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
-            0x24, 0x25, 0x26, 0x27, 0x24, 0x25, 0x26, 0x27
+                0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
+                0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
+                0x24, 0x25, 0x26, 0x27, 0x24, 0x25, 0x26, 0x27
         };
         byte[] actualMap = Arrays.copyOfRange(header, 0x11, 0x11 + expectedMap.length);
         assertArrayEquals(expectedMap, actualMap, "LoROM 32Mbit should use MAP_LO_32MB");
@@ -227,7 +227,7 @@ class Gd3HeaderGeneratorTest {
 
     @Property(tries = 100)
     void loRomDspFlagSetWhenHasDsp() {
-        SnesRom rom = createTestRom(RomType.LoROM, 1 * 1024 * 1024, 0, true);
+        SnesRom rom = createTestRom(RomType.LoROM, 1024 * 1024, 0, true);
 
         byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
@@ -237,7 +237,7 @@ class Gd3HeaderGeneratorTest {
 
     @Property(tries = 100)
     void loRomDspFlagNotSetWhenNoDsp() {
-        SnesRom rom = createTestRom(RomType.LoROM, 1 * 1024 * 1024, 0, false);
+        SnesRom rom = createTestRom(RomType.LoROM, 1024 * 1024, 0, false);
 
         byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
@@ -247,7 +247,7 @@ class Gd3HeaderGeneratorTest {
 
     @Property(tries = 100)
     void loRomSramMappingSetWhenSramPresent(@ForAll("positiveSramSize") int sramSize) {
-        SnesRom rom = createTestRom(RomType.LoROM, 1 * 1024 * 1024, sramSize, false);
+        SnesRom rom = createTestRom(RomType.LoROM, 1024 * 1024, sramSize, false);
 
         byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
@@ -257,7 +257,7 @@ class Gd3HeaderGeneratorTest {
 
     @Property(tries = 100)
     void loRomSramMappingNotSetWhenNoSram() {
-        SnesRom rom = createTestRom(RomType.LoROM, 1 * 1024 * 1024, 0, false);
+        SnesRom rom = createTestRom(RomType.LoROM, 1024 * 1024, 0, false);
 
         byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
 
@@ -279,9 +279,9 @@ class Gd3HeaderGeneratorTest {
         assertEquals("GAME DOCTOR SF 3", id, "Should contain Game Doctor ID");
 
         byte[] expectedMap = new byte[]{
-            0x20, 0x21, 0x22, 0x23, 0x20, 0x21, 0x22, 0x23,
-            0x20, 0x21, 0x22, 0x23, 0x20, 0x21, 0x22, 0x23,
-            0x24, 0x25, 0x26, 0x27, 0x24, 0x25, 0x26, 0x27
+                0x20, 0x21, 0x22, 0x23, 0x20, 0x21, 0x22, 0x23,
+                0x20, 0x21, 0x22, 0x23, 0x20, 0x21, 0x22, 0x23,
+                0x24, 0x25, 0x26, 0x27, 0x24, 0x25, 0x26, 0x27
         };
         byte[] actualMap = Arrays.copyOfRange(header, 0x11, 0x11 + expectedMap.length);
         assertArrayEquals(expectedMap, actualMap, "Should use MAP_HI_32MB for Chrono Trigger");
@@ -319,16 +319,16 @@ class Gd3HeaderGeneratorTest {
     private SnesRom createTestRom(RomType type, int size, int sramSize, boolean hasDsp) {
         byte[] rawData = new byte[size];
         return new SnesRom(
-            rawData,
-            type,
-            sramSize,
-            "TEST TITLE",
-            hasDsp,
-            (byte) 0x00,  // region
-            (byte) 0x00,  // maker
-            (byte) 0x00,  // version
-            0,            // checksum
-            0             // complement
+                rawData,
+                type,
+                sramSize,
+                "TEST TITLE",
+                hasDsp,
+                (byte) 0x00,  // region
+                (byte) 0x00,  // maker
+                (byte) 0x00,  // version
+                0,            // checksum
+                0             // complement
         );
     }
 }

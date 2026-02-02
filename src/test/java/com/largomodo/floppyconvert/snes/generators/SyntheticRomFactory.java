@@ -14,19 +14,13 @@ import java.util.Arrays;
  */
 public class SyntheticRomFactory {
 
-    private static final int LOROM_HEADER_OFFSET = 0x7FB0;
-    private static final int HIROM_HEADER_OFFSET = 0xFFB0;
-
     public static final int SRAM_0KB = 0;
     public static final int SRAM_2KB = 2;
     public static final int SRAM_8KB = 8;
     public static final int SRAM_64KB = 64;
     public static final int SRAM_256KB = 256;
-
-    public enum DspChipset {
-        PRESENT, ABSENT
-    }
-
+    private static final int LOROM_HEADER_OFFSET = 0x7FB0;
+    private static final int HIROM_HEADER_OFFSET = 0xFFB0;
     private static final byte MAP_TYPE_LOROM = 0x20;
     private static final byte MAP_TYPE_LOROM_DSP = 0x23;
     private static final byte MAP_TYPE_HIROM = 0x21;
@@ -35,10 +29,10 @@ public class SyntheticRomFactory {
     /**
      * Generates a LoROM file with specified parameters.
      *
-     * @param sizeMbit ROM size in megabits (8, 12, 16, etc.)
+     * @param sizeMbit   ROM size in megabits (8, 12, 16, etc.)
      * @param sramSizeKb SRAM size in kilobytes (use SRAM_* constants)
-     * @param dsp DSP chipset presence
-     * @param outputDir directory to write the ROM file
+     * @param dsp        DSP chipset presence
+     * @param outputDir  directory to write the ROM file
      * @return Path to the generated ROM file
      * @throws IOException if file writing fails
      */
@@ -55,10 +49,10 @@ public class SyntheticRomFactory {
     /**
      * Generates a HiROM file with specified parameters.
      *
-     * @param sizeMbit ROM size in megabits (8, 12, 16, etc.)
+     * @param sizeMbit   ROM size in megabits (8, 12, 16, etc.)
      * @param sramSizeKb SRAM size in kilobytes (use SRAM_* constants)
-     * @param dsp DSP chipset presence
-     * @param outputDir directory to write the ROM file
+     * @param dsp        DSP chipset presence
+     * @param outputDir  directory to write the ROM file
      * @return Path to the generated ROM file
      * @throws IOException if file writing fails
      */
@@ -73,7 +67,7 @@ public class SyntheticRomFactory {
     }
 
     private static Path generateRom(int sizeMbit, int sramSizeKb, byte mapType, byte romType,
-                                     int headerOffset, String title, Path outputPath) throws IOException {
+                                    int headerOffset, String title, Path outputPath) throws IOException {
         int sizeBytes = sizeMbit * 1024 * 1024 / 8;
         byte[] data = new byte[sizeBytes];
         Arrays.fill(data, (byte) 0xFF);
@@ -168,5 +162,9 @@ public class SyntheticRomFactory {
         Path outputDir = Path.of("src/test/resources/snes/synthetic");
         generateTestSuite(outputDir);
         System.out.println("Generated synthetic test ROMs in: " + outputDir.toAbsolutePath());
+    }
+
+    public enum DspChipset {
+        PRESENT, ABSENT
     }
 }

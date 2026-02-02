@@ -7,11 +7,11 @@ import com.largomodo.floppyconvert.core.workspace.CleanupException;
 import com.largomodo.floppyconvert.format.CopierFormat;
 import com.largomodo.floppyconvert.service.DefaultConversionFacade;
 import com.largomodo.floppyconvert.service.FloppyImageWriter;
-import com.largomodo.floppyconvert.service.RomSplitter;
 import com.largomodo.floppyconvert.service.NativeRomSplitter;
+import com.largomodo.floppyconvert.service.RomSplitter;
 import com.largomodo.floppyconvert.service.fat.Fat12ImageWriter;
-import com.largomodo.floppyconvert.snes.SnesRomReader;
 import com.largomodo.floppyconvert.snes.SnesInterleaver;
+import com.largomodo.floppyconvert.snes.SnesRomReader;
 import com.largomodo.floppyconvert.snes.header.HeaderGeneratorFactory;
 import com.largomodo.floppyconvert.util.SnesRomMatcher;
 import org.slf4j.Logger;
@@ -233,7 +233,8 @@ public class FloppyConvert implements Callable<Integer> {
     /**
      * Collect ROM files from directory tree.
      * Extracts file filtering logic for testability.
-     * @param stream Stream of paths to filter
+     *
+     * @param stream    Stream of paths to filter
      * @param inputRoot Root directory for relative path logging
      */
     private static List<Path> collectRomFiles(Stream<Path> stream, Path inputRoot) {
@@ -273,8 +274,8 @@ public class FloppyConvert implements Callable<Integer> {
      * Extracts ROM processing lambda for testability.
      */
     private static void submitRomProcessing(ExecutorService executor, Path romPath,
-            Path inputRoot, Path outputRoot, ConversionObserver observer,
-            RomProcessor processor, CopierFormat format) {
+                                            Path inputRoot, Path outputRoot, ConversionObserver observer,
+                                            RomProcessor processor, CopierFormat format) {
         executor.submit(() -> {
             try {
                 MDC.put("rom", romPath.getFileName().toString());

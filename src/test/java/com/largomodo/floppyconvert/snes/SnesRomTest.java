@@ -19,7 +19,7 @@ class SnesRomTest {
     @Test
     void testNullRawDataThrowsNPE() {
         assertThrows(NullPointerException.class, () ->
-            new SnesRom(null, RomType.LoROM, 0, "TITLE", false, (byte) 0, (byte) 0, (byte) 0, 0, 0)
+                new SnesRom(null, RomType.LoROM, 0, "TITLE", false, (byte) 0, (byte) 0, (byte) 0, 0, 0)
         );
     }
 
@@ -27,7 +27,7 @@ class SnesRomTest {
     void testNullRomTypeThrowsNPE() {
         byte[] data = new byte[1024];
         assertThrows(NullPointerException.class, () ->
-            new SnesRom(data, null, 0, "TITLE", false, (byte) 0, (byte) 0, (byte) 0, 0, 0)
+                new SnesRom(data, null, 0, "TITLE", false, (byte) 0, (byte) 0, (byte) 0, 0, 0)
         );
     }
 
@@ -35,7 +35,7 @@ class SnesRomTest {
     void testNullTitleThrowsNPE() {
         byte[] data = new byte[1024];
         assertThrows(NullPointerException.class, () ->
-            new SnesRom(data, RomType.LoROM, 0, null, false, (byte) 0, (byte) 0, (byte) 0, 0, 0)
+                new SnesRom(data, RomType.LoROM, 0, null, false, (byte) 0, (byte) 0, (byte) 0, 0, 0)
         );
     }
 

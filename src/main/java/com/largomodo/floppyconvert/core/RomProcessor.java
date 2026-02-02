@@ -77,7 +77,7 @@ public class RomProcessor {
      * @param uniqueSuffix  Unique suffix to prevent workspace collisions (e.g., UUID for concurrent execution)
      * @param format        Backup unit format for ROM splitting
      * @return Number of disk images created (for observer reporting)
-     * @throws IOException if any pipeline step fails
+     * @throws IOException                                          if any pipeline step fails
      * @throws com.largomodo.floppyconvert.core.workspace.CleanupException if workspace cleanup fails
      */
     public int processRom(
