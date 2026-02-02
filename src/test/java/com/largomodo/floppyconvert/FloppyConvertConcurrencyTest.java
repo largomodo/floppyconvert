@@ -40,7 +40,7 @@ class FloppyConvertConcurrencyTest {
         Path templateRom = Paths.get("src/test/resources/snes/Super Mario World (USA).sfc");
         if (!Files.exists(templateRom)) {
             // Skip test if template not available
-            Assumptions.assumeTrue(false, "Test ROM not available");
+            Assumptions.abort("Test ROM not available");
         }
         templateRomData = Files.readAllBytes(templateRom);
     }

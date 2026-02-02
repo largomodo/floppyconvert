@@ -1,6 +1,6 @@
 package com.largomodo.floppyconvert.service;
 
-import com.largomodo.floppyconvert.core.CopierFormat;
+import com.largomodo.floppyconvert.format.CopierFormat;
 
 import java.io.File;
 import java.io.IOException;

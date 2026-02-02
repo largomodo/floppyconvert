@@ -1,6 +1,6 @@
 package com.largomodo.floppyconvert.service;
 
-import com.largomodo.floppyconvert.core.CopierFormat;
+import com.largomodo.floppyconvert.format.CopierFormat;
 import com.largomodo.floppyconvert.service.UfoHiRomChunker.UfoChunk;
 import com.largomodo.floppyconvert.snes.SnesInterleaver;
 import com.largomodo.floppyconvert.snes.SnesRom;

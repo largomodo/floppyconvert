@@ -1,6 +1,6 @@
 package com.largomodo.floppyconvert.snes.header;
 
-import com.largomodo.floppyconvert.core.CopierFormat;
+import com.largomodo.floppyconvert.format.CopierFormat;
 
 /**
  * Factory for creating format-specific HeaderGenerators.

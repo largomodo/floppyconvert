@@ -15,6 +15,12 @@ import java.util.Arrays;
  */
 public class Gd3HeaderGenerator implements HeaderGenerator {
 
+    private final SramEncoder sramEncoder;
+
+    public Gd3HeaderGenerator() {
+        this.sramEncoder = new Gd3SramEncoder();
+    }
+
     @Override
     public byte[] generateHeader(SnesRom rom, int partSize, int splitPartIndex, boolean isLastPart, byte chunkFlag) {
         // GD3 headers only on first part, describe entire ROM layout. partSize is ignored.
@@ -29,11 +35,7 @@ public class Gd3HeaderGenerator implements HeaderGenerator {
         byte[] id = "GAME DOCTOR SF 3".getBytes(StandardCharsets.US_ASCII);
         System.arraycopy(id, 0, header, 0, id.length);
 
-        // 16: SRAM Size Code
-        // 0x81 = 64kb, 0x82 = 16kb, 0x80 = 0kb or 256kb
-        if (rom.sramSize() == 8192) header[16] = (byte) 0x81;
-        else if (rom.sramSize() == 2048) header[16] = (byte) 0x82;
-        else header[16] = (byte) 0x80;
+        sramEncoder.encodeSram(header, rom);
 
         // 17-40: Memory Map (0x11 - 0x28)
         // Calculate total 4Mbit parts

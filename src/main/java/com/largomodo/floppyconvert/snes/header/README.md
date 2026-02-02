@@ -37,6 +37,46 @@ The `partSize` parameter provides the size of ROM data (in bytes) for THIS speci
 
 The partSize parameter allows generators to accurately encode per-part metadata while maintaining access to total ROM size through the SnesRom parameter. The chunkFlag parameter enables UFO irregular chunk sequences without breaking interface consistency for other formats.
 
+## SRAM Encoder Strategy Pattern
+
+Each copier format has different SRAM size encodings and byte positions within the 512-byte header. To avoid duplicating SRAM encoding logic across header generators, the `SramEncoder` interface extracts this concern into format-specific strategy implementations.
+
+### SramEncoder Interface
+
+```java
+public interface SramEncoder {
+    void encodeSram(byte[] header, SnesRom rom);
+}
+```
+
+**Implementations:**
+- `SwcSramEncoder`: 4-bit encoding at byte 2 (0x0C/0x08/0x04/0x00 for 0/≤2KB/≤8KB/>8KB)
+- `FigSramEncoder`: SRAM influences emulation bytes (bytes 4-5)
+- `UfoSramEncoder`: SRAM size codes (0/1/2/3/8) at byte 16, mapping controls (A15, A20-A23) at bytes 20-23
+- `Gd3SramEncoder`: Single-byte codes at offsets 0x29/0x2A (HiROM) or 0x24/0x28 (LoROM)
+
+### Design Rationale
+
+**Chosen:** Strategy pattern with 4 format-specific encoder classes
+
+**Cost:** +4 files, indirection (encoder instance creation)
+
+**Benefit:**
+- Matches existing `HeaderGenerator` factory pattern
+- Extensible: new formats add encoder implementation without modifying existing code (Open/Closed Principle)
+- Testable: SRAM encoding logic testable independently from header structure assembly
+- Single responsibility: generators focus on header layout, encoders focus on SRAM bit patterns
+
+**Alternative cost:** Utility class with static methods would require switch statements in each generator, making new format addition require modifying multiple files.
+
+**Rationale:** Consistency with codebase patterns (factory pattern) prioritized over minimal file count. Strategy pattern enables isolated testing and follows Open/Closed Principle.
+
+### Idempotence Warning
+
+SRAM encoders use bitwise OR operations to set SRAM bits in the header buffer. **Caller must zero-initialize SRAM bit positions before first call.** Repeated calls on the same header accumulate bits (non-idempotent).
+
+Header generators are responsible for initializing the header with non-SRAM data before calling `encodeSram()`.
+
 ## Format-Specific Behavior
 
 ### SWC Format (Super Wild Card)

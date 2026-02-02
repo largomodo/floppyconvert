@@ -40,3 +40,13 @@ build/
 
 ### Maven shade plugin
 dependency-reduced-pom.xml
+
+# Ignore all markdown files in the repo root
+/*.md
+/*.txt
+/.*
+
+# Files to keep on root level
+!/README.md
+!/CLAUDE.md
+!/.gitignore

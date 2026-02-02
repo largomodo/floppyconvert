@@ -11,6 +11,12 @@ import java.util.Arrays;
  */
 public class SwcHeaderGenerator implements HeaderGenerator {
 
+    private final SramEncoder sramEncoder;
+
+    public SwcHeaderGenerator() {
+        this.sramEncoder = new SwcSramEncoder();
+    }
+
     @Override
     public byte[] generateHeader(SnesRom rom, int partSize, int splitPartIndex, boolean isLastPart, byte chunkFlag) {
         byte[] header = new byte[HEADER_SIZE];
@@ -29,24 +35,14 @@ public class SwcHeaderGenerator implements HeaderGenerator {
             emulation |= 0x30;
         }
 
-        // SRAM Size
-        // 0x04 = 64Kb (8KB), 0x08 = 16Kb (2KB), 0x0C = 0Kb, 0x00 = 256Kb (32KB)
-        if (rom.sramSize() == 0) {
-            emulation |= 0x0C;
-        } else if (rom.sramSize() <= 2048) {
-            emulation |= 0x08;
-        } else if (rom.sramSize() <= 8192) {
-            emulation |= 0x04;
-        } else {
-            emulation |= 0x00; // 32KB
-        }
+        header[2] = (byte) emulation;
+
+        sramEncoder.encodeSram(header, rom);
 
         // Split / Multi-file flag
         if (!isLastPart) {
-            emulation |= 0x40; // Bit 6 set if more files follow
+            header[2] |= 0x40;
         }
-
-        header[2] = (byte) emulation;
 
         // Fixed IDs
         header[8] = (byte) 0xAA;

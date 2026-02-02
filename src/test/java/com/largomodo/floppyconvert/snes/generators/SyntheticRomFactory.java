@@ -17,6 +17,16 @@ public class SyntheticRomFactory {
     private static final int LOROM_HEADER_OFFSET = 0x7FB0;
     private static final int HIROM_HEADER_OFFSET = 0xFFB0;
 
+    public static final int SRAM_0KB = 0;
+    public static final int SRAM_2KB = 2;
+    public static final int SRAM_8KB = 8;
+    public static final int SRAM_64KB = 64;
+    public static final int SRAM_256KB = 256;
+
+    public enum DspChipset {
+        PRESENT, ABSENT
+    }
+
     private static final byte MAP_TYPE_LOROM = 0x20;
     private static final byte MAP_TYPE_LOROM_DSP = 0x23;
     private static final byte MAP_TYPE_HIROM = 0x21;
@@ -26,13 +36,14 @@ public class SyntheticRomFactory {
      * Generates a LoROM file with specified parameters.
      *
      * @param sizeMbit ROM size in megabits (8, 12, 16, etc.)
-     * @param sramSizeKb SRAM size in kilobytes (0, 2, 8, 64, 256)
-     * @param hasDsp true if ROM uses DSP chipset
+     * @param sramSizeKb SRAM size in kilobytes (use SRAM_* constants)
+     * @param dsp DSP chipset presence
      * @param outputDir directory to write the ROM file
      * @return Path to the generated ROM file
      * @throws IOException if file writing fails
      */
-    public static Path generateLoRom(int sizeMbit, int sramSizeKb, boolean hasDsp, Path outputDir) throws IOException {
+    public static Path generateLoRom(int sizeMbit, int sramSizeKb, DspChipset dsp, Path outputDir) throws IOException {
+        boolean hasDsp = (dsp == DspChipset.PRESENT);
         byte mapType = hasDsp ? MAP_TYPE_LOROM_DSP : MAP_TYPE_LOROM;
         byte romType = hasDsp ? (byte) 0x03 : (byte) 0x00;
         String filename = String.format("synthetic_lorom_%dmbit_%dkb%s.sfc",
@@ -45,13 +56,14 @@ public class SyntheticRomFactory {
      * Generates a HiROM file with specified parameters.
      *
      * @param sizeMbit ROM size in megabits (8, 12, 16, etc.)
-     * @param sramSizeKb SRAM size in kilobytes (0, 2, 8, 64, 256)
-     * @param hasDsp true if ROM uses DSP chipset
+     * @param sramSizeKb SRAM size in kilobytes (use SRAM_* constants)
+     * @param dsp DSP chipset presence
      * @param outputDir directory to write the ROM file
      * @return Path to the generated ROM file
      * @throws IOException if file writing fails
      */
-    public static Path generateHiRom(int sizeMbit, int sramSizeKb, boolean hasDsp, Path outputDir) throws IOException {
+    public static Path generateHiRom(int sizeMbit, int sramSizeKb, DspChipset dsp, Path outputDir) throws IOException {
+        boolean hasDsp = (dsp == DspChipset.PRESENT);
         byte mapType = hasDsp ? MAP_TYPE_HIROM_DSP : MAP_TYPE_HIROM;
         byte romType = hasDsp ? (byte) 0x03 : (byte) 0x00;
         String filename = String.format("synthetic_hirom_%dmbit_%dkb%s.sfc",
@@ -141,12 +153,12 @@ public class SyntheticRomFactory {
     public static void generateTestSuite(Path outputDir) throws IOException {
         Files.createDirectories(outputDir);
 
-        generateLoRom(8, 0, false, outputDir);
-        generateHiRom(8, 64, false, outputDir);
-        generateLoRom(16, 8, false, outputDir);
-        generateHiRom(16, 256, false, outputDir);
-        generateLoRom(12, 2, true, outputDir);
-        generateHiRom(12, 0, true, outputDir);
+        generateLoRom(8, SRAM_0KB, DspChipset.ABSENT, outputDir);
+        generateHiRom(8, SRAM_64KB, DspChipset.ABSENT, outputDir);
+        generateLoRom(16, SRAM_8KB, DspChipset.ABSENT, outputDir);
+        generateHiRom(16, SRAM_256KB, DspChipset.ABSENT, outputDir);
+        generateLoRom(12, SRAM_2KB, DspChipset.PRESENT, outputDir);
+        generateHiRom(12, SRAM_0KB, DspChipset.PRESENT, outputDir);
     }
 
     /**

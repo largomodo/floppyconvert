@@ -14,6 +14,12 @@ import java.util.Arrays;
  */
 public class UfoHeaderGenerator implements HeaderGenerator {
 
+    private final SramEncoder sramEncoder;
+
+    public UfoHeaderGenerator() {
+        this.sramEncoder = new UfoSramEncoder();
+    }
+
     @Override
     public byte[] generateHeader(SnesRom rom, int partSize, int splitPartIndex, boolean isLastPart, byte chunkFlag) {
         byte[] header = new byte[HEADER_SIZE];
@@ -32,9 +38,6 @@ public class UfoHeaderGenerator implements HeaderGenerator {
         byte[] id = "SUPERUFO".getBytes(StandardCharsets.US_ASCII);
         System.arraycopy(id, 0, header, 8, id.length);
 
-        // 16: Uses SRAM
-        header[16] = (byte) (rom.sramSize() > 0 ? 1 : 0);
-
         // Byte 17 encodes TOTAL ROM size (hardware uses for memory map selection)
         int sizeMbit = rom.rawData().length / 131072;
         header[17] = (byte) sizeMbit;
@@ -42,43 +45,7 @@ public class UfoHeaderGenerator implements HeaderGenerator {
         // 18: Bank Type (0=HiROM, 1=LoROM)
         header[18] = (byte) (rom.isHiRom() ? 0 : 1);
 
-        // 19: SRAM Size Code
-        // 1=16kb, 2=64kb, 3=256kb, 8=>32kb
-        int sramCode = 0;
-        if (rom.sramSize() > 32768) sramCode = 8; // >256kbit
-        else if (rom.sramSize() > 8192) sramCode = 3; // 256kbit
-        else if (rom.sramSize() > 2048) sramCode = 2; // 64kbit
-        else if (rom.sramSize() > 0) sramCode = 1; // 16kbit
-        header[19] = (byte) sramCode;
-
-        // 20-22: SRAM Mapping Controls (A15, A20/A21, A22/A23)
-        // 23: SRAM Type
-        if (rom.isHiRom()) {
-            header[23] = 0; // HiROM SRAM type
-
-            // Map Control (HiROM)
-            // Based on snes_ufo logic for HiROM
-            if (rom.sramSize() > 0) {
-                header[21] = 0x0C; // A20/A21
-            }
-            header[22] = 0x02; // A22/A23
-        } else {
-            header[23] = 3; // LoROM SRAM type
-
-            if (rom.sramSize() == 0) {
-                if (rom.hasDsp()) {
-                    header[20] = 1; // A15
-                    header[21] = 0x0C; // A20/A21
-                } else {
-                    header[22] = 2;
-                    header[23] = 0;
-                }
-            } else {
-                header[20] = 2; // A15=0 selects SRAM
-                header[21] = 0x0F; // A20=0, A21=1
-                header[22] = 3; // A22=1, A23=0
-            }
-        }
+        sramEncoder.encodeSram(header, rom);
 
         return header;
     }
