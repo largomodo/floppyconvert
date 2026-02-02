@@ -106,8 +106,11 @@ public class ConversionWorkspace implements AutoCloseable {
             try {
                 Files.delete(sourceArtifact);
             } catch (IOException deleteEx) {
-                // Best-effort cleanup; workspace close() will retry
-                log.warn("Could not delete workspace copy after move: {}: {}", sourceArtifact, deleteEx.getMessage());
+                // Preserve both move failure and delete failure in exception chain
+                IOException compositeEx = new IOException(
+                    "Atomic move unsupported and cleanup failed for: " + sourceArtifact, e);
+                compositeEx.addSuppressed(deleteEx);
+                throw compositeEx;
             }
         }
 
@@ -117,13 +120,15 @@ public class ConversionWorkspace implements AutoCloseable {
     /**
      * Deletes tracked artifacts in reverse acquisition order.
      * <p>
-     * Idempotent: safe to call multiple times.
-     * Never throws exceptions: swallows and logs IOException per file.
+     * Accumulates cleanup failures and throws CleanupException if any fail.
+     * Preserves full cause chains for production diagnostics.
      * <p>
      * If thread is interrupted, logs warning and skips cleanup to avoid blocking.
+     *
+     * @throws CleanupException if any cleanup operations fail
      */
     @Override
-    public void close() {
+    public void close() throws CleanupException {
         // Check interruption status WITHOUT clearing flag (non-destructive read)
         if (Thread.currentThread().isInterrupted()) {
             log.warn("Thread interrupted, skipping cleanup for workspace: {}", workDir);
@@ -132,19 +137,27 @@ public class ConversionWorkspace implements AutoCloseable {
 
         // Delete in reverse order: files before containing directories
         Collections.reverse(trackedFiles);
+        List<IOException> failures = new ArrayList<>();
+
         for (Path artifact : trackedFiles) {
             try {
                 if (Files.isDirectory(artifact)) {
-                    // Delete directory and all its contents recursively
                     deleteDirectoryRecursively(artifact);
                 } else {
                     Files.deleteIfExists(artifact);
                 }
             } catch (IOException e) {
-                // Best-effort cleanup: log but don't propagate
-                // Windows file locking may prevent immediate deletion
-                log.warn("Could not delete artifact {}: {}", artifact, e.getMessage());
+                // Accumulate failures for diagnostic reporting
+                failures.add(e);
+                log.warn("Cleanup failed for artifact: {}", artifact, e);
             }
+        }
+
+        // Throw exception with all failures as suppressed exceptions
+        if (!failures.isEmpty()) {
+            throw new CleanupException(
+                "Workspace cleanup encountered " + failures.size() + " failure(s) in: " + workDir,
+                failures);
         }
     }
 

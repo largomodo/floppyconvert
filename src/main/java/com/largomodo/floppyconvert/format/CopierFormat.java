@@ -1,4 +1,4 @@
-package com.largomodo.floppyconvert.core;
+package com.largomodo.floppyconvert.format;
 
 import java.io.File;
 import java.util.function.Predicate;

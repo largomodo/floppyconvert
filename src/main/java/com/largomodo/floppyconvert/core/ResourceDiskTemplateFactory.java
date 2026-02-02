@@ -16,7 +16,7 @@ import java.nio.file.StandardCopyOption;
 public class ResourceDiskTemplateFactory implements DiskTemplateFactory {
 
     @Override
-    public void createBlankDisk(FloppyType type, Path targetFile) throws IOException {
+    public void createBlankDisk(FloppyType type, Path targetImage) throws IOException {
         String resourcePath = type.getResourcePath();
 
         // Resource path is absolute classpath reference (leading slash required)
@@ -28,7 +28,7 @@ public class ResourceDiskTemplateFactory implements DiskTemplateFactory {
                         " not found. Ensure application is built correctly.");
             }
 
-            Files.copy(templateStream, targetFile, StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(templateStream, targetImage, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 }

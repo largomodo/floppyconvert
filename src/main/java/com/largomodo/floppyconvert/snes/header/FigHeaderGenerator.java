@@ -12,6 +12,12 @@ import java.util.Arrays;
  */
 public class FigHeaderGenerator implements HeaderGenerator {
 
+    private final SramEncoder sramEncoder;
+
+    public FigHeaderGenerator() {
+        this.sramEncoder = new FigSramEncoder();
+    }
+
     @Override
     public byte[] generateHeader(SnesRom rom, int partSize, int splitPartIndex, boolean isLastPart, byte chunkFlag) {
         byte[] header = new byte[HEADER_SIZE];
@@ -34,38 +40,7 @@ public class FigHeaderGenerator implements HeaderGenerator {
             header[3] = (byte) 0x80;
         }
 
-        // 4-5: Emulation Bytes (Ported from snes_set_fig_header)
-        int emu1 = 0;
-        int emu2 = 0;
-
-        // DSP chipset handling logic applied below for HiROM and LoROM
-
-        if (rom.isHiRom()) {
-            // HiROM Defaults
-            emu2 |= 0x02;
-            if (rom.hasDsp()) {
-                emu1 |= 0xF0;
-            }
-            if (rom.sramSize() > 0) {
-                emu1 |= 0xDD; // 1101 1101
-            }
-        } else {
-            // LoROM Defaults
-            if (rom.sramSize() == 0) {
-                emu1 = 0x77;
-                emu2 = 0x83;
-            } else if (rom.sramSize() <= 8192) {
-                emu2 = 0x80;
-            }
-
-            if (rom.hasDsp()) {
-                emu1 &= 0x0F;
-                emu1 |= 0x40;
-            }
-        }
-
-        header[4] = (byte) emu1;
-        header[5] = (byte) emu2;
+        sramEncoder.encodeSram(header, rom);
 
         return header;
     }

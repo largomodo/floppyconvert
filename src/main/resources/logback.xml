@@ -11,14 +11,14 @@
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
         <file>floppyconvert.log</file>
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] [%X{rom}] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] [%X{rom}] %-5level %logger{36} - %msg%n%ex{full}</pattern>
         </encoder>
     </appender>
 
     <appender name="FAILURES" class="ch.qos.logback.core.FileAppender">
         <file>failures.log</file>
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss} - %X{rom} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} - %X{rom} - %msg%n%ex{full}</pattern>
         </encoder>
         <filter class="ch.qos.logback.classic.filter.LevelFilter">
             <level>ERROR</level>

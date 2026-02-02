@@ -167,7 +167,7 @@ class FloppyConvertRecursionTest {
         try {
             Files.createSymbolicLink(symlinkDir, realDir);
         } catch (UnsupportedOperationException | IOException e) {
-            Assumptions.assumeTrue(false, "Skipping: filesystem does not support symlinks");
+            Assumptions.abort("Skipping: filesystem does not support symlinks");
         }
 
         int exitCode = new CommandLine(new FloppyConvert())

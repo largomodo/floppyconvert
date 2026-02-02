@@ -1,5 +1,6 @@
 package com.largomodo.floppyconvert.core;
 
+import com.largomodo.floppyconvert.format.CopierFormat;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;

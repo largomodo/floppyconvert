@@ -1,6 +1,6 @@
 package com.largomodo.floppyconvert;
 
-import com.largomodo.floppyconvert.core.CopierFormat;
+import com.largomodo.floppyconvert.format.CopierFormat;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;

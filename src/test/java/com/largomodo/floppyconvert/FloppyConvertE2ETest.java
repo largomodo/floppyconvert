@@ -1,11 +1,12 @@
 package com.largomodo.floppyconvert;
 
-import com.largomodo.floppyconvert.core.CopierFormat;
+import com.largomodo.floppyconvert.format.CopierFormat;
 import com.largomodo.floppyconvert.core.DiskTemplateFactory;
 import com.largomodo.floppyconvert.core.ResourceDiskTemplateFactory;
 import com.largomodo.floppyconvert.core.RomPartNormalizer;
 import com.largomodo.floppyconvert.core.RomProcessor;
 import com.largomodo.floppyconvert.core.domain.GreedyDiskPacker;
+import com.largomodo.floppyconvert.service.DefaultConversionFacade;
 import com.largomodo.floppyconvert.service.NativeRomSplitter;
 import com.largomodo.floppyconvert.service.fat.Fat12ImageWriter;
 import com.largomodo.floppyconvert.snes.RomType;
@@ -64,14 +65,17 @@ class FloppyConvertE2ETest {
     }
 
     private RomProcessor createProcessor() {
+        NativeRomSplitter splitter = new NativeRomSplitter(
+                new SnesRomReader(),
+                new SnesInterleaver(),
+                new HeaderGeneratorFactory()
+        );
+        Fat12ImageWriter writer = new Fat12ImageWriter();
+        DefaultConversionFacade facade = new DefaultConversionFacade(splitter, writer);
+
         return new RomProcessor(
                 new GreedyDiskPacker(),
-                new NativeRomSplitter(
-                        new SnesRomReader(),
-                        new SnesInterleaver(),
-                        new HeaderGeneratorFactory()
-                ),
-                new Fat12ImageWriter(),
+                facade,
                 new ResourceDiskTemplateFactory(),
                 new RomPartNormalizer()
         );
@@ -463,7 +467,7 @@ class FloppyConvertE2ETest {
                 );
 
         if (exitCode != 0) {
-            assumeTrue(false, "Known issue: GD3 X-padding creates DOS 8.3 name collisions for synthetic ROM titles");
+            Assumptions.abort("Known issue: GD3 X-padding creates DOS 8.3 name collisions for synthetic ROM titles");
         }
 
         Path gameOutputDir = outputDir.resolve("test_16mbit_hirom");
@@ -505,7 +509,7 @@ class FloppyConvertE2ETest {
                 );
 
         if (exitCode != 0) {
-            assumeTrue(false, "Known issue: GD3 X-padding creates DOS 8.3 name collisions for synthetic ROM titles");
+            Assumptions.abort("Known issue: GD3 X-padding creates DOS 8.3 name collisions for synthetic ROM titles");
         }
 
         Path gameOutputDir = outputDir.resolve("test_12mbit_hirom");
@@ -665,7 +669,7 @@ class FloppyConvertE2ETest {
             assertTrue(diskImages.size() >= 2, "Should produce at least 2 disk images");
         } catch (IOException e) {
             if (e.getMessage().contains("DOS name collision")) {
-                assumeTrue(false, "Known issue: GD3 X-padding creates DOS 8.3 name collisions for some titles");
+                Assumptions.abort("Known issue: GD3 X-padding creates DOS 8.3 name collisions for some titles");
             }
             throw e;
         }

@@ -14,9 +14,9 @@ public interface DiskTemplateFactory {
     /**
      * Create blank floppy disk image at target path.
      *
-     * @param type       Floppy format (determines capacity and template source)
-     * @param targetFile Destination path for disk image
+     * @param type        Floppy format (determines capacity and template source)
+     * @param targetImage Destination path for disk image
      * @throws IOException if template cannot be loaded or copied
      */
-    void createBlankDisk(FloppyType type, Path targetFile) throws IOException;
+    void createBlankDisk(FloppyType type, Path targetImage) throws IOException;
 }
