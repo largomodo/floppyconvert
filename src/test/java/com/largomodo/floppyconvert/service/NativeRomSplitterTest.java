@@ -356,10 +356,10 @@ class NativeRomSplitterTest {
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
         assertEquals(4, parts.size());
-        assertEquals("SF16CHRXA.078", parts.get(0).getName());
-        assertEquals("SF16CHRXB.078", parts.get(1).getName());
-        assertEquals("SF16CHRXC.078", parts.get(2).getName());
-        assertEquals("SF16CHRXD.078", parts.get(3).getName());
+        assertEquals("SF16CHRA.078", parts.get(0).getName());
+        assertEquals("SF16CHRB.078", parts.get(1).getName());
+        assertEquals("SF16CHRC.078", parts.get(2).getName());
+        assertEquals("SF16CHRD.078", parts.get(3).getName());
     }
 
     @Test
@@ -550,10 +550,10 @@ class NativeRomSplitterTest {
         verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(3), eq(true), anyByte());
 
         assertEquals(4, parts.size());
-        assertEquals("SF16TESXA.078", parts.get(0).getName());
-        assertEquals("SF16TESXB.078", parts.get(1).getName());
-        assertEquals("SF16TESXC.078", parts.get(2).getName());
-        assertEquals("SF16TESXD.078", parts.get(3).getName());
+        assertEquals("SF16TESA.078", parts.get(0).getName());
+        assertEquals("SF16TESB.078", parts.get(1).getName());
+        assertEquals("SF16TESC.078", parts.get(2).getName());
+        assertEquals("SF16TESD.078", parts.get(3).getName());
     }
 
     @Test

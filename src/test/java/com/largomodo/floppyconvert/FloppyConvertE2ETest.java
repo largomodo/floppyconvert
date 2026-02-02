@@ -688,7 +688,7 @@ class FloppyConvertE2ETest {
         assertTrue(diskCount >= 2, "20Mbit ROM should span multiple disks");
 
         List<Path> diskImages = listDiskImages("Street Fighter II Turbo (USA) (Rev 1)");
-        assertTrue(diskImages.siz+-e() >= 2, "Should produce at least 2 disk images");
+        assertTrue(diskImages.size() >= 2, "Should produce at least 2 disk images");
     }
 
     @Test
