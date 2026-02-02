@@ -82,7 +82,8 @@ class FloppyConvertE2ETest {
     }
 
     private List<Path> listDiskImages(String romName) throws Exception {
-        Path gameDir = outputDir.resolve(romName);
+        String sanitizedName = new RomPartNormalizer().sanitizeName(romName);
+        Path gameDir = outputDir.resolve(sanitizedName);
         if (!Files.exists(gameDir)) {
             return List.of();
         }
@@ -290,7 +291,7 @@ class FloppyConvertE2ETest {
         // Verify output structure - base name is sanitized for filesystem safety
         // Special characters #, [, ], (, ), and space are replaced with underscores
         String expectedBaseName = "VLDC10___053__-_ERROR_CODE__1D4__Update__by_Sayuri__2017-04-02___SMW_Hack_";
-        Path gameOutputDir = outputDir.resolve("VLDC10 [#053] - ERROR CODE #1D4 (Update) by Sayuri [2017-04-02] (SMW Hack)");
+        Path gameOutputDir = outputDir.resolve(expectedBaseName);
         assertTrue(Files.exists(gameOutputDir), "Output directory should exist");
         assertTrue(Files.isDirectory(gameOutputDir), "Output should be a directory");
 
@@ -353,9 +354,10 @@ class FloppyConvertE2ETest {
         assertEquals(0, exitCode, "Conversion should succeed with shell-sensitive characters (&, $, !, space)");
 
         // Verify output structure - shell-sensitive characters replaced with underscores
-        // &, $, !, space, (, and ) are all sanitized to underscores
-        String expectedBaseName = "Ren___Stimpy_Show,_The_-_Buckeroo____USA_";
-        Path gameOutputDir = outputDir.resolve("Ren & Stimpy Show, The - Buckeroo$! (USA)");
+        // &, $, !, space, (, ), and , are all sanitized to underscores
+        String expectedBaseName = "Ren___Stimpy_Show__The_-_Buckeroo____USA_";
+        Path gameOutputDir = outputDir.resolve(expectedBaseName);
+
         assertTrue(Files.exists(outputDir), "Output directory should exist");
         assertTrue(Files.isDirectory(outputDir), "Output should be a directory");
 
@@ -686,7 +688,7 @@ class FloppyConvertE2ETest {
         assertTrue(diskCount >= 2, "20Mbit ROM should span multiple disks");
 
         List<Path> diskImages = listDiskImages("Street Fighter II Turbo (USA) (Rev 1)");
-        assertTrue(diskImages.size() >= 2, "Should produce at least 2 disk images");
+        assertTrue(diskImages.siz+-e() >= 2, "Should produce at least 2 disk images");
     }
 
     @Test
