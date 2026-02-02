@@ -178,8 +178,8 @@ public class NativeRomSplitter implements RomSplitter {
                         sb.append('_');
                     }
                 } else {
-                    // ucon64 snes_gd_make_names inserts X for HiROM ≤16Mbit (hardware firmware checks this pattern)
-                    if (rom.isHiRom() && sizeMbit <= 16) {
+                    // ucon64 snes_gd_make_names inserts X for HiROM <10Mbit (hardware firmware checks this pattern)
+                    if (rom.isHiRom() && sizeMbit < 10) {
                         sb.append('X');
                     }
                     sb.append((char) ('A' + partIndex));
