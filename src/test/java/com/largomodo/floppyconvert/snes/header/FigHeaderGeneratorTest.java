@@ -62,11 +62,9 @@ class FigHeaderGeneratorTest {
         int emu1 = header[4] & 0xFF;
 
         if (rom.isHiRom()) {
-            assertTrue((emu1 & 0xF0) == 0xF0,
-                "DSP flag 0xF0 should be set in emu1 for HiROM DSP ROMs");
+            assertEquals(0xF0, (emu1 & 0xF0), "DSP flag 0xF0 should be set in emu1 for HiROM DSP ROMs");
         } else {
-            assertTrue((emu1 & 0x40) == 0x40,
-                "DSP flag 0x40 should be set in emu1 for LoROM DSP ROMs");
+            assertEquals(0x40, (emu1 & 0x40), "DSP flag 0x40 should be set in emu1 for LoROM DSP ROMs");
         }
     }
 
@@ -90,8 +88,7 @@ class FigHeaderGeneratorTest {
         byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         int emu1 = header[4] & 0xFF;
-        assertTrue((emu1 & 0xDD) == 0xDD,
-            "HiROM with SRAM should have 0xDD bits set in emu1");
+        assertEquals(0xDD, (emu1 & 0xDD), "HiROM with SRAM should have 0xDD bits set in emu1");
     }
 
     @Property(tries = 100)
@@ -99,8 +96,7 @@ class FigHeaderGeneratorTest {
         byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
         int emu2 = header[5] & 0xFF;
-        assertTrue((emu2 & 0x02) == 0x02,
-            "HiROM should have 0x02 bit set in emu2");
+        assertEquals(0x02, (emu2 & 0x02), "HiROM should have 0x02 bit set in emu2");
     }
 
     @Property(tries = 100)
@@ -109,10 +105,10 @@ class FigHeaderGeneratorTest {
         byte[] header = generator.generateHeader(rom, 512 * 1024, splitPartIndex, false, (byte) 0x00);
 
         assertEquals(512, header.length,
-            "FIG header should be generated for ALL parts (index " + splitPartIndex + ")");
+                "FIG header should be generated for ALL parts (index " + splitPartIndex + ")");
 
         assertNotEquals(0, header[0],
-            "Header should contain valid size data for part " + splitPartIndex);
+                "Header should contain valid size data for part " + splitPartIndex);
     }
 
     @Test
@@ -120,7 +116,7 @@ class FigHeaderGeneratorTest {
         byte[] romData = new byte[4 * 1024 * 1024];
         int partSize = 512 * 1024;
         SnesRom rom = new SnesRom(romData, RomType.HiROM, 8192, "CHRONO TRIGGER",
-            false, 0x01, 0x00, 0x00, 0, 0);
+                false, 0x01, 0x00, 0x00, 0, 0);
 
         byte[] header = generator.generateHeader(rom, partSize, 0, true, (byte) 0x00);
 
@@ -135,7 +131,7 @@ class FigHeaderGeneratorTest {
     void headerContainsValidDataForFirstPart() {
         byte[] romData = new byte[2 * 1024 * 1024];
         SnesRom rom = new SnesRom(romData, RomType.LoROM, 0, "TEST ROM",
-            false, 0x01, 0x00, 0x00, 0, 0);
+                false, 0x01, 0x00, 0x00, 0, 0);
 
         byte[] header = generator.generateHeader(rom, 512 * 1024, 0, false, (byte) 0x00);
 
@@ -148,7 +144,7 @@ class FigHeaderGeneratorTest {
     void headerContainsValidDataForLastPart() {
         byte[] romData = new byte[2 * 1024 * 1024];
         SnesRom rom = new SnesRom(romData, RomType.HiROM, 8192, "TEST ROM",
-            false, 0x01, 0x00, 0x00, 0, 0);
+                false, 0x01, 0x00, 0x00, 0, 0);
 
         byte[] header = generator.generateHeader(rom, 512 * 1024, 2, true, (byte) 0x00);
 
@@ -175,29 +171,29 @@ class FigHeaderGeneratorTest {
     @Provide
     Arbitrary<SnesRom> dspRom() {
         return Arbitraries.oneOf(
-            RomDataGenerator.loRomData().map(data -> createRomWithDsp(data, RomType.LoROM)),
-            RomDataGenerator.hiRomData().map(data -> createRomWithDsp(data, RomType.HiROM))
+                RomDataGenerator.loRomData().map(data -> createRomWithDsp(data, RomType.LoROM)),
+                RomDataGenerator.hiRomData().map(data -> createRomWithDsp(data, RomType.HiROM))
         );
     }
 
     @Provide
     Arbitrary<SnesRom> loRomNoSram() {
         return RomDataGenerator.loRomData().map(data ->
-            new SnesRom(data, RomType.LoROM, 0, "TEST ROM", false, 0x01, 0x00, 0x00, 0, 0)
+                new SnesRom(data, RomType.LoROM, 0, "TEST ROM", false, 0x01, 0x00, 0x00, 0, 0)
         );
     }
 
     @Provide
     Arbitrary<SnesRom> loRomSmallSram() {
         return RomDataGenerator.loRomData().map(data ->
-            new SnesRom(data, RomType.LoROM, 2048, "TEST ROM", false, 0x01, 0x00, 0x00, 0, 0)
+                new SnesRom(data, RomType.LoROM, 2048, "TEST ROM", false, 0x01, 0x00, 0x00, 0, 0)
         );
     }
 
     @Provide
     Arbitrary<SnesRom> hiRomWithSram() {
         return RomDataGenerator.hiRomData().map(data ->
-            new SnesRom(data, RomType.HiROM, 8192, "TEST ROM", false, 0x01, 0x00, 0x00, 0, 0)
+                new SnesRom(data, RomType.HiROM, 8192, "TEST ROM", false, 0x01, 0x00, 0x00, 0, 0)
         );
     }
 

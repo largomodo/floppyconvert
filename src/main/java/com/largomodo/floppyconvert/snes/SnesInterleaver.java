@@ -1,7 +1,5 @@
 package com.largomodo.floppyconvert.snes;
 
-import java.util.Arrays;
-
 /**
  * Handles SNES ROM interleaving for Game Doctor (GD3) format.
  * <p>
@@ -27,8 +25,8 @@ public class SnesInterleaver {
      * Transformation:
      * 1. Align data to 8Mbit boundary using mirroring (e.g., 12Mbit -> 16Mbit by repeating last 4Mbit).
      * 2. For every 8Mbit chunk:
-     *    The first 4Mbit (512KB) of destination receives the UPPER 32KB of each 64KB source block.
-     *    The second 4Mbit (512KB) of destination receives the LOWER 32KB of each 64KB source block.
+     * The first 4Mbit (512KB) of destination receives the UPPER 32KB of each 64KB source block.
+     * The second 4Mbit (512KB) of destination receives the LOWER 32KB of each 64KB source block.
      *
      * @param input Raw linear ROM data
      * @return Interleaved and mirrored data
@@ -89,7 +87,7 @@ public class SnesInterleaver {
         while (bytesWritten < gap) {
             int sourceOffset = Math.max(0, input.length - (gap - bytesWritten));
             int copyLength = Math.min(input.length, gap - bytesWritten);
-            
+
             // If the gap is larger than the entire file, we mirror the whole file repeatedly
             if (copyLength == 0 && input.length > 0) {
                 // Fallback for very small files being aligned up

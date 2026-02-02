@@ -14,29 +14,6 @@ import java.util.List;
  */
 public class UfoHiRomChunker {
 
-    /**
-     * Chunk specification: size in Mbit and multi-file flag byte.
-     */
-    public record UfoChunk(int sizeMbit, byte flag) {
-        public UfoChunk {
-            if (sizeMbit <= 0) {
-                throw new IllegalArgumentException("Chunk size must be positive");
-            }
-        }
-    }
-
-    private static class LookupEntry {
-        final int sizeMbit;
-        final int[] chunkSizesMbit;
-        final byte[] flags;
-
-        LookupEntry(int sizeMbit, int[] chunkSizesMbit, byte[] flags) {
-            this.sizeMbit = sizeMbit;
-            this.chunkSizesMbit = chunkSizesMbit;
-            this.flags = flags;
-        }
-    }
-
     private static final LookupEntry[] LOOKUP_TABLE = {
             new LookupEntry(2, new int[]{2}, new byte[]{0x10}),
             new LookupEntry(4, new int[]{2, 2}, new byte[]{0x10, 0x00}),
@@ -78,5 +55,19 @@ public class UfoHiRomChunker {
             }
         }
         return LOOKUP_TABLE[4];
+    }
+
+    /**
+     * Chunk specification: size in Mbit and multi-file flag byte.
+     */
+    public record UfoChunk(int sizeMbit, byte flag) {
+        public UfoChunk {
+            if (sizeMbit <= 0) {
+                throw new IllegalArgumentException("Chunk size must be positive");
+            }
+        }
+    }
+
+    private record LookupEntry(int sizeMbit, int[] chunkSizesMbit, byte[] flags) {
     }
 }

@@ -1,11 +1,10 @@
 package com.largomodo.floppyconvert;
 
-import com.largomodo.floppyconvert.format.CopierFormat;
-import com.largomodo.floppyconvert.core.DiskTemplateFactory;
 import com.largomodo.floppyconvert.core.ResourceDiskTemplateFactory;
 import com.largomodo.floppyconvert.core.RomPartNormalizer;
 import com.largomodo.floppyconvert.core.RomProcessor;
 import com.largomodo.floppyconvert.core.domain.GreedyDiskPacker;
+import com.largomodo.floppyconvert.format.CopierFormat;
 import com.largomodo.floppyconvert.service.DefaultConversionFacade;
 import com.largomodo.floppyconvert.service.NativeRomSplitter;
 import com.largomodo.floppyconvert.service.fat.Fat12ImageWriter;
@@ -24,6 +23,7 @@ import picocli.CommandLine;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -48,15 +48,27 @@ class FloppyConvertE2ETest {
     private static final String CHRONO_TRIGGER_RESOURCE = "/snes/Chrono Trigger (USA).sfc";
     // Super Mario World is 4 Mbit - too small to split, tests single-file-per-disk path
     private static final String SUPER_MARIO_WORLD_RESOURCE = "/snes/Super Mario World (USA).sfc";
-
+    private static final int LOROM_HEADER_OFFSET = 0x7FB0;
+    private static final int HIROM_HEADER_OFFSET = 0xFFB0;
     @TempDir
     Path tempDir;
-
     Path testResourcesDir;
     Path outputDir;
 
-    private static final int LOROM_HEADER_OFFSET = 0x7FB0;
-    private static final int HIROM_HEADER_OFFSET = 0xFFB0;
+    static Stream<Arguments> formatAndRomProvider() {
+        return Stream.of(
+                // Multi-part tests: Chrono Trigger (32 Mbit - produces 8 split parts)
+                Arguments.of(CopierFormat.FIG, CHRONO_TRIGGER_RESOURCE),
+                Arguments.of(CopierFormat.SWC, CHRONO_TRIGGER_RESOURCE),
+                Arguments.of(CopierFormat.UFO, CHRONO_TRIGGER_RESOURCE),
+                Arguments.of(CopierFormat.GD3, CHRONO_TRIGGER_RESOURCE),
+                // Single-file tests: Super Mario World (4 Mbit - no split, 1 file per disk)
+                Arguments.of(CopierFormat.FIG, SUPER_MARIO_WORLD_RESOURCE),
+                Arguments.of(CopierFormat.SWC, SUPER_MARIO_WORLD_RESOURCE),
+                Arguments.of(CopierFormat.UFO, SUPER_MARIO_WORLD_RESOURCE),
+                Arguments.of(CopierFormat.GD3, SUPER_MARIO_WORLD_RESOURCE)
+        );
+    }
 
     @BeforeEach
     void setUp() {
@@ -94,21 +106,6 @@ class FloppyConvertE2ETest {
                     .sorted(Comparator.comparing(Path::toString))
                     .toList();
         }
-    }
-
-    static Stream<Arguments> formatAndRomProvider() {
-        return Stream.of(
-                // Multi-part tests: Chrono Trigger (32 Mbit - produces 8 split parts)
-                Arguments.of(CopierFormat.FIG, CHRONO_TRIGGER_RESOURCE),
-                Arguments.of(CopierFormat.SWC, CHRONO_TRIGGER_RESOURCE),
-                Arguments.of(CopierFormat.UFO, CHRONO_TRIGGER_RESOURCE),
-                Arguments.of(CopierFormat.GD3, CHRONO_TRIGGER_RESOURCE),
-                // Single-file tests: Super Mario World (4 Mbit - no split, 1 file per disk)
-                Arguments.of(CopierFormat.FIG, SUPER_MARIO_WORLD_RESOURCE),
-                Arguments.of(CopierFormat.SWC, SUPER_MARIO_WORLD_RESOURCE),
-                Arguments.of(CopierFormat.UFO, SUPER_MARIO_WORLD_RESOURCE),
-                Arguments.of(CopierFormat.GD3, SUPER_MARIO_WORLD_RESOURCE)
-        );
     }
 
     @ParameterizedTest(name = "{0} - {1}")
@@ -171,7 +168,7 @@ class FloppyConvertE2ETest {
                     .count();
             assertEquals(0, partFileCount,
                     "Split parts must not remain in output for " + format + " / " + baseName +
-                    " (pattern: " + formatPattern + ")");
+                            " (pattern: " + formatPattern + ")");
         }
 
         // Verify cleanup removed intermediate format files (only for large ROMs that were split)
@@ -600,7 +597,7 @@ class FloppyConvertE2ETest {
         int headerOffset = (romType == RomType.LoROM) ? LOROM_HEADER_OFFSET : HIROM_HEADER_OFFSET;
 
         String title = "SYNTHETIC ROM";
-        byte[] titleBytes = title.getBytes("ASCII");
+        byte[] titleBytes = title.getBytes(StandardCharsets.US_ASCII);
         System.arraycopy(titleBytes, 0, romData, headerOffset + 0x10, Math.min(titleBytes.length, 21));
 
         int mapType = switch (romType) {

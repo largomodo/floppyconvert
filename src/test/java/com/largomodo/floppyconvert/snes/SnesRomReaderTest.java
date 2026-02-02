@@ -3,7 +3,6 @@ package com.largomodo.floppyconvert.snes;
 import com.largomodo.floppyconvert.snes.generators.RomDataGenerator;
 import net.jqwik.api.*;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -126,7 +125,8 @@ class SnesRomReaderTest {
             if (tempFile != null) {
                 try {
                     Files.deleteIfExists(tempFile);
-                } catch (IOException ignored) {}
+                } catch (IOException ignored) {
+                }
             }
         }
     }

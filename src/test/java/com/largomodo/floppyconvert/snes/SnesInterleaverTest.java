@@ -11,10 +11,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class SnesInterleaverTest {
 
-    private final SnesInterleaver interleaver = new SnesInterleaver();
-
     private static final int CHUNK_8MBIT = 0x100000; // 1MB
     private static final int BLOCK_32KB = 0x8000;
+    private final SnesInterleaver interleaver = new SnesInterleaver();
 
     @Property
     void interleavingPreservesDataSize_8MbitAligned(@ForAll("data8MbitAligned") byte[] input) {
@@ -31,8 +30,7 @@ class SnesInterleaverTest {
         int expectedSize = ((input.length / CHUNK_8MBIT) + 1) * CHUNK_8MBIT;
         assertEquals(expectedSize, output.length,
                 "Output should be aligned to nearest 8Mbit boundary");
-        assertTrue(output.length % CHUNK_8MBIT == 0,
-                "Output size must be multiple of 8Mbit");
+        assertEquals(0, output.length % CHUNK_8MBIT, "Output size must be multiple of 8Mbit");
     }
 
     @Property
@@ -171,9 +169,9 @@ class SnesInterleaverTest {
         byte[] output = interleaver.interleave(input);
 
         assertEquals(CHUNK_8MBIT, output.length);
-        
+
         // Since input is all 0x42, output should be all 0x42
-        for(byte b : output) {
+        for (byte b : output) {
             assertEquals((byte) 0x42, b, "Data should be mirrored to fill the chunk");
         }
     }
