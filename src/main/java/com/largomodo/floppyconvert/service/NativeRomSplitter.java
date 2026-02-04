@@ -2,9 +2,14 @@ package com.largomodo.floppyconvert.service;
 
 import com.largomodo.floppyconvert.format.CopierFormat;
 import com.largomodo.floppyconvert.service.UfoHiRomChunker.UfoChunk;
+import com.largomodo.floppyconvert.snes.Gd3HardwareValidator;
+import com.largomodo.floppyconvert.snes.HardwareValidator;
+import com.largomodo.floppyconvert.snes.SnesConstants;
 import com.largomodo.floppyconvert.snes.SnesInterleaver;
 import com.largomodo.floppyconvert.snes.SnesRom;
 import com.largomodo.floppyconvert.snes.SnesRomReader;
+import com.largomodo.floppyconvert.snes.UfoHardwareValidator;
+import com.largomodo.floppyconvert.snes.UnsupportedHardwareException;
 import com.largomodo.floppyconvert.snes.header.HeaderGenerator;
 import com.largomodo.floppyconvert.snes.header.HeaderGeneratorFactory;
 import org.slf4j.Logger;
@@ -73,10 +78,18 @@ public class NativeRomSplitter implements RomSplitter {
 
         SnesRom rom = reader.load(inputRom.toPath());
 
+        HardwareValidator validator = createValidator(format);
+        try {
+            validator.validate(rom, format);
+        } catch (UnsupportedHardwareException e) {
+            logger.error("Hardware validation failed: {}", e.getMessage());
+            throw e;
+        }
+
         byte[] data = rom.rawData();
         if (format == CopierFormat.GD3 && rom.isHiRom()) {
             logger.debug("Applying GD3 HiROM interleaving for: {}", inputRom.getName());
-            data = interleaver.interleave(data);
+            data = interleaver.interleave(data, rom.type());
         }
 
         // Force 4Mbit chunks for GD3 HiROM <= 16Mbit to trigger X-padding
@@ -95,13 +108,13 @@ public class NativeRomSplitter implements RomSplitter {
         // UFO HiROM requires irregular chunk sizes from lookup table
         // Matches ucon64 size_to_partsizes for copier bank allocation compatibility
         if (format == CopierFormat.UFO && rom.isHiRom()) {
-            int totalSizeMbit = data.length / 131072;
+            int totalSizeMbit = data.length / SnesConstants.MBIT;
             List<UfoChunk> chunks = UfoHiRomChunker.computeChunks(totalSizeMbit);
 
             int offset = 0;
             for (int i = 0; i < chunks.size(); i++) {
                 UfoChunk chunk = chunks.get(i);
-                int chunkBytes = chunk.sizeMbit() * 131072;
+                int chunkBytes = chunk.sizeMbit() * SnesConstants.MBIT;
                 int length = Math.min(chunkBytes, data.length - offset);
                 boolean isLastPart = (i == chunks.size() - 1);
 
@@ -135,6 +148,17 @@ public class NativeRomSplitter implements RomSplitter {
     }
 
     /**
+     * Creates format-specific hardware validator for ROM compatibility check.
+     */
+    private HardwareValidator createValidator(CopierFormat format) {
+        return switch (format) {
+            case UFO -> new UfoHardwareValidator();
+            case GD3 -> new Gd3HardwareValidator();
+            case FIG, SWC -> (rom, fmt) -> { };
+        };
+    }
+
+    /**
      * Creates a format-specific filename for a split part.
      * <p>
      * Naming conventions:
@@ -159,7 +183,7 @@ public class NativeRomSplitter implements RomSplitter {
             }
             case GD3 -> {
                 // GD3 SF-Code format: SF + Mbit + 3-char name + suffix
-                int sizeMbit = rom.rawData().length / 131072;
+                int sizeMbit = rom.rawData().length / SnesConstants.MBIT;
                 String cleanName = baseName.replaceAll("[^a-zA-Z0-9]", "").toUpperCase(Locale.ROOT);
 
                 String shortName;

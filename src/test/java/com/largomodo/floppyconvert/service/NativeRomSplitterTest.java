@@ -2,9 +2,11 @@ package com.largomodo.floppyconvert.service;
 
 import com.largomodo.floppyconvert.format.CopierFormat;
 import com.largomodo.floppyconvert.snes.RomType;
+import com.largomodo.floppyconvert.snes.SnesConstants;
 import com.largomodo.floppyconvert.snes.SnesInterleaver;
 import com.largomodo.floppyconvert.snes.SnesRom;
 import com.largomodo.floppyconvert.snes.SnesRomReader;
+import com.largomodo.floppyconvert.snes.UnsupportedHardwareException;
 import com.largomodo.floppyconvert.snes.header.HeaderGenerator;
 import com.largomodo.floppyconvert.snes.header.HeaderGeneratorFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,14 +105,14 @@ class NativeRomSplitterTest {
         SnesRom rom = createHiRom(romData);
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockInterleaver.interleave(romData)).thenReturn(interleavedData);
+        when(mockInterleaver.interleave(any(byte[].class), any(RomType.class))).thenReturn(interleavedData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
         when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
         verify(mockReader, times(1)).load(inputRom.toPath());
-        verify(mockInterleaver, times(1)).interleave(romData);
+        verify(mockInterleaver, times(1)).interleave(any(byte[].class), any(RomType.class));
         verify(mockHeaderFactory, times(1)).get(CopierFormat.GD3);
         verify(mockHeaderGenerator, times(4)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte());
 
@@ -152,13 +154,13 @@ class NativeRomSplitterTest {
         SnesRom rom = createHiRom(romData);
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockInterleaver.interleave(romData)).thenReturn(interleavedData);
+        when(mockInterleaver.interleave(any(byte[].class), any(RomType.class))).thenReturn(interleavedData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
         when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
         splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
-        verify(mockInterleaver, times(1)).interleave(romData);
+        verify(mockInterleaver, times(1)).interleave(any(byte[].class), any(RomType.class));
     }
 
     @Test
@@ -209,7 +211,7 @@ class NativeRomSplitterTest {
     @Test
     void testUfoNeverCallsInterleaver() throws IOException {
         File inputRom = createRomFile("test.sfc");
-        byte[] romData = createRomData(1024 * 1024);
+        byte[] romData = createRomData(512 * 1024);
         SnesRom rom = createHiRom(romData);
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
@@ -262,7 +264,7 @@ class NativeRomSplitterTest {
         SnesRom rom = createHiRom(romData);
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockInterleaver.interleave(romData)).thenReturn(interleavedData);
+        when(mockInterleaver.interleave(any(byte[].class), any(RomType.class))).thenReturn(interleavedData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
         when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
@@ -314,7 +316,7 @@ class NativeRomSplitterTest {
         SnesRom rom = createHiRom(romData);
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockInterleaver.interleave(romData)).thenReturn(interleavedData);
+        when(mockInterleaver.interleave(any(byte[].class), any(RomType.class))).thenReturn(interleavedData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
         when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
@@ -349,7 +351,7 @@ class NativeRomSplitterTest {
         SnesRom rom = createHiRom(romData);
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockInterleaver.interleave(romData)).thenReturn(romData);
+        when(mockInterleaver.interleave(any(byte[].class), any(RomType.class))).thenReturn(romData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
         when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
@@ -369,7 +371,7 @@ class NativeRomSplitterTest {
         SnesRom rom = createHiRom(romData);
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockInterleaver.interleave(romData)).thenReturn(romData);
+        when(mockInterleaver.interleave(any(byte[].class), any(RomType.class))).thenReturn(romData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
         when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
@@ -389,7 +391,7 @@ class NativeRomSplitterTest {
         SnesRom rom = createHiRom(romData);
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockInterleaver.interleave(romData)).thenReturn(interleavedData);
+        when(mockInterleaver.interleave(any(byte[].class), any(RomType.class))).thenReturn(interleavedData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
         when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
@@ -487,6 +489,21 @@ class NativeRomSplitterTest {
         );
     }
 
+    private SnesRom createExHiRom(byte[] data) {
+        return new SnesRom(
+                data,
+                RomType.ExHiROM,
+                0,
+                "Test ROM",
+                false,
+                0,
+                0,
+                0,
+                0,
+                0
+        );
+    }
+
     @Test
     void testGd3_8MbitHiRom_ForceSplitTo4Mbit() throws IOException {
         File inputRom = createRomFile("test.sfc");
@@ -495,7 +512,7 @@ class NativeRomSplitterTest {
         SnesRom rom = createHiRom(romData);
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockInterleaver.interleave(romData)).thenReturn(interleavedData);
+        when(mockInterleaver.interleave(any(byte[].class), any(RomType.class))).thenReturn(interleavedData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
         when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
@@ -537,7 +554,7 @@ class NativeRomSplitterTest {
         SnesRom rom = createHiRom(romData);
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockInterleaver.interleave(romData)).thenReturn(interleavedData);
+        when(mockInterleaver.interleave(any(byte[].class), any(RomType.class))).thenReturn(interleavedData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
         when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
@@ -564,7 +581,7 @@ class NativeRomSplitterTest {
         SnesRom rom = createHiRom(romData);
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockInterleaver.interleave(romData)).thenReturn(interleavedData);
+        when(mockInterleaver.interleave(any(byte[].class), any(RomType.class))).thenReturn(interleavedData);
         when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
         when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
 
@@ -636,5 +653,33 @@ class NativeRomSplitterTest {
         verify(spyHeaderGen).generateHeader(eq(rom), eq(512 * 1024), eq(0), eq(false), anyByte());
         verify(spyHeaderGen).generateHeader(eq(rom), eq(512 * 1024), eq(1), eq(false), anyByte());
         verify(spyHeaderGen).generateHeader(eq(rom), eq(512 * 1024), eq(2), eq(true), anyByte());
+    }
+
+    @Test
+    void testExHiRom48MbitGd3_Accepted() throws IOException {
+        File inputRom = createRomFile("test.sfc");
+        byte[] romData = createRomData(48 * SnesConstants.MBIT);
+        SnesRom rom = createExHiRom(romData);
+
+        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
+        when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
+        when(mockInterleaver.interleave(any(byte[].class), eq(RomType.ExHiROM))).thenReturn(romData);
+
+        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
+
+        verify(mockInterleaver, times(1)).interleave(romData, RomType.ExHiROM);
+        assertEquals(6, parts.size());
+    }
+
+    @Test
+    void testExHiRom48MbitUfo_Rejected() throws IOException {
+        File inputRom = createRomFile("test.sfc");
+        byte[] romData = createRomData(48 * SnesConstants.MBIT);
+        SnesRom rom = createExHiRom(romData);
+
+        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
+
+        assertThrows(UnsupportedHardwareException.class, () -> splitter.split(inputRom, tempDir, CopierFormat.UFO));
     }
 }

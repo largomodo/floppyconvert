@@ -17,7 +17,7 @@ class SnesInterleaverTest {
 
     @Property
     void interleavingPreservesDataSize_8MbitAligned(@ForAll("data8MbitAligned") byte[] input) {
-        byte[] output = interleaver.interleave(input);
+        byte[] output = interleaver.interleave(input, RomType.HiROM);
 
         assertEquals(input.length, output.length,
                 "Output size should equal input size for 8Mbit-aligned input");
@@ -25,7 +25,7 @@ class SnesInterleaverTest {
 
     @Property
     void interleavingAlignsTo8Mbit_NonAligned(@ForAll("dataNonAligned") byte[] input) {
-        byte[] output = interleaver.interleave(input);
+        byte[] output = interleaver.interleave(input, RomType.HiROM);
 
         int expectedSize = ((input.length / CHUNK_8MBIT) + 1) * CHUNK_8MBIT;
         assertEquals(expectedSize, output.length,
@@ -35,7 +35,7 @@ class SnesInterleaverTest {
 
     @Property
     void interleavingSwapsBlocksCorrectly_FirstChunk(@ForAll("data8Mbit") byte[] input) {
-        byte[] output = interleaver.interleave(input);
+        byte[] output = interleaver.interleave(input, RomType.HiROM);
 
         int halfSize = input.length / 2;
         int numBlocks = input.length / (BLOCK_32KB * 2);
@@ -60,7 +60,7 @@ class SnesInterleaverTest {
 
     @Property
     void testGlobalInterleavingPreservesAllData(@ForAll("romData8MbitMultiple") byte[] input) {
-        byte[] output = interleaver.interleave(input);
+        byte[] output = interleaver.interleave(input, RomType.HiROM);
 
         assertEquals(input.length, output.length,
                 "Output length should equal input length for 8Mbit-aligned input");
@@ -86,7 +86,7 @@ class SnesInterleaverTest {
 
     @Property
     void testBlockPairMappingCorrect(@ForAll("romData8MbitMultiple") byte[] input) {
-        byte[] output = interleaver.interleave(input);
+        byte[] output = interleaver.interleave(input, RomType.HiROM);
 
         int halfSize = input.length / 2;
         int numBlocks = input.length / (BLOCK_32KB * 2);
@@ -119,7 +119,7 @@ class SnesInterleaverTest {
         // Fill next 4Mbit with B
         Arrays.fill(input, CHUNK_8MBIT, size12Mbit, (byte) 0xBB);
 
-        byte[] output = interleaver.interleave(input);
+        byte[] output = interleaver.interleave(input, RomType.HiROM);
         int size16Mbit = 2 * CHUNK_8MBIT;
 
         assertEquals(size16Mbit, output.length,
@@ -166,7 +166,7 @@ class SnesInterleaverTest {
         // Extreme case: 1 byte input. Should fill 8Mbit with that 1 byte.
         byte[] input = new byte[]{0x42};
 
-        byte[] output = interleaver.interleave(input);
+        byte[] output = interleaver.interleave(input, RomType.HiROM);
 
         assertEquals(CHUNK_8MBIT, output.length);
 
@@ -174,6 +174,33 @@ class SnesInterleaverTest {
         for (byte b : output) {
             assertEquals((byte) 0x42, b, "Data should be mirrored to fill the chunk");
         }
+    }
+
+    @Property
+    void testExHiRomSplitInterleaving(@ForAll("exHiRomData") byte[] input) {
+        byte[] output = interleaver.interleave(input, RomType.ExHiROM);
+
+        // Split-interleaving preserves all data
+        assertEquals(input.length, output.length);
+
+        long inputSum = 0;
+        long outputSum = 0;
+        for (int i = 0; i < input.length; i++) {
+            inputSum += input[i] & 0xFF;
+            outputSum += output[i] & 0xFF;
+        }
+        assertEquals(inputSum, outputSum, "ExHiROM split-interleaving should preserve all bytes");
+    }
+
+    @Test
+    void testLoRomNoInterleaving() {
+        byte[] input = new byte[CHUNK_8MBIT];
+        Arrays.fill(input, (byte) 0xAA);
+
+        // LoROM data is not interleaved per GD3 copier specification (ucon64 snes.c:1148-1160 interleaves only HiROM/ExHiROM)
+        byte[] output = interleaver.interleave(input, RomType.LoROM);
+
+        assertArrayEquals(input, output, "LoROM data should not be interleaved");
     }
 
     @Provide
@@ -203,6 +230,14 @@ class SnesInterleaverTest {
     Arbitrary<byte[]> romData8MbitMultiple() {
         return Arbitraries.integers()
                 .between(1, 4)
+                .map(chunks -> new byte[chunks * CHUNK_8MBIT])
+                .map(this::fillWithRandomPattern);
+    }
+
+    @Provide
+    Arbitrary<byte[]> exHiRomData() {
+        return Arbitraries.integers()
+                .between(5, 8) // 40-64 Mbit range for ExHiROM
                 .map(chunks -> new byte[chunks * CHUNK_8MBIT])
                 .map(this::fillWithRandomPattern);
     }

@@ -9,8 +9,10 @@ import com.largomodo.floppyconvert.service.DefaultConversionFacade;
 import com.largomodo.floppyconvert.service.NativeRomSplitter;
 import com.largomodo.floppyconvert.service.fat.Fat12ImageWriter;
 import com.largomodo.floppyconvert.snes.RomType;
+import com.largomodo.floppyconvert.snes.SnesConstants;
 import com.largomodo.floppyconvert.snes.SnesInterleaver;
 import com.largomodo.floppyconvert.snes.SnesRomReader;
+import com.largomodo.floppyconvert.snes.UnsupportedHardwareException;
 import com.largomodo.floppyconvert.snes.header.HeaderGeneratorFactory;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -722,6 +724,40 @@ class FloppyConvertE2ETest {
         for (Path diskImage : diskImages) {
             assertTrue(Files.size(diskImage) > 700_000, "Each disk should be at least 720KB");
         }
+    }
+
+    @Test
+    void testUfoRejectsLargeHiRom() throws Exception {
+        Path romFile = tempDir.resolve("large_hirom.sfc");
+        byte[] romData = new byte[48 * SnesConstants.MBIT];
+        romData[HIROM_HEADER_OFFSET + 0x15] = 0x21;
+        romData[HIROM_HEADER_OFFSET + 0x1C] = (byte) 0xFF;
+        romData[HIROM_HEADER_OFFSET + 0x1D] = (byte) 0xFF;
+        romData[HIROM_HEADER_OFFSET + 0x1E] = 0x00;
+        romData[HIROM_HEADER_OFFSET + 0x1F] = 0x00;
+        Files.write(romFile, romData);
+
+        RomProcessor processor = createProcessor();
+
+        assertThrows(UnsupportedHardwareException.class, () ->
+            processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.UFO)
+        );
+    }
+
+    @Test
+    void testGd3AcceptsExHiRom() throws Exception {
+        Path romFile = tempDir.resolve("exhirom.sfc");
+        byte[] romData = new byte[48 * SnesConstants.MBIT];
+        int headerOffset = 0x40FFB0;
+        romData[headerOffset + 0x15] = 0x25;
+        romData[headerOffset + 0x1C] = (byte) 0xAA;
+        romData[headerOffset + 0x1D] = (byte) 0xBB;
+        romData[headerOffset + 0x1E] = (byte) 0x55;
+        romData[headerOffset + 0x1F] = (byte) 0x44;
+        Files.write(romFile, romData);
+
+        RomProcessor processor = createProcessor();
+        processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.GD3);
     }
 
 }
