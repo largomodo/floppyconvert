@@ -254,8 +254,7 @@ public class RomProcessor {
      */
     private void promoteFinalOutputs(List<Path> createdImages, Path outputBaseDir,
                                      String sanitizedBaseName, ConversionWorkspace ws) throws IOException {
-        String baseName = sanitizedBaseName;
-        Path finalGameDir = outputBaseDir.resolve(baseName);
+        Path finalGameDir = outputBaseDir.resolve(sanitizedBaseName);
         Files.createDirectories(finalGameDir);
 
         for (Path imgFile : createdImages) {

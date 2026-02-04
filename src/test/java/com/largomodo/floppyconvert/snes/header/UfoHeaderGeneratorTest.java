@@ -2,7 +2,6 @@ package com.largomodo.floppyconvert.snes.header;
 
 import com.largomodo.floppyconvert.snes.RomType;
 import com.largomodo.floppyconvert.snes.SnesRom;
-import com.largomodo.floppyconvert.snes.SnesRomReader;
 import net.jqwik.api.*;
 import org.junit.jupiter.api.Test;
 
@@ -15,7 +14,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class UfoHeaderGeneratorTest {
 
     private final UfoHeaderGenerator generator = new UfoHeaderGenerator();
-    private final SnesRomReader reader = new SnesRomReader();
 
     @Property
     void headerSizeIsAlways512Bytes(@ForAll("snesRom") SnesRom rom,

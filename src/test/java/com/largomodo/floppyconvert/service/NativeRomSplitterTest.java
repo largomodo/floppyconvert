@@ -71,7 +71,7 @@ class NativeRomSplitterTest {
         verifyNoInteractions(mockInterleaver);
 
         assertEquals(1, parts.size());
-        assertEquals("test.1", parts.get(0).getName());
+        assertEquals("test.1", parts.getFirst().getName());
     }
 
     @Test
@@ -117,7 +117,7 @@ class NativeRomSplitterTest {
         verify(mockHeaderGenerator, times(4)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte());
 
         assertEquals(4, parts.size());
-        assertEquals("SF32TESA.078", parts.get(0).getName());
+        assertEquals("SF32TESA.078", parts.getFirst().getName());
         assertEquals("SF32TESB.078", parts.get(1).getName());
         assertEquals("SF32TESC.078", parts.get(2).getName());
         assertEquals("SF32TESD.078", parts.get(3).getName());
@@ -141,7 +141,7 @@ class NativeRomSplitterTest {
         verifyNoInteractions(mockInterleaver);
 
         assertEquals(3, parts.size());
-        assertEquals("test.1", parts.get(0).getName());
+        assertEquals("test.1", parts.getFirst().getName());
         assertEquals("test.2", parts.get(1).getName());
         assertEquals("test.3", parts.get(2).getName());
     }
@@ -271,7 +271,7 @@ class NativeRomSplitterTest {
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
         assertEquals(1, parts.size());
-        assertEquals("SF4TES__.078", parts.get(0).getName());
+        assertEquals("SF4TES__.078", parts.getFirst().getName());
     }
 
     @Test
@@ -287,7 +287,7 @@ class NativeRomSplitterTest {
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.FIG);
 
         assertEquals(2, parts.size());
-        assertEquals("game.1", parts.get(0).getName());
+        assertEquals("game.1", parts.getFirst().getName());
         assertEquals("game.2", parts.get(1).getName());
     }
 
@@ -304,7 +304,7 @@ class NativeRomSplitterTest {
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.UFO);
 
         assertEquals(2, parts.size());
-        assertEquals("game.1gm", parts.get(0).getName());
+        assertEquals("game.1gm", parts.getFirst().getName());
         assertEquals("game.2gm", parts.get(1).getName());
     }
 
@@ -323,7 +323,7 @@ class NativeRomSplitterTest {
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
         assertEquals(1, parts.size());
-        assertTrue(parts.get(0).getName().matches("SF4SUP__.078"),
+        assertTrue(parts.getFirst().getName().matches("SF4SUP__.078"),
                 "Single-file GD3 should match SF-Code pattern with underscore padding");
     }
 
@@ -340,7 +340,7 @@ class NativeRomSplitterTest {
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
         assertEquals(2, parts.size());
-        assertEquals("SF16STRA.078", parts.get(0).getName());
+        assertEquals("SF16STRA.078", parts.getFirst().getName());
         assertEquals("SF16STRB.078", parts.get(1).getName());
     }
 
@@ -358,7 +358,7 @@ class NativeRomSplitterTest {
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
         assertEquals(4, parts.size());
-        assertEquals("SF16CHRA.078", parts.get(0).getName());
+        assertEquals("SF16CHRA.078", parts.getFirst().getName());
         assertEquals("SF16CHRB.078", parts.get(1).getName());
         assertEquals("SF16CHRC.078", parts.get(2).getName());
         assertEquals("SF16CHRD.078", parts.get(3).getName());
@@ -378,7 +378,7 @@ class NativeRomSplitterTest {
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
         assertEquals(3, parts.size());
-        assertEquals("SF24TESA.078", parts.get(0).getName());
+        assertEquals("SF24TESA.078", parts.getFirst().getName());
         assertEquals("SF24TESB.078", parts.get(1).getName());
         assertEquals("SF24TESC.078", parts.get(2).getName());
     }
@@ -398,7 +398,7 @@ class NativeRomSplitterTest {
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
         assertEquals(1, parts.size());
-        assertEquals("SF4MYG__.078", parts.get(0).getName());
+        assertEquals("SF4MYG__.078", parts.getFirst().getName());
     }
 
     @Test
@@ -523,7 +523,7 @@ class NativeRomSplitterTest {
         verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(1), eq(true), anyByte());
 
         assertEquals(2, parts.size());
-        assertEquals("SF8TESXA.078", parts.get(0).getName());
+        assertEquals("SF8TESXA.078", parts.getFirst().getName());
         assertEquals("SF8TESXB.078", parts.get(1).getName());
     }
 
@@ -543,7 +543,7 @@ class NativeRomSplitterTest {
         verify(mockHeaderGenerator).generateHeader(eq(rom), eq(1024 * 1024), eq(0), eq(true), anyByte());
 
         assertEquals(1, parts.size());
-        assertEquals("SF8TES__.078", parts.get(0).getName());
+        assertEquals("SF8TES__.078", parts.getFirst().getName());
     }
 
     @Test
@@ -567,7 +567,7 @@ class NativeRomSplitterTest {
         verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(3), eq(true), anyByte());
 
         assertEquals(4, parts.size());
-        assertEquals("SF16TESA.078", parts.get(0).getName());
+        assertEquals("SF16TESA.078", parts.getFirst().getName());
         assertEquals("SF16TESB.078", parts.get(1).getName());
         assertEquals("SF16TESC.078", parts.get(2).getName());
         assertEquals("SF16TESD.078", parts.get(3).getName());
@@ -593,7 +593,7 @@ class NativeRomSplitterTest {
         verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(2), eq(true), anyByte());
 
         assertEquals(3, parts.size());
-        assertEquals("SF20TESA.078", parts.get(0).getName());
+        assertEquals("SF20TESA.078", parts.getFirst().getName());
         assertEquals("SF20TESB.078", parts.get(1).getName());
         assertEquals("SF20TESC.078", parts.get(2).getName());
     }
@@ -614,7 +614,7 @@ class NativeRomSplitterTest {
 
         assertEquals(4, parts.size(), "12Mbit HiROM UFO should produce 4 parts");
 
-        assertEquals("test.1gm", parts.get(0).getName());
+        assertEquals("test.1gm", parts.getFirst().getName());
         assertEquals("test.2gm", parts.get(1).getName());
         assertEquals("test.3gm", parts.get(2).getName());
         assertEquals("test.4gm", parts.get(3).getName());
@@ -624,7 +624,7 @@ class NativeRomSplitterTest {
         verify(spyHeaderGen).generateHeader(eq(rom), eq(512 * 1024), eq(2), eq(false), eq((byte) 0x10));
         verify(spyHeaderGen).generateHeader(eq(rom), eq(256 * 1024), eq(3), eq(true), eq((byte) 0x00));
 
-        assertEquals(512 * 1024 + 512, parts.get(0).length(), "Part 1: 4Mbit + 512-byte header");
+        assertEquals(512 * 1024 + 512, parts.getFirst().length(), "Part 1: 4Mbit + 512-byte header");
         assertEquals(256 * 1024 + 512, parts.get(1).length(), "Part 2: 2Mbit + 512-byte header");
         assertEquals(512 * 1024 + 512, parts.get(2).length(), "Part 3: 4Mbit + 512-byte header");
         assertEquals(256 * 1024 + 512, parts.get(3).length(), "Part 4: 2Mbit + 512-byte header");
@@ -646,7 +646,7 @@ class NativeRomSplitterTest {
 
         assertEquals(3, parts.size(), "12Mbit LoROM UFO should produce 3 parts (standard 4Mbit chunks)");
 
-        assertEquals("test.1gm", parts.get(0).getName());
+        assertEquals("test.1gm", parts.getFirst().getName());
         assertEquals("test.2gm", parts.get(1).getName());
         assertEquals("test.3gm", parts.get(2).getName());
 

@@ -231,11 +231,18 @@ public class NativeRomSplitter implements RomSplitter {
                 StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
 
             if (header != null && header.length > 0) {
-                channel.write(ByteBuffer.wrap(header));
+                ByteBuffer headerBuffer = ByteBuffer.wrap(header);
+                int headerBytesWritten = channel.write(headerBuffer);
+                if (headerBytesWritten != header.length) {
+                    throw new IOException("Partial header write: expected " + header.length + " bytes, wrote " + headerBytesWritten);
+                }
             }
 
             ByteBuffer dataBuffer = ByteBuffer.wrap(data, offset, length);
-            channel.write(dataBuffer);
+            int dataBytesWritten = channel.write(dataBuffer);
+            if (dataBytesWritten != length) {
+                throw new IOException("Partial data write: expected " + length + " bytes, wrote " + dataBytesWritten);
+            }
         }
     }
 

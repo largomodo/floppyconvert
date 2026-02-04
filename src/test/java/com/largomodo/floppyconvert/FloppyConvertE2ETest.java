@@ -220,19 +220,21 @@ class FloppyConvertE2ETest {
         assertTrue(Files.isDirectory(gameOutputDir), "Output should be a directory");
 
         // Verify .img files were created
-        List<Path> imgFiles = Files.list(gameOutputDir)
-                .filter(p -> p.toString().endsWith(".img"))
-                .collect(Collectors.toList());
-        assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
+        try (var stream = Files.list(gameOutputDir)) {
+            List<Path> imgFiles = stream
+                    .filter(p -> p.toString().endsWith(".img"))
+                    .toList();
+            assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
 
-        assertEquals(1, imgFiles.size(), "Should produce single disk for 4Mbit ROM");
-        assertTrue(imgFiles.get(0).getFileName().toString().matches(".*\\.img"),
-                "Output should be .img file");
+            assertEquals(1, imgFiles.size(), "Should produce single disk for 4Mbit ROM");
+            assertTrue(imgFiles.getFirst().getFileName().toString().matches(".*\\.img"),
+                    "Output should be .img file");
 
-        // Super Mario World is 4Mbit (512KB) - should fit on 720K disk
-        long imageSize = Files.size(imgFiles.get(0));
-        assertTrue(imageSize < 800_000,
-                "Should use 720K template (~737KB) for 512KB ROM, got " + imageSize + " bytes");
+            // Super Mario World is 4Mbit (512KB) - should fit on 720K disk
+            long imageSize = Files.size(imgFiles.getFirst());
+            assertTrue(imageSize < 800_000,
+                    "Should use 720K template (~737KB) for 512KB ROM, got " + imageSize + " bytes");
+        }
 
         // Verify cleanup: no split parts should remain (small ROM doesn't split)
         // FIG format uses .1, .2, .3 extensions
@@ -295,10 +297,12 @@ class FloppyConvertE2ETest {
         assertTrue(Files.isDirectory(gameOutputDir), "Output should be a directory");
 
         // Verify .img files were created
-        List<Path> imgFiles = Files.list(gameOutputDir)
-                .filter(p -> p.toString().endsWith(".img"))
-                .collect(Collectors.toList());
-        assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
+        try (var stream = Files.list(gameOutputDir)) {
+            List<Path> imgFiles = stream
+                    .filter(p -> p.toString().endsWith(".img"))
+                    .toList();
+            assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
+        }
 
         // Verify cleanup: no split parts should remain
         // FIG format uses .1, .2, .3 extensions
@@ -361,10 +365,12 @@ class FloppyConvertE2ETest {
         assertTrue(Files.isDirectory(outputDir), "Output should be a directory");
 
         // Verify .img files were created
-        List<Path> imgFiles = Files.list(gameOutputDir)
-                .filter(p -> p.toString().endsWith(".img"))
-                .collect(Collectors.toList());
-        assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
+        try (var stream = Files.list(gameOutputDir)) {
+            List<Path> imgFiles = stream
+                    .filter(p -> p.toString().endsWith(".img"))
+                    .toList();
+            assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
+        }
 
         // Verify cleanup: no split parts should remain
         // FIG format uses .1, .2, .3 extensions
