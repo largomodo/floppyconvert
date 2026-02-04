@@ -72,25 +72,23 @@ public class SyntheticRomFactory {
         byte[] data = new byte[sizeBytes];
         Arrays.fill(data, (byte) 0xFF);
 
-        int headerBase = headerOffset;
+        writeString(data, headerOffset + 0x10, title, 21);
 
-        writeString(data, headerBase + 0x10, title, 21);
-
-        data[headerBase + 0x25] = mapType;
-        data[headerBase + 0x26] = romType;
-        data[headerBase + 0x27] = calculateRomSizeByte(sizeMbit);
-        data[headerBase + 0x28] = calculateSramSizeByte(sramSizeKb);
-        data[headerBase + 0x29] = 0x01;
-        data[headerBase + 0x2A] = 0x01;
-        data[headerBase + 0x2B] = 0x00;
+        data[headerOffset + 0x25] = mapType;
+        data[headerOffset + 0x26] = romType;
+        data[headerOffset + 0x27] = calculateRomSizeByte(sizeMbit);
+        data[headerOffset + 0x28] = calculateSramSizeByte(sramSizeKb);
+        data[headerOffset + 0x29] = 0x01;
+        data[headerOffset + 0x2A] = 0x01;
+        data[headerOffset + 0x2B] = 0x00;
 
         int checksum = calculateChecksum(data);
         int complement = checksum ^ 0xFFFF;
-        writeWord(data, headerBase + 0x2C, complement);
-        writeWord(data, headerBase + 0x2E, checksum);
+        writeWord(data, headerOffset + 0x2C, complement);
+        writeWord(data, headerOffset + 0x2E, checksum);
 
-        data[headerBase + 0x3C] = (byte) 0x00;
-        data[headerBase + 0x3D] = (byte) 0x80;
+        data[headerOffset + 0x3C] = (byte) 0x00;
+        data[headerOffset + 0x3D] = (byte) 0x80;
 
         Files.write(outputPath, data);
         return outputPath;

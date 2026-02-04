@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class ConversionWorkspaceTest {
 
@@ -35,8 +36,9 @@ class ConversionWorkspaceTest {
 
     @Test
     void testGetWorkDir() {
-        ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test");
-        assertEquals(tempDir.resolve("TestRom.test"), workspace.getWorkDir());
+        try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
+            assertEquals(tempDir.resolve("TestRom.test"), workspace.getWorkDir());
+        }
     }
 
     @Test
@@ -126,7 +128,7 @@ class ConversionWorkspaceTest {
         // On Windows, this test simulates the file locking scenario
         boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
         if (!isWindows) {
-            dir.toFile().setWritable(false);
+            assumeTrue(dir.toFile().setWritable(false), "Could not make directory read-only");
         }
 
         try {
@@ -181,13 +183,14 @@ class ConversionWorkspaceTest {
         Path file = tempDir.resolve("artifact.tmp");
         Files.writeString(file, "content");
 
-        ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test");
-        workspace.track(file);
+        try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
+            workspace.track(file);
 
-        // Call close() multiple times
-        workspace.close();
-        workspace.close();
-        workspace.close();
+            // Call close() multiple times
+            workspace.close();
+            workspace.close();
+            workspace.close();
+        }
 
         // File should be deleted only once, no errors
         assertFalse(Files.exists(file));
@@ -195,8 +198,9 @@ class ConversionWorkspaceTest {
 
     @Test
     void testEmptyWorkspaceClosesWithoutError() {
-        ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test");
-        assertDoesNotThrow(workspace::close);
+        try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
+            // Empty workspace - close() called automatically by try-with-resources
+        }
     }
 
     @Test
@@ -229,9 +233,10 @@ class ConversionWorkspaceTest {
         Files.createDirectories(finalDir);
         Files.writeString(workspaceFile, "test content");
 
-        ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test");
-        workspace.track(workspaceFile);
-        workspace.promoteToFinal(workspaceFile, finalDir);
+        try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
+            workspace.track(workspaceFile);
+            workspace.promoteToFinal(workspaceFile, finalDir);
+        }
 
         Path expectedTarget = finalDir.resolve("artifact.tmp");
         assertTrue(Files.exists(expectedTarget), "File should exist at target location");
@@ -269,8 +274,9 @@ class ConversionWorkspaceTest {
         Path targetFile = finalDir.resolve("artifact.tmp");
         Files.writeString(targetFile, "old content");
 
-        ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test");
-        workspace.promoteToFinal(workspaceFile, finalDir);
+        try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
+            workspace.promoteToFinal(workspaceFile, finalDir);
+        }
 
         String stderr = errContent.toString();
         assertTrue(stderr.contains("Overwriting existing file:"),
@@ -291,9 +297,10 @@ class ConversionWorkspaceTest {
         Files.createDirectories(finalDir);
         Files.writeString(workspaceFile, "test content");
 
-        ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test");
-        workspace.track(workspaceFile);
-        workspace.promoteToFinal(workspaceFile, finalDir);
+        try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
+            workspace.track(workspaceFile);
+            workspace.promoteToFinal(workspaceFile, finalDir);
+        }
 
         Path expectedTarget = finalDir.resolve("artifact.tmp");
         assertTrue(Files.exists(expectedTarget), "File should exist at target after move");
@@ -309,23 +316,24 @@ class ConversionWorkspaceTest {
         Files.createDirectories(finalDir);
         Files.writeString(workspaceFile, "test content");
 
-        ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test");
-        workspace.track(workspaceFile);
+        try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
+            workspace.track(workspaceFile);
 
-        // First call
-        workspace.promoteToFinal(workspaceFile, finalDir);
-        Path expectedTarget = finalDir.resolve("artifact.tmp");
-        assertTrue(Files.exists(expectedTarget), "File should exist after first call");
+            // First call
+            workspace.promoteToFinal(workspaceFile, finalDir);
+            Path expectedTarget = finalDir.resolve("artifact.tmp");
+            assertTrue(Files.exists(expectedTarget), "File should exist after first call");
 
-        // Second call with same arguments (source no longer exists, but should not throw)
-        // Re-create source to test idempotency
-        Files.writeString(workspaceFile, "test content 2");
-        workspace.track(workspaceFile);
-        workspace.promoteToFinal(workspaceFile, finalDir);
+            // Second call with same arguments (source no longer exists, but should not throw)
+            // Re-create source to test idempotency
+            Files.writeString(workspaceFile, "test content 2");
+            workspace.track(workspaceFile);
+            workspace.promoteToFinal(workspaceFile, finalDir);
 
-        // Should overwrite without error
-        assertTrue(Files.exists(expectedTarget), "File should still exist after second call");
-        assertEquals("test content 2", Files.readString(expectedTarget), "Content should be updated");
+            // Should overwrite without error
+            assertTrue(Files.exists(expectedTarget), "File should still exist after second call");
+            assertEquals("test content 2", Files.readString(expectedTarget), "Content should be updated");
+        }
     }
 
     @Test
@@ -339,11 +347,12 @@ class ConversionWorkspaceTest {
         Files.createDirectories(finalDir);
         Files.writeString(workspaceFile, "test content");
 
-        ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test");
-        workspace.track(workspaceFile);
+        try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
+            workspace.track(workspaceFile);
 
-        // This should complete successfully regardless of delete success
-        assertDoesNotThrow(() -> workspace.promoteToFinal(workspaceFile, finalDir));
+            // This should complete successfully regardless of delete success
+            assertDoesNotThrow(() -> workspace.promoteToFinal(workspaceFile, finalDir));
+        }
 
         Path expectedTarget = finalDir.resolve("artifact.tmp");
         assertTrue(Files.exists(expectedTarget), "Target file should exist");
@@ -357,22 +366,27 @@ class ConversionWorkspaceTest {
         // Make file read-only and its directory unwritable on Unix to simulate delete failure
         boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
         if (!isWindows) {
-            file.toFile().setReadOnly();
-            Files.setPosixFilePermissions(tempDir, PosixFilePermissions.fromString("r-xr-xr-x"));
+            assumeTrue(file.toFile().setReadOnly(), "Could not make file read-only");
+            try {
+                Files.setPosixFilePermissions(tempDir, PosixFilePermissions.fromString("r-xr-xr-x"));
+            } catch (IOException | UnsupportedOperationException e) {
+                assumeTrue(false, "Platform does not support POSIX file permissions");
+            }
         }
-
-        ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test");
-        workspace.track(file);
 
         try {
             if (!isWindows) {
-                CleanupException ex = assertThrows(CleanupException.class, workspace::close);
+                CleanupException ex = assertThrows(CleanupException.class, () -> {
+                    try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
+                        workspace.track(file);
+                    }
+                });
                 assertEquals(1, ex.getSuppressed().length, "Should have one suppressed exception");
                 assertTrue(ex.getMessage().contains("1 failure(s)"), "Message should indicate failure count");
             } else {
-                // On Windows, file locking behavior is different - test may not fail
-                // This documents the platform-specific behavior
-                workspace.close();
+                try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
+                    workspace.track(file);
+                }
             }
         } finally {
             // Restore permissions for cleanup
@@ -393,22 +407,30 @@ class ConversionWorkspaceTest {
         // Make both files read-only on Unix to simulate delete failures
         boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
         if (!isWindows) {
-            file1.toFile().setReadOnly();
-            file2.toFile().setReadOnly();
-            Files.setPosixFilePermissions(tempDir, PosixFilePermissions.fromString("r-xr-xr-x"));
+            assumeTrue(file1.toFile().setReadOnly(), "Could not make file1 read-only");
+            assumeTrue(file2.toFile().setReadOnly(), "Could not make file2 read-only");
+            try {
+                Files.setPosixFilePermissions(tempDir, PosixFilePermissions.fromString("r-xr-xr-x"));
+            } catch (IOException | UnsupportedOperationException e) {
+                assumeTrue(false, "Platform does not support POSIX file permissions");
+            }
         }
-
-        ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test");
-        workspace.track(file1);
-        workspace.track(file2);
 
         try {
             if (!isWindows) {
-                CleanupException ex = assertThrows(CleanupException.class, workspace::close);
+                CleanupException ex = assertThrows(CleanupException.class, () -> {
+                    try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
+                        workspace.track(file1);
+                        workspace.track(file2);
+                    }
+                });
                 assertEquals(2, ex.getSuppressed().length, "Should have two suppressed exceptions");
                 assertTrue(ex.getMessage().contains("2 failure(s)"), "Message should indicate failure count");
             } else {
-                workspace.close();
+                try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
+                    workspace.track(file1);
+                    workspace.track(file2);
+                }
             }
         } finally {
             // Restore permissions
@@ -430,12 +452,13 @@ class ConversionWorkspaceTest {
         Files.createDirectories(finalDir);
         Files.writeString(workspaceFile, "test content");
 
-        ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test");
-        workspace.track(workspaceFile);
+        try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
+            workspace.track(workspaceFile);
 
-        // In normal conditions, promoteToFinal succeeds
-        // The exception chain preservation is tested by the implementation
-        assertDoesNotThrow(() -> workspace.promoteToFinal(workspaceFile, finalDir));
+            // In normal conditions, promoteToFinal succeeds
+            // The exception chain preservation is tested by the implementation
+            assertDoesNotThrow(() -> workspace.promoteToFinal(workspaceFile, finalDir));
+        }
 
         Path expectedTarget = finalDir.resolve("artifact.tmp");
         assertTrue(Files.exists(expectedTarget), "Target file should exist");

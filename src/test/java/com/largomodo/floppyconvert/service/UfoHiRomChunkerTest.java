@@ -37,14 +37,14 @@ class UfoHiRomChunkerTest {
 
         assertFalse(chunks.isEmpty(), "Chunk list must not be empty");
 
-        byte lastFlag = chunks.get(chunks.size() - 1).flag();
+        byte lastFlag = chunks.getLast().flag();
         if (sizeMbit == 2) {
             assertEquals((byte) 0x10, lastFlag, "2Mbit single-part must have flag 0x10");
         } else {
             assertEquals((byte) 0x00, lastFlag, "Last chunk must have flag 0x00");
         }
 
-        byte firstFlag = chunks.get(0).flag();
+        byte firstFlag = chunks.getFirst().flag();
         assertTrue(firstFlag == (byte) 0x40 || firstFlag == (byte) 0x10,
                 "First chunk must have flag 0x40 or 0x10");
     }
@@ -54,8 +54,8 @@ class UfoHiRomChunkerTest {
         List<UfoChunk> chunks = UfoHiRomChunker.computeChunks(2);
 
         assertEquals(1, chunks.size(), "2Mbit ROM should produce 1 chunk");
-        assertEquals(2, chunks.get(0).sizeMbit(), "Chunk size should be 2 Mbit");
-        assertEquals((byte) 0x10, chunks.get(0).flag(), "2Mbit single-part flag should be 0x10");
+        assertEquals(2, chunks.getFirst().sizeMbit(), "Chunk size should be 2 Mbit");
+        assertEquals((byte) 0x10, chunks.getFirst().flag(), "2Mbit single-part flag should be 0x10");
     }
 
     @Test

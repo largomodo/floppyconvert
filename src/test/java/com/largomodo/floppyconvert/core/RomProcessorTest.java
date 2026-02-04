@@ -195,10 +195,6 @@ class RomProcessorTest {
 
         assertEquals("Splitter failure", ex.getMessage());
 
-        // Verify workspace cleanup: work directory should be removed
-        // ConversionWorkspace creates subdirectory under outputDir
-        Path workDir = outputDir.resolve("FailGame");
-
         // If workspace cleanup worked, directory should not exist (or be empty if cleanup failed)
         // We can't directly test ConversionWorkspace cleanup without integration test,
         // but we verify exception propagates correctly

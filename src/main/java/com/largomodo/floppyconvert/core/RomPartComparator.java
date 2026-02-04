@@ -78,7 +78,7 @@ public class RomPartComparator implements Comparator<File> {
             }
         }
 
-        if (numStr.length() > 0) {
+        if (!numStr.isEmpty()) {
             try {
                 return Integer.parseInt(numStr.toString());
             } catch (NumberFormatException e) {
