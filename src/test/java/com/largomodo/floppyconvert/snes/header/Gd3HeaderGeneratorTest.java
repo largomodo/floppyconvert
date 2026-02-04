@@ -1,8 +1,10 @@
 package com.largomodo.floppyconvert.snes.header;
 
 import com.largomodo.floppyconvert.snes.RomType;
+import com.largomodo.floppyconvert.snes.SnesConstants;
 import com.largomodo.floppyconvert.snes.SnesRom;
 import net.jqwik.api.*;
+import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -330,5 +332,39 @@ class Gd3HeaderGeneratorTest {
                 0,            // checksum
                 0             // complement
         );
+    }
+
+    @Test
+    void testTalesOfPhantasiaHeaderOverrides() {
+        SnesRom genericRom = new SnesRom(
+                new byte[8 * SnesConstants.MBIT],
+                RomType.HiROM,
+                64 * 1024,
+                "GENERIC GAME TITLE",
+                false,
+                (byte) 0x00,
+                (byte) 0x01,
+                (byte) 0x00,
+                0x0000,
+                0xFFFF
+        );
+        byte[] genericHeader = generator.generateHeader(genericRom, 8 * SnesConstants.MBIT, 0, true, (byte) 0x00);
+        assertNotEquals(0x40, genericHeader[0x17] & 0xFF);
+
+        SnesRom rom = new SnesRom(
+                new byte[8 * SnesConstants.MBIT],
+                RomType.HiROM,
+                64 * 1024,
+                "TALES OF PHANTASIA",
+                false,
+                (byte) 0x00,
+                (byte) 0x36,
+                (byte) 0x00,
+                0x0000,
+                0xFFFF
+        );
+
+        byte[] header = generator.generateHeader(rom, 8 * SnesConstants.MBIT, 0, true, (byte) 0x00);
+        assertEquals(0x40, header[0x17] & 0xFF);
     }
 }

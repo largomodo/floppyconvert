@@ -1,5 +1,7 @@
 package com.largomodo.floppyconvert.snes;
 
+import com.largomodo.floppyconvert.snes.SnesConstants;
+
 /**
  * Handles SNES ROM interleaving for Game Doctor (GD3) format.
  * <p>
@@ -29,9 +31,20 @@ public class SnesInterleaver {
      * The second 4Mbit (512KB) of destination receives the LOWER 32KB of each 64KB source block.
      *
      * @param input Raw linear ROM data
+     * @param type ROM memory map type (LoROM/HiROM/ExHiROM)
      * @return Interleaved and mirrored data
      */
-    public byte[] interleave(byte[] input) {
+    public byte[] interleave(byte[] input, RomType type) {
+        // LoROM requires no interleaving (GD3 copier specification applies only to HiROM/ExHiROM per ucon64 snes.c:1148-1160)
+        if (type == RomType.LoROM) {
+            return input;
+        }
+
+        // ExHiROM base ROM (32Mbit @banks C0-FF) and expansion (@banks 40-7D) require separate interleaving to preserve bank boundaries per ucon64 snes.c:1148-1160
+        if (type == RomType.ExHiROM) {
+            return splitInterleave(input);
+        }
+
         // 1. Extend input to nearest 8Mbit boundary using mirroring (Hardware requirement)
         byte[] source = mirrorTo8Mbit(input);
         byte[] dest = new byte[source.length];
@@ -55,6 +68,74 @@ public class SnesInterleaver {
             System.arraycopy(source, srcBlockOffset, dest, destUpperOffset, BLOCK_32KB);
 
             // Copy Src Upper 32K to Dest Lower Half
+            System.arraycopy(source, srcBlockOffset + BLOCK_32KB, dest, destLowerOffset, BLOCK_32KB);
+        }
+
+        return dest;
+    }
+
+    /**
+     * Split-interleaves ExHiROM data (base 32Mbit + expansion separately).
+     * <p>
+     * <b>Algorithm Strategy:</b>
+     * ExHiROM layout: First 32Mbit (base ROM) mapped to $C0-$FF banks.
+     * Remaining data (expansion) mapped to $40-$7D banks.
+     * Single-pass interleaving would corrupt bank boundaries; hardware requires
+     * separate interleaving per section to maintain bank integrity.
+     * <p>
+     * <b>Steps:</b>
+     * 1. Split input at 32Mbit boundary (base vs expansion)
+     * 2. Interleave base independently
+     * 3. Interleave expansion independently
+     * 4. Concatenate interleaved sections
+     * <p>
+     * <b>Invariants:</b>
+     * - Split boundary at exactly 32Mbit (4,194,304 bytes) per SNES memory map
+     * - Each section interleaved separately (no cross-section block mapping)
+     * - Output size equals input size (data preservation)
+     * <p>
+     * Ported from ucon64 snes.c snes_int_blocks ExHiROM branch (lines 1148-1160).
+     */
+    private byte[] splitInterleave(byte[] input) {
+        // 32Mbit boundary separates base ROM (banks $C0-$FF) from expansion (banks $40-$7D)
+        // Bank boundary integrity required for ExHiROM hardware mapping
+        int splitBoundary = 32 * SnesConstants.MBIT; // 32Mbit = 4,194,304 bytes
+        byte[] base = new byte[Math.min(input.length, splitBoundary)];
+        System.arraycopy(input, 0, base, 0, base.length);
+
+        byte[] interleavedBase = interleaveBlock(base);
+
+        if (input.length <= splitBoundary) {
+            return interleavedBase;
+        }
+
+        byte[] expansion = new byte[input.length - splitBoundary];
+        System.arraycopy(input, splitBoundary, expansion, 0, expansion.length);
+        byte[] interleavedExpansion = interleaveBlock(expansion);
+
+        byte[] result = new byte[interleavedBase.length + interleavedExpansion.length];
+        System.arraycopy(interleavedBase, 0, result, 0, interleavedBase.length);
+        System.arraycopy(interleavedExpansion, 0, result, interleavedBase.length, interleavedExpansion.length);
+        return result;
+    }
+
+    /**
+     * Interleaves a single ROM block (base or expansion).
+     * Reusable for both single-block and split-interleave operations.
+     */
+    private byte[] interleaveBlock(byte[] input) {
+        byte[] source = mirrorTo8Mbit(input);
+        byte[] dest = new byte[source.length];
+
+        int halfSize = source.length / 2;
+        int numBlocks = source.length / BLOCK_64KB;
+
+        for (int i = 0; i < numBlocks; i++) {
+            int srcBlockOffset = i * BLOCK_64KB;
+            int destLowerOffset = i * BLOCK_32KB;
+            int destUpperOffset = halfSize + (i * BLOCK_32KB);
+
+            System.arraycopy(source, srcBlockOffset, dest, destUpperOffset, BLOCK_32KB);
             System.arraycopy(source, srcBlockOffset + BLOCK_32KB, dest, destLowerOffset, BLOCK_32KB);
         }
 

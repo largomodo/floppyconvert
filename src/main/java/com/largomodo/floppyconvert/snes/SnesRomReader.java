@@ -129,6 +129,11 @@ public class SnesRomReader {
             score += 2;
         }
 
+        // Map Mode byte at 0x15 with value 0x25 indicates Extended HiROM mapping per SNES specification
+        if ((data[base + 0x15] & 0xFF) == 0x25) {
+            score += 10;
+        }
+
         // ROM Size reasonable (<= 64Mbit) (ucon64: score += 1)
         int romSize = data[base + 0x27] & 0xFF;
         if (romSize >= 7 && romSize <= 13) { // 1Mbit to 64Mbit

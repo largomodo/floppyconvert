@@ -1,5 +1,6 @@
 package com.largomodo.floppyconvert.snes.header;
 
+import com.largomodo.floppyconvert.snes.SpecialCaseRegistry;
 import com.largomodo.floppyconvert.snes.SnesRom;
 
 import java.nio.charset.StandardCharsets;
@@ -109,10 +110,8 @@ public class Gd3HeaderGenerator implements HeaderGenerator {
 
             // SRAM mapping for HiROM
             if (rom.sramSize() > 0) {
-                // Check for specific large games that need special SRAM mapping
-                // Tales of Phantasia (J) & Dai Kaiju Monogatari 2 (J)
-                boolean isTop = rom.maker() == 0x36 && rom.title().startsWith("TALES OF PHANTASIA"); // Namco
-                boolean isDkm2 = rom.maker() == 0x18 && rom.title().startsWith("DAIKAIJYU MONOGATARI2"); // Hudson
+                boolean isTop = SpecialCaseRegistry.isTalesOfPhantasia(rom);
+                boolean isDkm2 = SpecialCaseRegistry.isDaiKaijuMonogatari2(rom);
 
                 if (isTop || isDkm2) {
                     if (isTop) {

@@ -54,7 +54,7 @@ public class UfoHiRomChunker {
                 return entry;
             }
         }
-        return LOOKUP_TABLE[4];
+        throw new IllegalArgumentException("UFO hardware does not support HiROM size: " + sizeMbit + " Mbit");
     }
 
     /**

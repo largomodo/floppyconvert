@@ -16,10 +16,20 @@ Input ROM File
      |                  +---> SRAM size, DSP flag, title
      |
      v
-[Conditional: GD3 + HiROM only]
+[HardwareValidator] ---> Validate ROM/format compatibility
+     |                        |
+     |                        v
+     |                   Format-specific checks:
+     |                     - UFO: HiROM ≤32Mbit, LoROM ≤36Mbit
+     |                     - GD3: ExHiROM ≤64Mbit, HiROM/LoROM ≤32Mbit
+     |                     - Throws UnsupportedHardwareException
+     |
+     v
+[Conditional: GD3 + HiROM/ExHiROM only]
      |
      v
 [SnesInterleaver] ---> byte[] interleaved data
+     |                   (ExHiROM: split-interleave at 32Mbit boundary)
      |
      v
 [NativeRomSplitter] ---> Split calculation (4Mbit/8Mbit boundaries)
@@ -39,6 +49,48 @@ Output: List<File> (split ROM parts)
      v
 [RomProcessor] ---> Pack into floppy disks (existing logic)
 ```
+
+## Validation Architecture
+
+```
+               ┌─────────────────────────────────────────────────────────┐
+               │                    NativeRomSplitter                    │
+               │  (entry point for format-specific ROM splitting)        │
+               └─────────────────────────────────────────────────────────┘
+                                         │
+                    ┌────────────────────┼────────────────────┐
+                    ▼                    ▼                    ▼
+          ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+          │ HardwareValidator│  │  SnesInterleaver │  │ HeaderGenerator │
+          │   (NEW)          │  │  (MODIFIED)      │  │ (existing)      │
+          │                  │  │                  │  │                 │
+          │ validate(rom,    │  │ interleave(data, │  │ generateHeader( │
+          │   format)        │  │   romType)       │  │   rom, ...)     │
+          └─────────────────┘  └─────────────────┘  └─────────────────┘
+                    │                    │                    │
+         ┌──────────┴──────────┐         │         ┌─────────┴─────────┐
+         ▼                     ▼         │         ▼                   ▼
+┌─────────────────┐ ┌─────────────────┐  │  ┌─────────────┐ ┌─────────────────┐
+│UfoHardwareValid.│ │Gd3HardwareValid.│  │  │  Gd3Header  │ │SpecialCaseReg.  │
+│                 │ │                 │  │  │  Generator  │ │  (NEW static)   │
+│ Rejects HiROM   │ │ Rejects HiROM   │  │  │             │ │                 │
+│ > 32Mbit        │ │ > 32Mbit        │  │  │ Uses        │ │ isTalesOf...()  │
+│                 │ │ (unless ExHiROM)│  │  │ Registry    │ │ isDaiKaiju...() │
+└─────────────────┘ └─────────────────┘  │  └─────────────┘ └─────────────────┘
+                                         │
+                                         ▼
+                              ┌─────────────────────┐
+                              │ ExHiROM handling:   │
+                              │ - Split at 32Mbit   │
+                              │ - Interleave base   │
+                              │ - Interleave expan. │
+                              │ - Concatenate       │
+                              └─────────────────────┘
+```
+
+**HardwareValidator** enforces copier-specific constraints before splitting. Different backup unit formats have distinct memory mapping limitations. The interface enables format-specific validation strategies following the HeaderGenerator pattern.
+
+**SpecialCaseRegistry** provides game-specific detection for ROMs requiring non-standard header values (e.g., Tales of Phantasia, Dai Kaiju Monogatari 2). Static utility pattern matches immutable ROM records.
 
 ## Data Flow
 
@@ -243,6 +295,18 @@ List<File> (split parts)
 - Per-chunk iteration would break 64KB block boundaries for multi-chunk ROMs causing corruption
 - Matches ucon64 reference implementation: single pass over entire buffer with global offset
 
+### Hardware Validation Invariants
+
+**1. Validation precedes splitting**: HardwareValidator.validate() must be called before any format-specific logic in NativeRomSplitter. CopierFormat is only known at split time, making NativeRomSplitter the correct entry point for validation.
+
+**2. ExHiROM split-interleave order**: Base 32Mbit interleaved THEN expansion interleaved THEN concatenated (not interleaved as single block). ExHiROM layout: first 32Mbit (base ROM) mapped to $C0-$FF banks, remaining data (expansion) mapped to $40-$7D banks. Single-pass interleaving would corrupt bank boundaries.
+
+**3. UFO HiROM ceiling**: 32Mbit maximum for HiROM, enforced at two levels (validator + chunker exception). UFO hardware cannot map HiROM banks beyond $40. Reference: ucon64 snes.c:1445 explicit rejection.
+
+**4. GD3 ExHiROM ceiling**: 64Mbit maximum (limited by existing memory map tables in Gd3HeaderGenerator). Standard HiROM and LoROM limited to 32Mbit.
+
+**5. Exception logging**: UnsupportedHardwareException must be logged at throw site (caller's responsibility). RuntimeException enables fail-fast validation without catch blocks at every call site.
+
 ### GD3 HiROM Force-Split (≤16Mbit)
 
 - GD3 HiROM ROMs ≤16Mbit (2MB) force 4Mbit chunks instead of default 8Mbit
@@ -258,7 +322,7 @@ List<File> (split parts)
 - UfoHiRomChunker provides lookup table with 5 size variants (2, 4, 12, 20, 32 Mbit)
 - Multi-file flags (0x40/0x10/0x00) indicate copier memory window progression (position-based)
 - Flag encoding from ucon64 size_to_flags table (not derived from individual chunk sizes)
-- 32Mbit table fallback for unsupported sizes (supports up to 8 parts)
+- Chunker throws IllegalArgumentException for unsupported sizes (defensive, after validator)
 - LoROM UFO uses standard 4Mbit chunks (no lookup table)
 
 ## Binary Compatibility

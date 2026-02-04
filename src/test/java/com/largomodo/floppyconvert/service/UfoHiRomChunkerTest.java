@@ -128,19 +128,11 @@ class UfoHiRomChunkerTest {
     }
 
     @Test
-    void testFallbackTo32Mbit_UnsupportedSize() {
-        List<UfoChunk> chunks48 = UfoHiRomChunker.computeChunks(48);
-        List<UfoChunk> chunks32 = UfoHiRomChunker.computeChunks(32);
+    void testUnsupportedSize_ThrowsException() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> UfoHiRomChunker.computeChunks(48));
 
-        assertEquals(chunks32.size(), chunks48.size(),
-                "48Mbit ROM should use 32Mbit table (fallback)");
-
-        for (int i = 0; i < chunks32.size(); i++) {
-            assertEquals(chunks32.get(i).sizeMbit(), chunks48.get(i).sizeMbit(),
-                    "Chunk sizes should match 32Mbit table");
-            assertEquals(chunks32.get(i).flag(), chunks48.get(i).flag(),
-                    "Chunk flags should match 32Mbit table");
-        }
+        assertTrue(exception.getMessage().contains("UFO hardware does not support HiROM size: 48 Mbit"));
     }
 
     @Test
