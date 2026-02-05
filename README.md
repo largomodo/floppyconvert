@@ -1,6 +1,6 @@
 # FloppyConvert
 
-FloppyConvert is a CLI utility designed to automate the conversion of SNES ROM files (`.sfc`, `.fig`, `.smw`, `.swc`, `.ufo`) into FAT12 floppy disk images compatible with vintage backup units.
+FloppyConvert is a CLI utility designed to automate the conversion of SNES ROM files (`.sfc`, `.fig`, `.swc`, `.ufo`) into FAT12 floppy disk images compatible with vintage backup units.
 
 It uses a native Java ROM splitting engine to generate format-specific split files (FIG, SWC, UFO, GD3) with accurate copier headers, then packages them into FAT12 floppy images using a custom FAT12 writer. The tool supports recursive directory scanning, concurrent batch processing, and intelligent workspace management.
 
