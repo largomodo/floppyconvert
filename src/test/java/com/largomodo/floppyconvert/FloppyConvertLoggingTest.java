@@ -7,8 +7,9 @@ import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.FileAppender;
 import ch.qos.logback.core.read.ListAppender;
+import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory;
+import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory.DspChipset;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -18,7 +19,6 @@ import picocli.CommandLine;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -36,7 +36,7 @@ class FloppyConvertLoggingTest {
     @TempDir
     Path tempDir;
 
-    private byte[] templateRomData;
+    private Path romPath;
     private ListAppender<ILoggingEvent> listAppender;
     private FileAppender<ILoggingEvent> testFileAppender;
     private Logger rootLogger;
@@ -45,11 +45,7 @@ class FloppyConvertLoggingTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        // Load real ROM file from test resources for MDC test
-        Path templateRom = Paths.get("src/test/resources/snes/Super Mario World (USA).sfc");
-        if (Files.exists(templateRom)) {
-            templateRomData = Files.readAllBytes(templateRom);
-        }
+        romPath = SyntheticRomFactory.generateLoRom(4, 0, DspChipset.ABSENT, "LOGTEST4L", tempDir);
 
         // Set up test logging infrastructure
         LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
@@ -126,14 +122,11 @@ class FloppyConvertLoggingTest {
 
     @Test
     void testMdcContextInBatch() throws Exception {
-        // Skip if ucon64 or template ROM not available
-        Assumptions.assumeTrue(templateRomData != null, "Template ROM not available");
-
         // Create input directory with a ROM file
         Path inputDir = tempDir.resolve("input");
         Files.createDirectories(inputDir);
-        Path romFile = inputDir.resolve("TestRom.sfc");
-        Files.write(romFile, templateRomData);
+        Path romFile = inputDir.resolve("LOGTEST4L.sfc");
+        Files.copy(romPath, romFile);
 
         Path outputDir = tempDir.resolve("output");
 
@@ -158,13 +151,13 @@ class FloppyConvertLoggingTest {
         String logContent = Files.readString(testLogFile);
 
         // The pattern is: %d{HH:mm:ss.SSS} [%thread] [%X{rom}] %-5level %logger{36} - %msg%n
-        // Check that the log contains [TestRom.sfc] which is the MDC context
-        assertTrue(logContent.contains("[TestRom.sfc]"),
-                "Log file should contain MDC context [TestRom.sfc]. Log content:\n" + logContent);
+        // Check that the log contains [LOGTEST4L.sfc] which is the MDC context
+        assertTrue(logContent.contains("[LOGTEST4L.sfc]"),
+                "Log file should contain MDC context [LOGTEST4L.sfc]. Log content:\n" + logContent);
 
         // Verify the MDC context appears alongside processing messages
-        boolean hasMdcWithProcessing = logContent.contains("[TestRom.sfc]") &&
-                logContent.contains("Processing: TestRom.sfc");
+        boolean hasMdcWithProcessing = logContent.contains("[LOGTEST4L.sfc]") &&
+                logContent.contains("Processing: LOGTEST4L.sfc");
 
         assertTrue(hasMdcWithProcessing,
                 "Log should contain both MDC context and processing messages");

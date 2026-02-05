@@ -185,4 +185,48 @@ This design matches Game Doctor hardware behavior:
 - Subsequent files are loaded by first file's code (raw data only)
 
 Adding headers to all parts (like FIG does) would break compatibility because Game Doctor expects raw data in parts > 0.
-```
+
+## Test ROM Files
+
+### Real ROM Checksums
+
+The test suite uses real SNES ROM files when available for high-fidelity hardware compatibility testing. The expected SHA1 checksums are:
+
+| ROM File | SHA1 Checksum |
+|----------|---------------|
+| ActRaiser 2 (USA).sfc | `17c086f3418f7f51e5472270d756ec5112914b83` |
+| Art of Fighting (USA).sfc | `db0ed085bd28bf58ec050e6eb950471163f8367e` |
+| Breath of Fire (USA).sfc | `b8a9e3023b92e0f4139428f6d7a9e0f9db70f60e` |
+| Chrono Trigger (USA).sfc | `de5822f4f2f7a55acb8926d4c0eaa63d5d989312` |
+| Street Fighter II Turbo (USA) (Rev 1).sfc | `9f6e8f2585e60bd6690c068c692ac97653bae6a6` |
+| Super Bomberman 2 (USA).sfc | `14e4d0b3d00fd04f996eea86daa485a35e501853` |
+| Super Mario World (USA).sfc | `6b47bb75d16514b6a476aa0c73a683a2a4c18765` |
+
+### Synthetic ROM Fallback
+
+Tests automatically fall back to synthetic ROMs when real ROM files are unavailable. This ensures tests run successfully on clean checkouts without requiring users to obtain ROM files.
+
+The `TestRomProvider.getRomOrSynthetic()` method implements this behavior:
+- First attempts to load the real ROM from `src/test/resources/snes/`
+- Falls back to generating a synthetic ROM with matching characteristics if file not found
+- Synthetic ROMs have valid SNES headers and checksum integrity but contain generated data
+
+### Test Categories
+
+| Test File | ROM Source |
+|-----------|------------|
+| `FloppyConvertE2ETest` | Real or Synthetic (fallback) |
+| `FloppyConvertLoggingTest` | Synthetic only |
+| `FloppyConvertConcurrencyTest` | Synthetic only |
+| `FloppyConvertRecursionTest` | Synthetic only |
+| `SnesRomReaderTest` | Synthetic only |
+
+### Obtaining Real ROMs
+
+To use real ROM files for testing:
+
+1. Obtain legal copies of the ROM files listed above
+2. Place them in `src/test/resources/snes/`
+3. Verify checksums match the table above using `sha1sum`
+
+Tests will automatically detect and use real ROMs when present. On clean checkouts without ROM files, tests use synthetic fallback and still pass all validations.

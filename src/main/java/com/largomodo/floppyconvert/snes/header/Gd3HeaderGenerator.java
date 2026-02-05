@@ -1,7 +1,7 @@
 package com.largomodo.floppyconvert.snes.header;
 
-import com.largomodo.floppyconvert.snes.SpecialCaseRegistry;
 import com.largomodo.floppyconvert.snes.SnesRom;
+import com.largomodo.floppyconvert.snes.SpecialCaseRegistry;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -11,8 +11,6 @@ import java.util.Arrays;
  * <p>
  * Logic ported from {@code snes.c} (snes_set_gd3_header).
  * Header is only present on the first file (file.078).
- * <p>
- * Updates: Added extended memory maps for 40-64Mbit ROMs.
  */
 public class Gd3HeaderGenerator implements HeaderGenerator {
 
@@ -81,6 +79,7 @@ public class Gd3HeaderGenerator implements HeaderGenerator {
             0x2C, 0x2D, 0x2E, 0x2F, 0x24, 0x25, 0x26, 0x27
     };
     private final SramEncoder sramEncoder;
+
     public Gd3HeaderGenerator() {
         this.sramEncoder = new Gd3SramEncoder();
     }

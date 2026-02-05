@@ -8,13 +8,13 @@ import com.largomodo.floppyconvert.format.CopierFormat;
 import com.largomodo.floppyconvert.service.DefaultConversionFacade;
 import com.largomodo.floppyconvert.service.NativeRomSplitter;
 import com.largomodo.floppyconvert.service.fat.Fat12ImageWriter;
-import com.largomodo.floppyconvert.snes.RomType;
 import com.largomodo.floppyconvert.snes.SnesConstants;
 import com.largomodo.floppyconvert.snes.SnesInterleaver;
 import com.largomodo.floppyconvert.snes.SnesRomReader;
 import com.largomodo.floppyconvert.snes.UnsupportedHardwareException;
+import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory;
+import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory.DspChipset;
 import com.largomodo.floppyconvert.snes.header.HeaderGeneratorFactory;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -23,19 +23,13 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import picocli.CommandLine;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * End-to-end tests for the full ROM conversion pipeline.
@@ -113,14 +107,8 @@ class FloppyConvertE2ETest {
     @ParameterizedTest(name = "{0} - {1}")
     @MethodSource("formatAndRomProvider")
     void testFullConversionPipeline(CopierFormat format, String romResourcePath, @TempDir Path tempDir) throws Exception {
-        // Copy ROM file to temp directory
-        Path inputRom = tempDir.resolve("input.sfc");
-        try (InputStream is = getClass().getResourceAsStream(romResourcePath)) {
-            // Refactored: Skip test if resource is missing (Clean Checkout / CI support)
-            Assumptions.assumeTrue(is != null,
-                    "Test resource not found: " + romResourcePath + " - Skipping E2E test on clean checkout");
-            Files.copy(is, inputRom);
-        }
+        // Use real ROM if available, fallback to synthetic ROM based on registry spec
+        Path inputRom = TestRomProvider.getRomOrSynthetic(romResourcePath, tempDir);
 
         Path outputDir = tempDir.resolve("output");
 
@@ -137,9 +125,11 @@ class FloppyConvertE2ETest {
 
         // Verify output structure
         String baseName = inputRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        Path gameOutputDir = outputDir.resolve(baseName);
+        // Sanitize baseName to match RomProcessor behavior (replaces special chars with underscores)
+        String sanitizedBaseName = new RomPartNormalizer().sanitizeName(baseName);
+        Path gameOutputDir = outputDir.resolve(sanitizedBaseName);
 
-        assertTrue(Files.exists(gameOutputDir), "Game output directory not created: " + baseName);
+        assertTrue(Files.exists(gameOutputDir), "Game output directory not created: " + sanitizedBaseName);
         assertTrue(Files.isDirectory(gameOutputDir), "Expected directory: " + gameOutputDir);
 
         // Verify .img files were created and are non-empty
@@ -192,14 +182,8 @@ class FloppyConvertE2ETest {
 
     @Test
     void testSingleFileMode(@TempDir Path tempDir) throws Exception {
-        // Copy Super Mario World ROM to temp directory
-        Path testRom = tempDir.resolve("SuperMarioWorld.sfc");
-        try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
-            // Refactored: Skip test if resource is missing
-            Assumptions.assumeTrue(is != null,
-                    "Test resource not found: " + SUPER_MARIO_WORLD_RESOURCE + " - Skipping E2E test");
-            Files.copy(is, testRom);
-        }
+        // Use real ROM if available, fallback to synthetic ROM
+        Path testRom = TestRomProvider.getRomOrSynthetic(SUPER_MARIO_WORLD_RESOURCE, tempDir);
 
         Path outputDir = tempDir.resolve("output");
 
@@ -214,8 +198,10 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed");
 
-        // Verify output structure
-        Path gameOutputDir = outputDir.resolve("SuperMarioWorld");
+        // Verify output structure - compute sanitized base name from actual input file
+        String baseName = testRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
+        String sanitizedBaseName = new RomPartNormalizer().sanitizeName(baseName);
+        Path gameOutputDir = outputDir.resolve(sanitizedBaseName);
         assertTrue(Files.exists(gameOutputDir), "Output directory should exist");
         assertTrue(Files.isDirectory(gameOutputDir), "Output should be a directory");
 
@@ -264,16 +250,17 @@ class FloppyConvertE2ETest {
         String problematicFilename = "VLDC10 [#053] - ERROR CODE #1D4 (Update) by Sayuri [2017-04-02] (SMW Hack).sfc";
         Path testRom = tempDir.resolve(problematicFilename);
 
-        // Try to source from workspace or fallback to resource, skip if neither
+        // Try to source from workspace or fallback to TestRomProvider
         Path sourceRom = Path.of("/workspace", problematicFilename);
         if (Files.exists(sourceRom)) {
             Files.copy(sourceRom, testRom);
         } else {
-            try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
-                // Refactored: Skip test if resource is missing
-                Assumptions.assumeTrue(is != null, "Test resource not found: " + SUPER_MARIO_WORLD_RESOURCE);
-                Files.copy(is, testRom);
-            }
+            // Fallback to TestRomProvider (uses Super Mario World spec)
+            testRom = TestRomProvider.getRomOrSynthetic(SUPER_MARIO_WORLD_RESOURCE, tempDir);
+            // Rename to problematic filename for test
+            Path renamed = tempDir.resolve(problematicFilename);
+            Files.move(testRom, renamed);
+            testRom = renamed;
         }
 
         Path outputDir = tempDir.resolve("output");
@@ -336,11 +323,12 @@ class FloppyConvertE2ETest {
         if (Files.exists(sourceRom)) {
             Files.copy(sourceRom, testRom);
         } else {
-            try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
-                // Refactored: Skip test if resource is missing
-                Assumptions.assumeTrue(is != null, "Test resource not found: " + SUPER_MARIO_WORLD_RESOURCE);
-                Files.copy(is, testRom);
-            }
+            // Fallback to TestRomProvider (uses Super Mario World spec)
+            testRom = TestRomProvider.getRomOrSynthetic(SUPER_MARIO_WORLD_RESOURCE, tempDir);
+            // Rename to problematic filename for test
+            Path renamed = tempDir.resolve(problematicFilename);
+            Files.move(testRom, renamed);
+            testRom = renamed;
         }
 
         Path outputDir = tempDir.resolve("output");
@@ -394,13 +382,12 @@ class FloppyConvertE2ETest {
 
     @Test
     void testAlternativeExtension(@TempDir Path tempDir) throws Exception {
-
-        Path testRom = tempDir.resolve("ChronoTrigger.fig");
-        try (InputStream is = getClass().getResourceAsStream(CHRONO_TRIGGER_RESOURCE)) {
-            // Refactored: Skip test if resource is missing
-            Assumptions.assumeTrue(is != null, "Test resource not found: " + CHRONO_TRIGGER_RESOURCE);
-            Files.copy(is, testRom);
-        }
+        // Use real ROM if available, fallback to synthetic ROM
+        Path testRom = TestRomProvider.getRomOrSynthetic(CHRONO_TRIGGER_RESOURCE, tempDir);
+        // Rename to .fig extension for test
+        Path renamedRom = tempDir.resolve("ChronoTrigger.fig");
+        Files.move(testRom, renamedRom);
+        testRom = renamedRom;
 
         Path outputDir = tempDir.resolve("output");
 
@@ -434,8 +421,7 @@ class FloppyConvertE2ETest {
 
     @Test
     void testConvertSynthetic8MbitLoRomWithSwc(@TempDir Path tempDir) throws Exception {
-        Path syntheticRom = createSyntheticRom(tempDir, "test_8mbit_lorom.sfc",
-                8, RomType.LoROM, 0, false);
+        Path syntheticRom = SyntheticRomFactory.generateLoRom(8, 0, DspChipset.ABSENT, "test_8mbit_lorom", tempDir);
         Path outputDir = tempDir.resolve("output");
 
         int exitCode = new CommandLine(new FloppyConvert())
@@ -448,7 +434,10 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed for 8 Mbit LoROM");
 
-        Path gameOutputDir = outputDir.resolve("test_8mbit_lorom");
+        // Compute sanitized base name from actual input file
+        String baseName = syntheticRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
+        String sanitizedBaseName = new RomPartNormalizer().sanitizeName(baseName);
+        Path gameOutputDir = outputDir.resolve(sanitizedBaseName);
         assertTrue(Files.exists(gameOutputDir), "Game output directory not created");
 
         try (var imgFiles = Files.list(gameOutputDir)) {
@@ -461,8 +450,7 @@ class FloppyConvertE2ETest {
 
     @Test
     void testConvertSynthetic16MbitHiRomWithGd3(@TempDir Path tempDir) throws Exception {
-        Path syntheticRom = createSyntheticRom(tempDir, "test_16mbit_hirom.sfc",
-                16, RomType.HiROM, 0, false);
+        Path syntheticRom = SyntheticRomFactory.generateHiRom(16, 0, DspChipset.ABSENT, "test_16mbit_hirom", tempDir);
         Path outputDir = tempDir.resolve("output");
 
         int exitCode = new CommandLine(new FloppyConvert())
@@ -473,11 +461,12 @@ class FloppyConvertE2ETest {
                         "--format", "gd3"
                 );
 
-        if (exitCode != 0) {
-            Assumptions.abort("Known issue: GD3 X-padding creates DOS 8.3 name collisions for synthetic ROM titles");
-        }
+        assertEquals(0, exitCode, "Conversion should succeed for 16 Mbit HiROM with GD3");
 
-        Path gameOutputDir = outputDir.resolve("test_16mbit_hirom");
+        // Compute sanitized base name from actual input file
+        String baseName = syntheticRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
+        String sanitizedBaseName = new RomPartNormalizer().sanitizeName(baseName);
+        Path gameOutputDir = outputDir.resolve(sanitizedBaseName);
         assertTrue(Files.exists(gameOutputDir), "Game output directory not created");
 
         try (var imgFiles = Files.list(gameOutputDir)) {
@@ -503,8 +492,7 @@ class FloppyConvertE2ETest {
 
     @Test
     void testConvertSynthetic12MbitHiRomWithGd3Padding(@TempDir Path tempDir) throws Exception {
-        Path syntheticRom = createSyntheticRom(tempDir, "test_12mbit_hirom.sfc",
-                12, RomType.HiROM, 0, false);
+        Path syntheticRom = SyntheticRomFactory.generateHiRom(12, 0, DspChipset.ABSENT, "test_12mbit_hirom", tempDir);
         Path outputDir = tempDir.resolve("output");
 
         int exitCode = new CommandLine(new FloppyConvert())
@@ -515,11 +503,12 @@ class FloppyConvertE2ETest {
                         "--format", "gd3"
                 );
 
-        if (exitCode != 0) {
-            Assumptions.abort("Known issue: GD3 X-padding creates DOS 8.3 name collisions for synthetic ROM titles");
-        }
+        assertEquals(0, exitCode, "Conversion should succeed for 12 Mbit HiROM with GD3");
 
-        Path gameOutputDir = outputDir.resolve("test_12mbit_hirom");
+        // Compute sanitized base name from actual input file
+        String baseName = syntheticRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
+        String sanitizedBaseName = new RomPartNormalizer().sanitizeName(baseName);
+        Path gameOutputDir = outputDir.resolve(sanitizedBaseName);
         assertTrue(Files.exists(gameOutputDir), "Game output directory not created");
 
         try (var imgFiles = Files.list(gameOutputDir)) {
@@ -544,8 +533,7 @@ class FloppyConvertE2ETest {
 
     @Test
     void testConvertSynthetic8MbitHiRomWith64KbSram(@TempDir Path tempDir) throws Exception {
-        Path syntheticRom = createSyntheticRom(tempDir, "test_8mbit_hirom_64kb_sram.sfc",
-                8, RomType.HiROM, 64 * 1024, false);
+        Path syntheticRom = SyntheticRomFactory.generateHiRom(8, 64, DspChipset.ABSENT, "test_8mbit_hirom_64kb_sram", tempDir);
         Path outputDir = tempDir.resolve("output");
 
         int exitCode = new CommandLine(new FloppyConvert())
@@ -558,7 +546,10 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed for 8 Mbit HiROM with 64KB SRAM");
 
-        Path gameOutputDir = outputDir.resolve("test_8mbit_hirom_64kb_sram");
+        // Compute sanitized base name from actual input file
+        String baseName = syntheticRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
+        String sanitizedBaseName = new RomPartNormalizer().sanitizeName(baseName);
+        Path gameOutputDir = outputDir.resolve(sanitizedBaseName);
         assertTrue(Files.exists(gameOutputDir), "Game output directory not created");
 
         try (var imgFiles = Files.list(gameOutputDir)) {
@@ -571,8 +562,7 @@ class FloppyConvertE2ETest {
 
     @Test
     void testConvertSynthetic12MbitLoRomWithDsp(@TempDir Path tempDir) throws Exception {
-        Path syntheticRom = createSyntheticRom(tempDir, "test_12mbit_lorom_dsp.sfc",
-                12, RomType.LoROM, 0, true);
+        Path syntheticRom = SyntheticRomFactory.generateLoRom(12, 0, DspChipset.PRESENT, "test_12mbit_lorom_dsp", tempDir);
         Path outputDir = tempDir.resolve("output");
 
         int exitCode = new CommandLine(new FloppyConvert())
@@ -585,7 +575,10 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed for 12 Mbit LoROM with DSP");
 
-        Path gameOutputDir = outputDir.resolve("test_12mbit_lorom_dsp");
+        // Compute sanitized base name from actual input file
+        String baseName = syntheticRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
+        String sanitizedBaseName = new RomPartNormalizer().sanitizeName(baseName);
+        Path gameOutputDir = outputDir.resolve(sanitizedBaseName);
         assertTrue(Files.exists(gameOutputDir), "Game output directory not created");
 
         try (var imgFiles = Files.list(gameOutputDir)) {
@@ -596,65 +589,18 @@ class FloppyConvertE2ETest {
         }
     }
 
-    private Path createSyntheticRom(Path tempDir, String filename, int sizeMbit,
-                                    RomType romType, int sramSizeBytes, boolean hasDsp) throws Exception {
-        int sizeBytes = sizeMbit * 1024 * 1024 / 8;
-        byte[] romData = new byte[sizeBytes];
-        Arrays.fill(romData, (byte) 0xFF);
-
-        int headerOffset = (romType == RomType.LoROM) ? LOROM_HEADER_OFFSET : HIROM_HEADER_OFFSET;
-
-        String title = "SYNTHETIC ROM";
-        byte[] titleBytes = title.getBytes(StandardCharsets.US_ASCII);
-        System.arraycopy(titleBytes, 0, romData, headerOffset + 0x10, Math.min(titleBytes.length, 21));
-
-        int mapType = switch (romType) {
-            case LoROM -> hasDsp ? 0x23 : 0x20;
-            case HiROM -> hasDsp ? 0x25 : 0x21;
-            default -> 0x20;
-        };
-        romData[headerOffset + 0x25] = (byte) mapType;
-
-        int romTypeByte = hasDsp ? 0x03 : 0x00;
-        romData[headerOffset + 0x26] = (byte) romTypeByte;
-
-        int romSizeByte = (int) Math.ceil(Math.log(sizeMbit) / Math.log(2));
-        romData[headerOffset + 0x27] = (byte) romSizeByte;
-
-        int sramSizeByte = 0;
-        if (sramSizeBytes > 0) {
-            int sramKb = sramSizeBytes / 1024;
-            sramSizeByte = (int) Math.ceil(Math.log(sramKb) / Math.log(2));
-        }
-        romData[headerOffset + 0x28] = (byte) sramSizeByte;
-
-        romData[headerOffset + 0x29] = 0x01;
-        romData[headerOffset + 0x2A] = 0x01;
-        romData[headerOffset + 0x2B] = 0x00;
-
-        int checksum = 0xFFFF;
-        int complement = 0x0000;
-        romData[headerOffset + 0x2C] = (byte) (complement & 0xFF);
-        romData[headerOffset + 0x2D] = (byte) ((complement >> 8) & 0xFF);
-        romData[headerOffset + 0x2E] = (byte) (checksum & 0xFF);
-        romData[headerOffset + 0x2F] = (byte) ((checksum >> 8) & 0xFF);
-
-        Path romFile = tempDir.resolve(filename);
-        Files.write(romFile, romData);
-        return romFile;
-    }
 
     @Test
     void testGd3_8MbitHiRom_ForceSplit_E2E() throws Exception {
-        Path romPath = testResourcesDir.resolve("Super Bomberman 2 (USA).sfc");
-        assumeTrue(Files.exists(romPath), "Test ROM not available");
+        Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.SUPER_BOMBERMAN_2, tempDir);
 
         RomProcessor processor = createProcessor();
         int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3);
 
         assertEquals(1, diskCount, "8Mbit ROM should fit on 1 disk");
 
-        List<Path> diskImages = listDiskImages("Super Bomberman 2 (USA)");
+        String baseName = romPath.getFileName().toString().replaceFirst("\\.[^.]+$", "");
+        List<Path> diskImages = listDiskImages(baseName);
         assertEquals(1, diskImages.size(), "Should produce 1 disk image");
 
         Path diskImage = diskImages.get(0);
@@ -663,50 +609,43 @@ class FloppyConvertE2ETest {
 
     @Test
     void testGd3_16MbitHiRom_BoundaryCase_E2E() throws Exception {
-        Path romPath = testResourcesDir.resolve("Art of Fighting (USA).sfc");
-        assumeTrue(Files.exists(romPath), "Test ROM not available");
+        Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.ART_OF_FIGHTING, tempDir);
 
         RomProcessor processor = createProcessor();
-        try {
-            int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3);
+        int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3);
 
-            assertTrue(diskCount >= 2, "16Mbit ROM should span multiple disks");
+        assertTrue(diskCount >= 2, "16Mbit ROM should span multiple disks");
 
-            List<Path> diskImages = listDiskImages("Art of Fighting (USA)");
-            assertTrue(diskImages.size() >= 2, "Should produce at least 2 disk images");
-        } catch (IOException e) {
-            if (e.getMessage().contains("DOS name collision")) {
-                Assumptions.abort("Known issue: GD3 X-padding creates DOS 8.3 name collisions for some titles");
-            }
-            throw e;
-        }
+        String baseName = romPath.getFileName().toString().replaceFirst("\\.[^.]+$", "");
+        List<Path> diskImages = listDiskImages(baseName);
+        assertTrue(diskImages.size() >= 2, "Should produce at least 2 disk images");
     }
 
     @Test
     void testGd3_20MbitHiRom_NoForceSplit_E2E() throws Exception {
-        Path romPath = testResourcesDir.resolve("Street Fighter II Turbo (USA) (Rev 1).sfc");
-        assumeTrue(Files.exists(romPath), "Test ROM not available");
+        Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.STREET_FIGHTER_II, tempDir);
 
         RomProcessor processor = createProcessor();
         int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3);
 
         assertTrue(diskCount >= 2, "20Mbit ROM should span multiple disks");
 
-        List<Path> diskImages = listDiskImages("Street Fighter II Turbo (USA) (Rev 1)");
+        String baseName = romPath.getFileName().toString().replaceFirst("\\.[^.]+$", "");
+        List<Path> diskImages = listDiskImages(baseName);
         assertTrue(diskImages.size() >= 2, "Should produce at least 2 disk images");
     }
 
     @Test
     void testUfo_12MbitHiRom_IrregularChunks_E2E() throws Exception {
-        Path romPath = testResourcesDir.resolve("ActRaiser 2 (USA).sfc");
-        assumeTrue(Files.exists(romPath), "Test ROM not available");
+        Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.ACTRAISER_2, tempDir);
 
         RomProcessor processor = createProcessor();
         int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.UFO);
 
         assertTrue(diskCount >= 1, "12Mbit ROM should produce at least 1 disk");
 
-        List<Path> diskImages = listDiskImages("ActRaiser 2 (USA)");
+        String baseName = romPath.getFileName().toString().replaceFirst("\\.[^.]+$", "");
+        List<Path> diskImages = listDiskImages(baseName);
         assertFalse(diskImages.isEmpty(), "Should produce disk images");
 
         for (Path diskImage : diskImages) {
@@ -716,15 +655,15 @@ class FloppyConvertE2ETest {
 
     @Test
     void testUfo_12MbitLoRom_StandardChunks_E2E() throws Exception {
-        Path romPath = testResourcesDir.resolve("Breath of Fire (USA).sfc");
-        assumeTrue(Files.exists(romPath), "Test ROM not available");
+        Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.BREATH_OF_FIRE, tempDir);
 
         RomProcessor processor = createProcessor();
         int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.UFO);
 
         assertTrue(diskCount >= 1, "12Mbit ROM should produce at least 1 disk");
 
-        List<Path> diskImages = listDiskImages("Breath of Fire (USA)");
+        String baseName = romPath.getFileName().toString().replaceFirst("\\.[^.]+$", "");
+        List<Path> diskImages = listDiskImages(baseName);
         assertFalse(diskImages.isEmpty(), "Should produce disk images");
 
         for (Path diskImage : diskImages) {
@@ -746,7 +685,7 @@ class FloppyConvertE2ETest {
         RomProcessor processor = createProcessor();
 
         assertThrows(UnsupportedHardwareException.class, () ->
-            processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.UFO)
+                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.UFO)
         );
     }
 
@@ -764,6 +703,24 @@ class FloppyConvertE2ETest {
 
         RomProcessor processor = createProcessor();
         processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.GD3);
+    }
+
+    @Test
+    void testGd3_48MbitExHiRom_E2E() throws Exception {
+        // Generate 48Mbit ExHiROM via TestRomProvider (synthetic-only, no real ROM)
+        Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.EXHIROM_48MBIT, tempDir);
+
+        RomProcessor processor = createProcessor();
+        processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3);
+
+        List<Path> images = listDiskImages(romPath.getFileName().toString().replaceFirst("\\.[^.]+$", ""));
+
+        assertFalse(images.isEmpty(), "Should generate at least one disk image");
+        assertTrue(images.size() > 1, "48Mbit ROM should span multiple disks");
+
+        for (Path img : images) {
+            assertTrue(Files.size(img) > 0, "Disk image should not be empty: " + img.getFileName());
+        }
     }
 
 }
