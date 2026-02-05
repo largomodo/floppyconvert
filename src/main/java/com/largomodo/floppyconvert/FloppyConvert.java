@@ -54,7 +54,7 @@ import java.util.stream.Stream;
         version = "${bundle:application.version}",
         header = "Converts SNES ROM files to floppy disk images.",
         description = {
-                "Automates the conversion of SNES ROM files (.sfc, .fig, .smw, .swc, .ufo) into FAT12 floppy disk" +
+                "Automates the conversion of SNES ROM files (.sfc, .fig, .swc, .ufo) into FAT12 floppy disk" +
                         " images compatible with retro backup units.",
                 "",
                 "This tool uses 'ucon64' to split ROMs and a native FAT12 engine to create .img files.",

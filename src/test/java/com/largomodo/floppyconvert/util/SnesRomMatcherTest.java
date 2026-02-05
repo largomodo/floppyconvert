@@ -21,7 +21,6 @@ class SnesRomMatcherTest {
     void testStandardExtensions(@TempDir Path tempDir) throws IOException {
         assertTrue(SnesRomMatcher.isRom(createFile(tempDir, "game.sfc")));
         assertTrue(SnesRomMatcher.isRom(createFile(tempDir, "game.fig")));
-        assertTrue(SnesRomMatcher.isRom(createFile(tempDir, "game.smw")));
         assertTrue(SnesRomMatcher.isRom(createFile(tempDir, "game.swc")));
         assertTrue(SnesRomMatcher.isRom(createFile(tempDir, "game.ufo")));
     }

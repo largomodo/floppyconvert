@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
 /**
  * SNES ROM format detection for multi-format support.
  * <p>
- * Recognizes standard SNES extensions (.sfc, .fig, .smw, .swc, .ufo)
+ * Recognizes standard SNES extensions (.sfc, .fig, .swc, .ufo)
  * and Game Doctor naming conventions (e.g., sf32chra.078, SF12TEST).
  * <p>
  * Stateless utility performing filesystem checks. Safe for concurrent use when each
@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 public class SnesRomMatcher {
 
     private static final Set<String> EXTENSIONS = Set.of(
-            ".sfc", ".fig", ".smw", ".swc", ".ufo"
+            ".sfc", ".fig", ".swc", ".ufo"
     );
 
     private static final Pattern GAME_DOCTOR_PATTERN =

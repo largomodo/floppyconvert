@@ -46,6 +46,9 @@ dependency-reduced-pom.xml
 /*.txt
 /.*
 
+# Ignore log files
+*.log
+
 # Files to keep on root level
 !/README.md
 !/CLAUDE.md
