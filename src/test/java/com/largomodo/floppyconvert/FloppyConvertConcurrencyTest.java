@@ -1,6 +1,7 @@
 package com.largomodo.floppyconvert;
 
-import org.junit.jupiter.api.Assumptions;
+import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory;
+import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory.DspChipset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -9,7 +10,6 @@ import picocli.CommandLine;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -32,17 +32,12 @@ class FloppyConvertConcurrencyTest {
     @TempDir
     Path tempDir;
 
-    private byte[] templateRomData;
+    private byte[] syntheticRomData;
 
     @BeforeEach
     void setUp() throws IOException {
-        // Load real ROM file from test resources
-        Path templateRom = Paths.get("src/test/resources/snes/Super Mario World (USA).sfc");
-        if (!Files.exists(templateRom)) {
-            // Skip test if template not available
-            Assumptions.abort("Test ROM not available");
-        }
-        templateRomData = Files.readAllBytes(templateRom);
+        Path syntheticRom = SyntheticRomFactory.generateLoRom(4, 0, DspChipset.ABSENT, "CONCUR4L", tempDir);
+        syntheticRomData = Files.readAllBytes(syntheticRom);
     }
 
     /**
@@ -66,7 +61,7 @@ class FloppyConvertConcurrencyTest {
         int romCount = romNames.length;
         for (int i = 0; i < romCount; i++) {
             Path romFile = inputDir.resolve(romNames[i] + ".sfc");
-            Files.write(romFile, templateRomData);
+            Files.write(romFile, syntheticRomData);
         }
 
         // Execute batch processing
@@ -125,8 +120,8 @@ class FloppyConvertConcurrencyTest {
         Files.createDirectories(subdir1);
         Files.createDirectories(subdir2);
 
-        Files.write(subdir1.resolve("SameName.sfc"), templateRomData);
-        Files.write(subdir2.resolve("SameName.sfc"), templateRomData);
+        Files.write(subdir1.resolve("SameName.sfc"), syntheticRomData);
+        Files.write(subdir2.resolve("SameName.sfc"), syntheticRomData);
 
         // Execute batch processing
         int exitCode = new CommandLine(new FloppyConvert())
@@ -169,7 +164,7 @@ class FloppyConvertConcurrencyTest {
         int romCount = romNames.length;
         for (int i = 0; i < romCount; i++) {
             Path romFile = inputDir.resolve(romNames[i] + ".sfc");
-            Files.write(romFile, templateRomData);
+            Files.write(romFile, syntheticRomData);
         }
 
         // Execute batch processing
@@ -209,7 +204,7 @@ class FloppyConvertConcurrencyTest {
 
         // Create single ROM for quick test
         Path romFile = inputDir.resolve("TestRom.sfc");
-        Files.write(romFile, templateRomData);
+        Files.write(romFile, syntheticRomData);
 
         // Execute batch processing (completes normally)
         int exitCode = new CommandLine(new FloppyConvert())
@@ -249,7 +244,7 @@ class FloppyConvertConcurrencyTest {
         int romCount = romNames.length;
         for (int i = 0; i < romCount; i++) {
             Path romFile = inputDir.resolve(romNames[i] + ".sfc");
-            Files.write(romFile, templateRomData);
+            Files.write(romFile, syntheticRomData);
         }
 
         // Track workspace directories during execution

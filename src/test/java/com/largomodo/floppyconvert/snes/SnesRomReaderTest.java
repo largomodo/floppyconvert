@@ -1,19 +1,23 @@
 package com.largomodo.floppyconvert.snes;
 
 import com.largomodo.floppyconvert.snes.generators.RomDataGenerator;
+import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory;
+import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory.DspChipset;
 import net.jqwik.api.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class SnesRomReaderTest {
 
     private final SnesRomReader reader = new SnesRomReader();
+    @TempDir
+    Path tempDir;
 
     @Property
     void loRomDataIsDetectedAsLoRom(@ForAll("loRomData") byte[] data) throws Exception {
@@ -88,26 +92,20 @@ class SnesRomReaderTest {
     }
 
     @Test
-    void chronoTriggerIsDetectedAsHiRom() throws IOException {
-        Path romPath = Paths.get("src/test/resources/snes/Chrono Trigger (USA).sfc");
-        if (!Files.exists(romPath)) {
-            return;
-        }
+    void hiRomWith32MbitAndSramIsDetectedAsHiRom() throws IOException {
+        Path romPath = SyntheticRomFactory.generateHiRom(32, 8, DspChipset.ABSENT, "SYNHI32T8", tempDir);
 
         SnesRom rom = reader.load(romPath);
-        assertEquals(RomType.HiROM, rom.type(), "Chrono Trigger should be detected as HiROM");
-        assertTrue(rom.sramSize() > 0, "Chrono Trigger should have SRAM");
+        assertEquals(RomType.HiROM, rom.type(), "32Mbit HiROM should be detected as HiROM");
+        assertTrue(rom.sramSize() > 0, "32Mbit HiROM with SRAM should have SRAM");
     }
 
     @Test
-    void superMarioWorldIsDetectedAsLoRom() throws IOException {
-        Path romPath = Paths.get("src/test/resources/snes/Super Mario World (USA).sfc");
-        if (!Files.exists(romPath)) {
-            return;
-        }
+    void loRomWith4MbitIsDetectedAsLoRom() throws IOException {
+        Path romPath = SyntheticRomFactory.generateLoRom(4, 0, DspChipset.ABSENT, "SYNLO4T0", tempDir);
 
         SnesRom rom = reader.load(romPath);
-        assertEquals(RomType.LoROM, rom.type(), "Super Mario World should be detected as LoROM");
+        assertEquals(RomType.LoROM, rom.type(), "4Mbit LoROM should be detected as LoROM");
     }
 
     @Test

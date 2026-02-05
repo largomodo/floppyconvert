@@ -1,12 +1,14 @@
 package com.largomodo.floppyconvert;
 
+import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory;
+import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory.DspChipset;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -19,7 +21,16 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class FloppyConvertRecursionTest {
 
-    private static final String SUPER_MARIO_WORLD_RESOURCE = "/snes/Super Mario World (USA).sfc";
+    @TempDir
+    static Path sharedTempDir;
+
+    private static byte[] syntheticRomData;
+
+    @BeforeAll
+    static void setUpClass() throws Exception {
+        Path syntheticRom = SyntheticRomFactory.generateLoRom(4, 0, DspChipset.ABSENT, "RECURS4L", sharedTempDir);
+        syntheticRomData = Files.readAllBytes(syntheticRom);
+    }
 
     @Test
     void testDeepNesting(@TempDir Path tempDir) throws Exception {
@@ -32,10 +43,7 @@ class FloppyConvertRecursionTest {
         Files.createDirectories(subCategoryDir);
 
         Path testRom = subCategoryDir.resolve("game.sfc");
-        try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
-            Assumptions.assumeTrue(is != null, "Skipping recursion test: ROM resource missing");
-            Files.copy(is, testRom);
-        }
+        Files.write(testRom, syntheticRomData);
 
         int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
@@ -74,14 +82,8 @@ class FloppyConvertRecursionTest {
 
         Path testRom1 = dirA.resolve("game1.sfc");
         Path testRom2 = dirB.resolve("game2.sfc");
-        try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
-            Assumptions.assumeTrue(is != null, "Skipping recursion test: ROM resource missing");
-            Files.copy(is, testRom1);
-        }
-        try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
-            Assumptions.assumeTrue(is != null, "Skipping recursion test: ROM resource missing");
-            Files.copy(is, testRom2);
-        }
+        Files.write(testRom1, syntheticRomData);
+        Files.write(testRom2, syntheticRomData);
 
         int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
@@ -120,10 +122,7 @@ class FloppyConvertRecursionTest {
         Files.createDirectories(inputRoot);
 
         Path testRom = inputRoot.resolve("game.sfc");
-        try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
-            Assumptions.assumeTrue(is != null, "Skipping recursion test: ROM resource missing");
-            Files.copy(is, testRom);
-        }
+        Files.write(testRom, syntheticRomData);
 
         int exitCode = new CommandLine(new FloppyConvert())
                 .setCaseInsensitiveEnumValuesAllowed(true)
@@ -158,10 +157,7 @@ class FloppyConvertRecursionTest {
         Path realDir = tempDir.resolve("real");
         Files.createDirectories(realDir);
         Path testRom = realDir.resolve("game.sfc");
-        try (InputStream is = getClass().getResourceAsStream(SUPER_MARIO_WORLD_RESOURCE)) {
-            Assumptions.assumeTrue(is != null, "Skipping recursion test: ROM resource missing");
-            Files.copy(is, testRom);
-        }
+        Files.write(testRom, syntheticRomData);
 
         Path symlinkDir = inputRoot.resolve("symlinked");
         try {
