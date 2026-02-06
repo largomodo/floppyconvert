@@ -69,8 +69,6 @@ import java.util.stream.Stream;
         },
         footerHeading = "%nSee Also:%n",
         footer = {
-                "ucon64(1)",
-                "",
                 "Project home: ${bundle:application.url}"
         }
 )
