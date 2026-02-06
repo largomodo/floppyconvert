@@ -142,12 +142,12 @@ class FloppyConvertTest {
 
     @ParameterizedTest
     @CsvSource({
-        "game.fig,FIG",
-        "game.swc,SWC",
-        "game.ufo,UFO",
-        "game.FIG,FIG",
-        "game.SWC,SWC",
-        "game.UFO,UFO"
+            "game.fig,FIG",
+            "game.swc,SWC",
+            "game.ufo,UFO",
+            "game.FIG,FIG",
+            "game.SWC,SWC",
+            "game.UFO,UFO"
     })
     void testAutoDetectFormatFromExtension(String filename, String expectedFormat) throws Exception {
         Path romSource = SyntheticRomFactory.generateLoRom(4, 0, DspChipset.ABSENT, "AUTODET", tempDir);
@@ -156,7 +156,8 @@ class FloppyConvertTest {
 
         FloppyConvert floppyConvert = new FloppyConvert();
         CommandLine cmd = new CommandLine(floppyConvert);
-        cmd.parseArgs(testFile.toAbsolutePath().toString());
+        // Explicitly set output to tempDir to avoid CWD pollution and locking
+        cmd.parseArgs(testFile.toAbsolutePath().toString(), "-o", tempDir.toString());
         floppyConvert.call();
 
         assertEquals(CopierFormat.valueOf(expectedFormat), floppyConvert.getEffectiveFormat());
@@ -170,7 +171,8 @@ class FloppyConvertTest {
 
         FloppyConvert floppyConvert = new FloppyConvert();
         CommandLine cmd = new CommandLine(floppyConvert);
-        cmd.parseArgs(testFile.toAbsolutePath().toString(), "--format", "GD3");
+        // Explicitly set output to tempDir
+        cmd.parseArgs(testFile.toAbsolutePath().toString(), "--format", "GD3", "-o", tempDir.toString());
         floppyConvert.call();
 
         assertEquals(CopierFormat.GD3, floppyConvert.getEffectiveFormat());
@@ -184,7 +186,8 @@ class FloppyConvertTest {
 
         FloppyConvert floppyConvert = new FloppyConvert();
         CommandLine cmd = new CommandLine(floppyConvert);
-        cmd.parseArgs(testFile.toAbsolutePath().toString());
+        // Explicitly set output to tempDir
+        cmd.parseArgs(testFile.toAbsolutePath().toString(), "-o", tempDir.toString());
         floppyConvert.call();
 
         assertEquals(CopierFormat.FIG, floppyConvert.getEffectiveFormat());
