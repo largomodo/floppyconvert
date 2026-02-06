@@ -1,6 +1,7 @@
 package com.largomodo.floppyconvert.format;
 
 import java.io.File;
+import java.util.Optional;
 import java.util.function.Predicate;
 
 /**
@@ -28,6 +29,24 @@ public enum CopierFormat {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Invalid format: " + arg + ". Supported: FIG, SWC, UFO, GD3");
         }
+    }
+
+    // Returns Optional to signal graceful fallback for .sfc (no matching format)
+    public static Optional<CopierFormat> fromFileExtension(String extension) {
+        if (extension == null || extension.isEmpty()) {
+            return Optional.empty();
+        }
+
+        // Case-insensitive matching: filesystem case sensitivity varies
+        String normalized = extension.startsWith(".") ? extension.substring(1) : extension;
+        normalized = normalized.toLowerCase();
+
+        return switch (normalized) {
+            case "fig" -> Optional.of(FIG);
+            case "swc" -> Optional.of(SWC);
+            case "ufo" -> Optional.of(UFO);
+            default -> Optional.empty();  // .sfc, .078, unrecognized fall through
+        };
     }
 
     public String getCmdFlag() {

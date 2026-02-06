@@ -1,8 +1,12 @@
 package com.largomodo.floppyconvert;
 
 import com.largomodo.floppyconvert.format.CopierFormat;
+import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory;
+import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory.DspChipset;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import picocli.CommandLine;
 import picocli.CommandLine.ParameterException;
 
@@ -134,5 +138,55 @@ class FloppyConvertTest {
                 "Should throw ParameterException for non-existent input path");
         assertTrue(exception.getMessage().contains("Input path does not exist"),
                 "Error message should indicate path does not exist");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "game.fig,FIG",
+        "game.swc,SWC",
+        "game.ufo,UFO",
+        "game.FIG,FIG",
+        "game.SWC,SWC",
+        "game.UFO,UFO"
+    })
+    void testAutoDetectFormatFromExtension(String filename, String expectedFormat) throws Exception {
+        Path romSource = SyntheticRomFactory.generateLoRom(4, 0, DspChipset.ABSENT, "AUTODET", tempDir);
+        Path testFile = tempDir.resolve(filename);
+        Files.copy(romSource, testFile);
+
+        FloppyConvert floppyConvert = new FloppyConvert();
+        CommandLine cmd = new CommandLine(floppyConvert);
+        cmd.parseArgs(testFile.toAbsolutePath().toString());
+        floppyConvert.call();
+
+        assertEquals(CopierFormat.valueOf(expectedFormat), floppyConvert.getEffectiveFormat());
+    }
+
+    @Test
+    void testExplicitFormatOverridesAutoDetection() throws Exception {
+        Path romSource = SyntheticRomFactory.generateLoRom(4, 0, DspChipset.ABSENT, "OVERRIDE", tempDir);
+        Path testFile = tempDir.resolve("game.swc");
+        Files.copy(romSource, testFile);
+
+        FloppyConvert floppyConvert = new FloppyConvert();
+        CommandLine cmd = new CommandLine(floppyConvert);
+        cmd.parseArgs(testFile.toAbsolutePath().toString(), "--format", "GD3");
+        floppyConvert.call();
+
+        assertEquals(CopierFormat.GD3, floppyConvert.getEffectiveFormat());
+    }
+
+    @Test
+    void testFallbackToFigForUnrecognizedExtension() throws Exception {
+        Path romSource = SyntheticRomFactory.generateLoRom(4, 0, DspChipset.ABSENT, "FALLBACK", tempDir);
+        Path testFile = tempDir.resolve("game.sfc");
+        Files.copy(romSource, testFile);
+
+        FloppyConvert floppyConvert = new FloppyConvert();
+        CommandLine cmd = new CommandLine(floppyConvert);
+        cmd.parseArgs(testFile.toAbsolutePath().toString());
+        floppyConvert.call();
+
+        assertEquals(CopierFormat.FIG, floppyConvert.getEffectiveFormat());
     }
 }

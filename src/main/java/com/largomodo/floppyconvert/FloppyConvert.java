@@ -28,6 +28,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -101,6 +102,8 @@ public class FloppyConvert implements Callable<Integer> {
                     "Default: ${DEFAULT-VALUE}"
             })
     CopierFormat format;
+    private CopierFormat effectiveFormat;
+
     @Spec
     CommandSpec spec;
     @Option(names = {"-v", "--verbose"}, description = "Enable verbose output")
@@ -125,6 +128,53 @@ public class FloppyConvert implements Callable<Integer> {
         SnesInterleaver interleaver = new SnesInterleaver();
         HeaderGeneratorFactory headerFactory = new HeaderGeneratorFactory();
         return new NativeRomSplitter(reader, interleaver, headerFactory);
+    }
+
+    // Package-private: enables test observability without exposing to CLI users
+    CopierFormat getEffectiveFormat() {
+        return effectiveFormat;
+    }
+
+    /**
+     * Extracts file extension from a filename, returning empty if no extension exists.
+     * Helper method reduces nesting depth for readability.
+     *
+     * @param fileName the filename to extract from
+     * @return Optional containing extension (including dot), or empty if no extension
+     */
+    private Optional<String> extractExtension(String fileName) {
+        // lastIndexOf: handles multiple dots (e.g., "game.backup.swc" → ".swc")
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex > 0) {  // > 0 rejects hidden files like ".gitignore"
+            return Optional.of(fileName.substring(dotIndex));
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Resolves the effective format for single-file conversion by checking if the user explicitly
+     * specified --format via Picocli's ParseResult API, or auto-detecting from file extension.
+     * <p>
+     * Uses ParseResult.hasMatchedOption() to distinguish between explicit --format flag and default
+     * value, preserving defaultValue visibility in --help output.
+     * <p>
+     * For unrecognized extensions (e.g., .sfc), falls back to the format field's default value (FIG)
+     * to maintain backward compatibility.
+     */
+    private CopierFormat resolveEffectiveFormat() {
+        // ParseResult API only checks CLI arguments, not config file defaults (project has no config files)
+        boolean explicitFormat = spec.commandLine()
+                .getParseResult()
+                .hasMatchedOption("--format");
+
+        if (explicitFormat) {
+            return format;  // User override takes precedence
+        }
+
+        // Auto-detect from extension, fallback to FIG for .sfc/unrecognized
+        return extractExtension(inputPath.getName())
+                .flatMap(CopierFormat::fromFileExtension)
+                .orElse(format);
     }
 
     /**
@@ -401,9 +451,11 @@ public class FloppyConvert implements Callable<Integer> {
         Files.createDirectories(outputDir.toPath());
 
         if (inputPath.isFile()) {
+            // Single-file only: batch mode uses explicit format for predictability
+            effectiveFormat = resolveEffectiveFormat();
             runSingleFile(
                     new Config(null, outputDir.getAbsolutePath(),
-                            format, inputPath.getAbsolutePath()),
+                            effectiveFormat, inputPath.getAbsolutePath()),
                     outputDir.toPath()
             );
         } else {

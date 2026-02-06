@@ -58,3 +58,9 @@ Moving `CopierFormat` to a dedicated `format` package provides:
 **No Dependencies:** The `format` package must not import from any other application package. It defines vocabulary, not behavior. Violation check: `grep "^import com.largomodo.floppyconvert" src/main/java/de/nrq/floppyconvert/format/*.java` must return no results (excluding test files).
 
 **Single Enum:** This package contains exactly one enum (`CopierFormat`). If additional format-related types are needed, create new packages (e.g., `format.encoding`) rather than expanding this package's scope.
+
+## Null Handling Patterns
+
+`CopierFormat.fromFileExtension()` checks `extension == null || extension.isEmpty()` explicitly because it accepts external input that may be null (public API contract). Callers using File.getName() as input source (guaranteed non-null per JDK contract) need no explicit null checking. This pattern difference reflects different input sources: external API boundary vs internal JDK guarantee.
+
+When adding future extension-based methods to `CopierFormat`, maintain explicit null checking to preserve public API safety.
