@@ -6,7 +6,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -39,12 +38,22 @@ public class Fat12ImageWriter implements FloppyImageWriter {
     @Override
     public void write(File targetImage, List<File> sources, Map<File, String> dosNameMap) throws IOException {
         try (FileChannel channel = FileChannel.open(targetImage.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE)) {
-            // Map the entire image into memory (Floppy images are small, < 2MB, so this is efficient)
-            MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, channel.size());
+            // Use Heap ByteBuffer instead of MappedByteBuffer to avoid Windows file locking issues
+            // (MappedByteBuffer keeps file handle open until GC, preventing atomic moves)
+            long fileSize = channel.size();
+            if (fileSize > Integer.MAX_VALUE) {
+                throw new IOException("Image size too large for memory buffer");
+            }
+
+            ByteBuffer buffer = ByteBuffer.allocate((int) fileSize);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
 
-            // Read BIOS Parameter Block (BPB)
-            // Offsets are standard for FAT12/16
+            // Read entire image into memory
+            while (buffer.hasRemaining()) {
+                if (channel.read(buffer) == -1) break;
+            }
+
+            // Parse BPB and calculate offsets (no changes to logic)
             int bytesPerSector = Short.toUnsignedInt(buffer.getShort(11));
             int sectorsPerCluster = Byte.toUnsignedInt(buffer.get(13));
             int reservedSectors = Short.toUnsignedInt(buffer.getShort(14));
@@ -52,19 +61,16 @@ public class Fat12ImageWriter implements FloppyImageWriter {
             int rootEntries = Short.toUnsignedInt(buffer.getShort(17));
             int totalSectors = Short.toUnsignedInt(buffer.getShort(19));
             if (totalSectors == 0) {
-                totalSectors = buffer.getInt(32); // Use large sector count if 16-bit field is 0
+                totalSectors = buffer.getInt(32);
             }
             int sectorsPerFat = Short.toUnsignedInt(buffer.getShort(22));
 
-            // Calculate Filesystem Offsets
             int fatStart = reservedSectors * bytesPerSector;
             int fatSize = sectorsPerFat * bytesPerSector;
             int rootDirStart = fatStart + (numberOfFats * fatSize);
-            int rootDirSize = rootEntries * 32; // 32 bytes per directory entry
+            int rootDirSize = rootEntries * 32;
             int dataStart = rootDirStart + rootDirSize;
 
-            // Calculate total clusters available in data area
-            // Data Sectors = Total - (Reserved + FATs + RootDir)
             int rootDirSectors = (rootDirSize + bytesPerSector - 1) / bytesPerSector;
             int dataSectors = totalSectors - (reservedSectors + (numberOfFats * sectorsPerFat) + rootDirSectors);
             int totalClusters = dataSectors / sectorsPerCluster;
@@ -77,22 +83,24 @@ public class Fat12ImageWriter implements FloppyImageWriter {
                     throw new IllegalArgumentException("No DOS name mapping for source: " + source);
                 }
 
-                // 1. Find a free directory entry in the Root Directory
                 int dirEntryOffset = findFreeDirEntry(buffer, rootDirStart, rootEntries);
                 if (dirEntryOffset == -1) {
                     throw new IOException("Root directory full in " + targetImage.getName());
                 }
 
-                // 2. Allocate clusters and write file data
                 int startCluster = writeData(buffer, fileData, fatStart, totalClusters, dataStart, bytesPerSector, sectorsPerCluster);
-
-                // 3. Write directory entry
                 writeDirEntry(buffer, dirEntryOffset, dosName, startCluster, fileData.length);
 
-                // 4. Mirror FATs (Standard practice: write to FAT1, copy to FAT2)
                 if (numberOfFats > 1) {
                     mirrorFat(buffer, fatStart, fatSize, numberOfFats);
                 }
+            }
+
+            // Write modified buffer back to disk
+            buffer.rewind();
+            channel.position(0);
+            while (buffer.hasRemaining()) {
+                channel.write(buffer);
             }
         }
     }
