@@ -28,7 +28,7 @@ floppyconvert - Converts SNES ROM files to floppy disk images.
 
 Automates the conversion of SNES ROM files (.sfc, .fig, .swc, .ufo) into FAT12 floppy disk images compatible with retro backup units.
 
-This tool uses 'ucon64' to split ROMs and a native FAT12 engine to create .img files.
+This tool uses a native ROM splitting engine and FAT12 writer to create .img files.
 It supports recursive directory processing and batch conversion.
 
 // end::picocli-generated-man-section-description[]
@@ -69,9 +69,9 @@ Necessary subdirectories will be created automatically.
 == Arguments
 
 _INPUT_::
-  The source ROM file (.sfc) to convert, or a directory to process.
+  The source ROM file (.sfc, .fig, .swc, .ufo) to convert, or a directory to process.
 +
-If a directory is provided, the tool scans it recursively for .sfc files and converts them in batch mode, preserving the directory structure.
+If a directory is provided, the tool scans it recursively for ROM files and converts them in batch mode, preserving the directory structure.
 
 // end::picocli-generated-man-section-arguments[]
 
@@ -94,9 +94,6 @@ If a directory is provided, the tool scans it recursively for .sfc files and con
 
 // tag::picocli-generated-man-section-footer[]
 ==  See Also:
-
-[%hardbreaks]
-ucon64(1)
 
 [%hardbreaks]
 Project home: https://github.com/largomodo/floppyconvert
