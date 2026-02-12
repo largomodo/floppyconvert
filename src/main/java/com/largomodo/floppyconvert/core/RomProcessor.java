@@ -32,6 +32,18 @@ import java.util.stream.Collectors;
  */
 public class RomProcessor {
 
+
+    /**
+     * Holds both original and sanitized ROM base names.
+     * Original name used for user-facing output folders (filesystem).
+     * Sanitized name used for .img filenames and temp directories (tool processing).
+     *
+     * @param original   Original ROM filename without extension (user-facing)
+     * @param sanitized  Sanitized ROM filename (tool-safe, shell-safe)
+     */
+    private record BaseName(String original, String sanitized) {
+    }
+
     private static final Logger log = LoggerFactory.getLogger(RomProcessor.class);
 
     private final DiskPacker packer;
@@ -87,7 +99,8 @@ public class RomProcessor {
             CopierFormat format
     ) throws IOException {
 
-        String sanitizedBaseName = extractAndSanitizeBaseName(romFile);
+        BaseName baseName = extractAndSanitizeBaseName(romFile);
+        String sanitizedBaseName = baseName.sanitized();
 
         try (ConversionWorkspace ws = new ConversionWorkspace(outputBaseDir, sanitizedBaseName, uniqueSuffix)) {
             Path gameOutputDir = ws.getWorkDir();
@@ -114,7 +127,7 @@ public class RomProcessor {
 
             List<Path> createdImages = writeDisksFromLayout(diskLayouts, gameOutputDir, sanitizedBaseName, ws);
 
-            promoteFinalOutputs(createdImages, outputBaseDir, sanitizedBaseName, ws);
+            promoteFinalOutputs(createdImages, outputBaseDir, baseName.original(), ws);
 
             log.info("Success: {} -> {} disk(s) [{}]", romFile.getName(), diskLayouts.size(), format.name());
 
@@ -123,12 +136,14 @@ public class RomProcessor {
     }
 
     /**
-     * Extract and sanitize base filename without extension.
+     * Extract base filename without extension and produce sanitized variant.
      * <p>
-     * Sanitization prevents shell escaping issues in output directory names.
+     * Returns both original and sanitized names to support dual naming strategy:
+     * original for user-facing output folders, sanitized for tool-safe .img filenames.
+     * <p>
      * Empty basename after sanitization indicates filesystem incompatibility.
      */
-    private String extractAndSanitizeBaseName(File romFile) throws IOException {
+    private BaseName extractAndSanitizeBaseName(File romFile) throws IOException {
         String baseName = romFile.getName().replaceFirst("\\.[^.]+$", "");
         if (baseName.isEmpty()) {
             throw new IOException("Cannot extract base name from ROM file: " + romFile.getName());
@@ -138,7 +153,7 @@ public class RomProcessor {
             throw new IOException("Sanitized base name is empty for ROM file: " +
                     romFile.getName() + " (original: " + baseName + ")");
         }
-        return sanitized;
+        return new BaseName(baseName, sanitized);
     }
 
     /**
@@ -251,10 +266,13 @@ public class RomProcessor {
     /**
      * Promote disk images from workspace to final output directory.
      * Uses atomic move to ensure outputs appear complete.
+     * <p>
+     * Output folder name uses original ROM filename (preserves user's special characters).
+     * Disk image filenames inside the folder use sanitized names (tool-safe).
      */
     private void promoteFinalOutputs(List<Path> createdImages, Path outputBaseDir,
-                                     String sanitizedBaseName, ConversionWorkspace ws) throws IOException {
-        Path finalGameDir = outputBaseDir.resolve(sanitizedBaseName);
+                                     String originalBaseName, ConversionWorkspace ws) throws IOException {
+        Path finalGameDir = outputBaseDir.resolve(originalBaseName);
         Files.createDirectories(finalGameDir);
 
         for (Path imgFile : createdImages) {

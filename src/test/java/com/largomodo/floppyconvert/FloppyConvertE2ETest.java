@@ -89,9 +89,13 @@ class FloppyConvertE2ETest {
         );
     }
 
+    /**
+     * Lists disk images in output folder resolved by original ROM name.
+     * Resolution uses original name to match user-facing output folders
+     * (folders preserve ROM filename special characters for user recognition).
+     */
     private List<Path> listDiskImages(String romName) throws Exception {
-        String sanitizedName = new RomPartNormalizer().sanitizeName(romName);
-        Path gameDir = outputDir.resolve(sanitizedName);
+        Path gameDir = outputDir.resolve(romName);
         if (!Files.exists(gameDir)) {
             return List.of();
         }
@@ -125,11 +129,10 @@ class FloppyConvertE2ETest {
 
         // Verify output structure
         String baseName = inputRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        // Sanitize baseName to match RomProcessor behavior (replaces special chars with underscores)
-        String sanitizedBaseName = new RomPartNormalizer().sanitizeName(baseName);
-        Path gameOutputDir = outputDir.resolve(sanitizedBaseName);
+        // Output folder uses original base name (preserves special characters)
+        Path gameOutputDir = outputDir.resolve(baseName);
 
-        assertTrue(Files.exists(gameOutputDir), "Game output directory not created: " + sanitizedBaseName);
+        assertTrue(Files.exists(gameOutputDir), "Game output directory not created: " + baseName);
         assertTrue(Files.isDirectory(gameOutputDir), "Expected directory: " + gameOutputDir);
 
         // Verify .img files were created and are non-empty
@@ -198,10 +201,9 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed");
 
-        // Verify output structure - compute sanitized base name from actual input file
+        // Verify output structure - output folder uses original base name
         String baseName = testRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        String sanitizedBaseName = new RomPartNormalizer().sanitizeName(baseName);
-        Path gameOutputDir = outputDir.resolve(sanitizedBaseName);
+        Path gameOutputDir = outputDir.resolve(baseName);
         assertTrue(Files.exists(gameOutputDir), "Output directory should exist");
         assertTrue(Files.isDirectory(gameOutputDir), "Output should be a directory");
 
@@ -276,9 +278,8 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed even with special characters in filename");
 
-        // Verify output structure - base name is sanitized for filesystem safety
-        // Special characters #, [, ], (, ), and space are replaced with underscores
-        String expectedBaseName = "VLDC10___053__-_ERROR_CODE__1D4__Update__by_Sayuri__2017-04-02___SMW_Hack_";
+        // Verify output structure - output folder uses ORIGINAL base name (preserves special characters)
+        String expectedBaseName = "VLDC10 [#053] - ERROR CODE #1D4 (Update) by Sayuri [2017-04-02] (SMW Hack)";
         Path gameOutputDir = outputDir.resolve(expectedBaseName);
         assertTrue(Files.exists(gameOutputDir), "Output directory should exist");
         assertTrue(Files.isDirectory(gameOutputDir), "Output should be a directory");
@@ -289,6 +290,13 @@ class FloppyConvertE2ETest {
                     .filter(p -> p.toString().endsWith(".img"))
                     .toList();
             assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
+
+            // Verify .img files inside use SANITIZED name
+            for (Path imgFile : imgFiles) {
+                String imgName = imgFile.getFileName().toString();
+                assertTrue(imgName.startsWith("VLDC10___053__"),
+                        ".img file should use sanitized name prefix: " + imgName);
+            }
         }
 
         // Verify cleanup: no split parts should remain
@@ -344,9 +352,8 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed with shell-sensitive characters (&, $, !, space)");
 
-        // Verify output structure - shell-sensitive characters replaced with underscores
-        // &, $, !, space, (, ), and , are all sanitized to underscores
-        String expectedBaseName = "Ren___Stimpy_Show__The_-_Buckeroo____USA_";
+        // Verify output structure - output folder uses ORIGINAL base name (preserves special characters)
+        String expectedBaseName = "Ren & Stimpy Show, The - Buckeroo$! (USA)";
         Path gameOutputDir = outputDir.resolve(expectedBaseName);
 
         assertTrue(Files.exists(outputDir), "Output directory should exist");
@@ -358,6 +365,13 @@ class FloppyConvertE2ETest {
                     .filter(p -> p.toString().endsWith(".img"))
                     .toList();
             assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
+
+            // Verify .img files inside use SANITIZED name
+            for (Path imgFile : imgFiles) {
+                String imgName = imgFile.getFileName().toString();
+                assertTrue(imgName.startsWith("Ren___Stimpy_Show__The"),
+                        ".img file should use sanitized name prefix: " + imgName);
+            }
         }
 
         // Verify cleanup: no split parts should remain
@@ -434,10 +448,9 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed for 8 Mbit LoROM");
 
-        // Compute sanitized base name from actual input file
+        // Output folder uses original base name
         String baseName = syntheticRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        String sanitizedBaseName = new RomPartNormalizer().sanitizeName(baseName);
-        Path gameOutputDir = outputDir.resolve(sanitizedBaseName);
+        Path gameOutputDir = outputDir.resolve(baseName);
         assertTrue(Files.exists(gameOutputDir), "Game output directory not created");
 
         try (var imgFiles = Files.list(gameOutputDir)) {
@@ -463,10 +476,9 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed for 16 Mbit HiROM with GD3");
 
-        // Compute sanitized base name from actual input file
+        // Output folder uses original base name
         String baseName = syntheticRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        String sanitizedBaseName = new RomPartNormalizer().sanitizeName(baseName);
-        Path gameOutputDir = outputDir.resolve(sanitizedBaseName);
+        Path gameOutputDir = outputDir.resolve(baseName);
         assertTrue(Files.exists(gameOutputDir), "Game output directory not created");
 
         try (var imgFiles = Files.list(gameOutputDir)) {
@@ -505,10 +517,9 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed for 12 Mbit HiROM with GD3");
 
-        // Compute sanitized base name from actual input file
+        // Output folder uses original base name
         String baseName = syntheticRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        String sanitizedBaseName = new RomPartNormalizer().sanitizeName(baseName);
-        Path gameOutputDir = outputDir.resolve(sanitizedBaseName);
+        Path gameOutputDir = outputDir.resolve(baseName);
         assertTrue(Files.exists(gameOutputDir), "Game output directory not created");
 
         try (var imgFiles = Files.list(gameOutputDir)) {
@@ -546,10 +557,9 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed for 8 Mbit HiROM with 64KB SRAM");
 
-        // Compute sanitized base name from actual input file
+        // Output folder uses original base name
         String baseName = syntheticRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        String sanitizedBaseName = new RomPartNormalizer().sanitizeName(baseName);
-        Path gameOutputDir = outputDir.resolve(sanitizedBaseName);
+        Path gameOutputDir = outputDir.resolve(baseName);
         assertTrue(Files.exists(gameOutputDir), "Game output directory not created");
 
         try (var imgFiles = Files.list(gameOutputDir)) {
@@ -575,10 +585,9 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed for 12 Mbit LoROM with DSP");
 
-        // Compute sanitized base name from actual input file
+        // Output folder uses original base name
         String baseName = syntheticRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        String sanitizedBaseName = new RomPartNormalizer().sanitizeName(baseName);
-        Path gameOutputDir = outputDir.resolve(sanitizedBaseName);
+        Path gameOutputDir = outputDir.resolve(baseName);
         assertTrue(Files.exists(gameOutputDir), "Game output directory not created");
 
         try (var imgFiles = Files.list(gameOutputDir)) {

@@ -346,4 +346,42 @@ class RomProcessorTest {
         assertTrue(Files.exists(expectedImage),
                 "Single disk should be named GameName.img (no numbering)");
     }
+
+    /**
+     * Verifies output folder preserves original ROM filename with special characters,
+     * while disk images inside use sanitized names for tool compatibility.
+     */
+    @Test
+    void testOutputFolderUsesOriginalRomName() throws IOException {
+        Path romFile = tempDir.resolve("Game#123.sfc");
+        Files.write(romFile, new byte[]{0x01});
+
+        Path outputDir = tempDir.resolve("output");
+        Files.createDirectories(outputDir);
+
+        File part1 = tempDir.resolve("work").resolve("Game_123.1").toFile();
+        Files.createDirectories(part1.getParentFile().toPath());
+        Files.write(part1.toPath(), new byte[]{0x01});
+
+        when(mockFacade.splitRom(any(File.class), any(Path.class), eq(CopierFormat.FIG)))
+                .thenReturn(List.of(part1));
+
+        doAnswer(invocation -> {
+            Path targetPath = invocation.getArgument(1);
+            Files.write(targetPath, new byte[]{0x00});
+            return null;
+        }).when(mockTemplateFactory).createBlankDisk(any(FloppyType.class), any(Path.class));
+
+        when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
+            List<RomPartMetadata> metadata = invocation.getArgument(0);
+            return List.of(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
+        });
+
+        processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG);
+
+        assertTrue(Files.exists(outputDir.resolve("Game#123")),
+                "Output folder should use original ROM name (unsanitized)");
+        assertTrue(Files.exists(outputDir.resolve("Game#123").resolve("Game_123.img")),
+                "Disk image should use sanitized name");
+    }
 }
