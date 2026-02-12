@@ -1,232 +1,64 @@
 # FloppyConvert
 
-FloppyConvert is a CLI utility designed to automate the conversion of SNES ROM files (`.sfc`, `.fig`, `.swc`, `.ufo`) into FAT12 floppy disk images compatible with vintage backup units.
-
-It uses a native Java ROM splitting engine to generate format-specific split files (FIG, SWC, UFO, GD3) with accurate copier headers, then packages them into FAT12 floppy images using a custom FAT12 writer. The tool supports recursive directory scanning, concurrent batch processing, and intelligent workspace management.
+A CLI tool that converts SNES ROM files into FAT12 floppy disk images for vintage backup units (Pro Fighter, Super Wild Card, Super UFO, Game Doctor SF3).
 
 ## Prerequisites
 
-### Build Dependencies
-*   Java Development Kit (JDK) 21 or higher.
-*   Apache Maven.
+- JDK 21+
+- Apache Maven
 
-## Installation
-
-### Pre-built Binaries
-Native executables for Windows, Linux, and macOS are automatically generated via GitHub Actions. Please refer to the **Releases** section of this repository to download the artifact appropriate for your system.
-
-### Building from Source
-To compile the project and generate the JAR artifact:
+## Building
 
 ```bash
 mvn clean package
 ```
 
-This will produce `target/floppyconvert-1.0-SNAPSHOT.jar`.
+Pre-built native executables are available in the **Releases** section.
 
 ## Usage
 
-For detailed command-line arguments and format options, please refer to the [Manpage Documentation](floppyconvert.adoc).
-
-### Basic Execution
-Run the compiled JAR using the Java 21 runtime:
+See the [manpage](floppyconvert.adoc) for full documentation.
 
 ```bash
-# Convert a single file (defaults output to current directory)
+# Single file conversion
 java -jar target/floppyconvert-1.0-SNAPSHOT.jar game.sfc
 
-# Recursive batch conversion with explicit output directory
-java -jar target/floppyconvert-1.0-SNAPSHOT.jar ./input_roms -o ./output_floppies --format SWC
+# Batch conversion with format selection
+java -jar target/floppyconvert-1.0-SNAPSHOT.jar ./roms -o ./output --format SWC
+
+# Native executable
+./floppyconvert game.sfc --format GD3 --verbose
 ```
 
-### Native Image
-If you have built the native executable (via the `native` Maven profile), you can run it directly without the JVM prefix:
+## Supported Formats
+
+### FIG / SWC
+
+Split into 4Mbit chunks with numeric extensions.
 
 ```
-# Linux / macOS
-./floppyconvert ./roms --verbose
-
-# Windows
-floppyconvert.exe .\roms --verbose
+game.1    game.2    game.3
 ```
 
-## Format-Specific Examples
+### UFO
 
-FloppyConvert supports four backup unit formats, each with distinct file naming conventions.
+Split into 4Mbit chunks (LoROM) or irregular chunks (HiROM) with `.gm` extensions.
 
-### FIG Format (Pro Fighter)
-
-```bash
-# Convert single ROM to FIG format
-java -jar floppyconvert.jar game.sfc --format FIG
-
-# Output files (for 12Mbit ROM):
-# game.1  (4Mbit chunk with FIG header)
-# game.2  (4Mbit chunk with FIG header)
-# game.3  (4Mbit chunk with FIG header)
+```
+game.1gm    game.2gm    game.3gm
 ```
 
-**Naming:** `.1`, `.2`, `.3`, ... (numeric extensions)
+### GD3
 
-**Headers:** All parts receive FIG headers (unlike GD3)
+Split into 8Mbit chunks using SF-Code filenames (`SF` + size + 3-char title + sequence + `.078`). HiROM data is interleaved before splitting. Only the first part carries a header.
 
-### SWC Format (Super Wild Card)
-
-```bash
-# Convert single ROM to SWC format
-java -jar floppyconvert.jar game.sfc --format SWC
-
-# Output files (for 8Mbit ROM):
-# game.1  (4Mbit chunk with SWC header)
-# game.2  (4Mbit chunk with SWC header)
+```
+SF4SUP__.078                              (4Mbit LoROM, single file)
+SF8AXEXA.078  SF8AXEXB.078                (8Mbit HiROM, force-split to 4Mbit)
+SF16CHRA.078  SF16CHRB.078  ...           (16Mbit HiROM, force-split to 4Mbit)
+SF32TALA.078  SF32TALB.078  ...           (32Mbit HiROM, 8Mbit chunks)
 ```
 
-**Naming:** `.1`, `.2`, `.3`, ... (numeric extensions)
+## Testing
 
-**Headers:** All parts receive SWC headers
-
-### UFO Format (Super UFO)
-
-```bash
-# Convert single ROM to UFO format
-java -jar floppyconvert.jar game.sfc --format UFO
-
-# Output files (for 12Mbit ROM):
-# game.1gm  (4Mbit chunk with UFO header)
-# game.2gm  (4Mbit chunk with UFO header)
-# game.3gm  (4Mbit chunk with UFO header)
-```
-
-**Naming:** `.1gm`, `.2gm`, `.3gm`, ... (numeric prefix + "gm" extension)
-
-**Headers:** All parts receive UFO headers with dual-source size encoding (per-part blocks in bytes 0-1, total Mbit in byte 17)
-
-### GD3 Format (Game Doctor SF3)
-
-```bash
-# Convert single ROM to GD3 format
-java -jar floppyconvert.jar game.sfc --format GD3
-
-# Output files (for 16Mbit HiROM "Chrono Trigger"):
-# SF16CHRXA.078  (8Mbit chunk with GD3 header)
-# SF16CHRXB.078  (8Mbit chunk, no header)
-```
-
-**Naming:** SF-Code format (SF + Mbit + 3-char name + suffix + .078)
-
-**SF-Code Examples:**
-
-| ROM Title | Size | Type | Output Files |
-|-----------|------|------|--------------|
-| Super Mario World | 4Mbit | LoROM | `SF4SUP__.078` (single file, underscore-padded) |
-| Chrono Trigger | 16Mbit | HiROM | `SF16CHRXA.078`, `SF16CHRXB.078` (X-padding for HiROM ≤16Mbit) |
-| Star Fox | 8Mbit | LoROM | `SF8STA__.078` (single file) |
-| Tales of Phantasia | 24Mbit | HiROM | `SF24TALA.078`, `SF24TALB.078`, `SF24TALC.078` (no X-padding, >16Mbit) |
-
-**Headers:** First part only (subsequent .078 files contain raw ROM data)
-
-**Interleaving:** HiROM ROMs are automatically interleaved before splitting (required for Game Doctor hardware)
-
-## Architecture Rationale
-
-### Why Native ROM Splitting?
-
-FloppyConvert uses a native Java ROM splitting engine instead of external tools like ucon64. This design decision provides:
-
-- **Precise header control:** Direct byte-level control over copier headers ensures exact hardware compatibility
-- **Format flexibility:** Easy to add new copier formats without external tool dependencies
-- **Portable builds:** Single JAR contains all conversion logic (no external binaries required)
-- **Test reliability:** Property-based tests validate headers across thousands of synthetic ROMs
-
-### Why Format-Specific Naming?
-
-Each backup unit format uses different naming conventions because the hardware expects specific patterns:
-
-- **FIG/SWC:** Simple numeric extensions (.1, .2, ...) match original DOS-era tooling
-- **UFO:** `.gm` extension identifies Game Master format files for hardware recognition
-- **GD3:** SF-Code format encodes ROM metadata (size, title, type) in filename for Game Doctor's file browser
-
-The SF-Code format is particularly complex because it encodes:
-- Total ROM size in Mbit (not per-part size)
-- Sanitized 3-character ROM title
-- HiROM/LoROM type via X-padding rules
-- Multi-file sequence letters
-
-This filename encoding allows Game Doctor hardware to display ROM information without reading file contents.
-
-### Why Dual-Source Size Encoding (UFO)?
-
-UFO format headers use two different size values in the same header:
-- **Bytes 0-1:** Per-part size in 8KB blocks (for this specific split part)
-- **Byte 17:** Total ROM size in Mbit (for entire ROM)
-
-This dual-source requirement exists because UFO hardware uses:
-- Per-part blocks for loading individual files from floppy
-- Total Mbit for internal memory mapping configuration
-
-Encoding only total size (like GD3) would break per-part loading. Encoding only per-part size would break memory mapping. Both are required.
-
-### Why X-Padding for HiROM ≤16Mbit?
-
-Game Doctor SF3 hardware expects X-padding in SF-Code filenames for HiROM ROMs ≤16Mbit in multi-file splits:
-- Correct: `SF16CHRXA.078`, `SF16CHRXB.078`
-- Wrong: `SF16CHRA.078`, `SF16CHRB.078`
-
-This quirk exists because early Game Doctor firmware used X-padding to distinguish HiROM from LoROM in its file browser. The condition must be `<=` not `<` because exactly 16Mbit HiROM ROMs require X-padding.
-
-Off-by-one errors here cause hardware to misdetect ROM type and fail to load.
-
-### Why First-Part-Only Headers (GD3)?
-
-GD3 format only includes headers in the first .078 file. Subsequent parts contain raw ROM data without headers.
-
-This design matches Game Doctor hardware behavior:
-- First file is loaded by hardware bootloader (reads header for memory map configuration)
-- Subsequent files are loaded by first file's code (raw data only)
-
-Adding headers to all parts (like FIG does) would break compatibility because Game Doctor expects raw data in parts > 0.
-
-## Test ROM Files
-
-### Real ROM Checksums
-
-The test suite uses real SNES ROM files when available for high-fidelity hardware compatibility testing. The expected SHA1 checksums are:
-
-| ROM File | SHA1 Checksum |
-|----------|---------------|
-| ActRaiser 2 (USA).sfc | `17c086f3418f7f51e5472270d756ec5112914b83` |
-| Art of Fighting (USA).sfc | `db0ed085bd28bf58ec050e6eb950471163f8367e` |
-| Breath of Fire (USA).sfc | `b8a9e3023b92e0f4139428f6d7a9e0f9db70f60e` |
-| Chrono Trigger (USA).sfc | `de5822f4f2f7a55acb8926d4c0eaa63d5d989312` |
-| Street Fighter II Turbo (USA) (Rev 1).sfc | `9f6e8f2585e60bd6690c068c692ac97653bae6a6` |
-| Super Bomberman 2 (USA).sfc | `14e4d0b3d00fd04f996eea86daa485a35e501853` |
-| Super Mario World (USA).sfc | `6b47bb75d16514b6a476aa0c73a683a2a4c18765` |
-
-### Synthetic ROM Fallback
-
-Tests automatically fall back to synthetic ROMs when real ROM files are unavailable. This ensures tests run successfully on clean checkouts without requiring users to obtain ROM files.
-
-The `TestRomProvider.getRomOrSynthetic()` method implements this behavior:
-- First attempts to load the real ROM from `src/test/resources/snes/`
-- Falls back to generating a synthetic ROM with matching characteristics if file not found
-- Synthetic ROMs have valid SNES headers and checksum integrity but contain generated data
-
-### Test Categories
-
-| Test File | ROM Source |
-|-----------|------------|
-| `FloppyConvertE2ETest` | Real or Synthetic (fallback) |
-| `FloppyConvertLoggingTest` | Synthetic only |
-| `FloppyConvertConcurrencyTest` | Synthetic only |
-| `FloppyConvertRecursionTest` | Synthetic only |
-| `SnesRomReaderTest` | Synthetic only |
-
-### Obtaining Real ROMs
-
-To use real ROM files for testing:
-
-1. Obtain legal copies of the ROM files listed above
-2. Place them in `src/test/resources/snes/`
-3. Verify checksums match the table above using `sha1sum`
-
-Tests will automatically detect and use real ROMs when present. On clean checkouts without ROM files, tests use synthetic fallback and still pass all validations.
+Tests use synthetic ROMs by default. For higher-fidelity testing, place real ROM files in `src/test/resources/snes/` — the test suite detects and uses them automatically.
