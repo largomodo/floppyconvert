@@ -44,6 +44,8 @@ dependency-reduced-pom.xml
 # Ignore all markdown files in the repo root
 /*.md
 /*.txt
+
+# Ignore dotfiles
 /.*
 
 # Ignore log files
