@@ -58,7 +58,7 @@ import java.util.stream.Stream;
                 "Automates the conversion of SNES ROM files (.sfc, .fig, .swc, .ufo) into FAT12 floppy disk" +
                         " images compatible with retro backup units.",
                 "",
-                "This tool uses 'ucon64' to split ROMs and a native FAT12 engine to create .img files.",
+                "This tool uses a native ROM splitting engine and FAT12 writer to create .img files.",
                 "It supports recursive directory processing and batch conversion."
         },
         exitCodeListHeading = "%nExit Codes:%n",
@@ -78,8 +78,8 @@ public class FloppyConvert implements Callable<Integer> {
 
     @Parameters(index = "0", paramLabel = "INPUT",
             description = {
-                    "The source ROM file (.sfc) to convert, or a directory to process.",
-                    "If a directory is provided, the tool scans it recursively for .sfc files and " +
+                    "The source ROM file (.sfc, .fig, .swc, .ufo) to convert, or a directory to process.",
+                    "If a directory is provided, the tool scans it recursively for ROM files and " +
                             "converts them in batch mode, preserving the directory structure."
             })
     File inputPath;
