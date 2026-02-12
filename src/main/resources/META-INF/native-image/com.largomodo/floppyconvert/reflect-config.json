@@ -8,5 +8,24 @@
     "name": "ch.qos.logback.classic.filter.LevelFilter",
     "allDeclaredConstructors": true,
     "allPublicMethods": true
+  },
+  {
+    "name": "ch.qos.logback.core.UnsynchronizedAppenderBase",
+    "methods": [
+      {
+        "name": "addFilter",
+        "parameterTypes": ["ch.qos.logback.core.filter.Filter"]
+      }
+    ]
+  },
+  {
+    "name": "ch.qos.logback.classic.Level",
+    "allDeclaredConstructors": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "ch.qos.logback.core.spi.FilterReply",
+    "allDeclaredConstructors": true,
+    "allPublicMethods": true
   }
 ]
