@@ -1,6 +1,7 @@
 package com.largomodo.floppyconvert;
 
 import com.largomodo.floppyconvert.core.*;
+import com.largomodo.floppyconvert.service.fat.Fat12FormatFactory;
 import com.largomodo.floppyconvert.core.domain.DiskPacker;
 import com.largomodo.floppyconvert.core.domain.GreedyDiskPacker;
 import com.largomodo.floppyconvert.core.workspace.CleanupException;
@@ -195,7 +196,7 @@ public class FloppyConvert implements Callable<Integer> {
         RomSplitter splitter = createRomSplitter();
         FloppyImageWriter writer = new Fat12ImageWriter();
         ConversionFacade facade = new DefaultConversionFacade(splitter, writer);
-        DiskTemplateFactory templateFactory = new ResourceDiskTemplateFactory();
+        DiskTemplateFactory templateFactory = new Fat12FormatFactory();
         RomPartNormalizer normalizer = new RomPartNormalizer();
         RomProcessor processor = new RomProcessor(packer, facade, templateFactory, normalizer);
 
@@ -389,7 +390,7 @@ public class FloppyConvert implements Callable<Integer> {
         FloppyImageWriter writer = new Fat12ImageWriter();
         // Facade layer enables dependency inversion - core depends on abstraction
         ConversionFacade facade = new DefaultConversionFacade(splitter, writer);
-        DiskTemplateFactory templateFactory = new ResourceDiskTemplateFactory();
+        DiskTemplateFactory templateFactory = new Fat12FormatFactory();
         RomPartNormalizer normalizer = new RomPartNormalizer();
         RomProcessor processor = new RomProcessor(packer, facade, templateFactory, normalizer);
 
