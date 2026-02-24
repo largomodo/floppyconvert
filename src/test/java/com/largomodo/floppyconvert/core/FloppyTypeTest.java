@@ -3,7 +3,6 @@ package com.largomodo.floppyconvert.core;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.io.InputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -41,16 +40,5 @@ class FloppyTypeTest {
                 () -> FloppyType.bestFit(1_700_000));
         assertTrue(ex.getMessage().contains("1700000"));
         assertTrue(ex.getMessage().contains("1.6MB"));
-    }
-
-    @Test
-    void testResourcesExist() {
-        for (FloppyType type : FloppyType.values()) {
-            try (InputStream stream = getClass().getResourceAsStream(type.getResourcePath())) {
-                assertNotNull(stream, "Missing resource: " + type.getResourcePath());
-            } catch (IOException e) {
-                fail("Failed to load resource: " + type.getResourcePath());
-            }
-        }
     }
 }

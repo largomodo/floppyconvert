@@ -1,6 +1,6 @@
 package com.largomodo.floppyconvert;
 
-import com.largomodo.floppyconvert.core.ResourceDiskTemplateFactory;
+import com.largomodo.floppyconvert.service.fat.Fat12FormatFactory;
 import com.largomodo.floppyconvert.core.RomPartNormalizer;
 import com.largomodo.floppyconvert.core.RomProcessor;
 import com.largomodo.floppyconvert.core.domain.GreedyDiskPacker;
@@ -84,7 +84,7 @@ class FloppyConvertE2ETest {
         return new RomProcessor(
                 new GreedyDiskPacker(),
                 facade,
-                new ResourceDiskTemplateFactory(),
+                new Fat12FormatFactory(),
                 new RomPartNormalizer()
         );
     }

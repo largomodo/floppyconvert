@@ -26,6 +26,7 @@ import java.util.Map;
  * </ul>
  * <p>
  * Supported Geometry: Standard 720KB (DD), 1.44MB (HD), and 1.6MB (Extra) images.
+ * Geometry values are defined in FloppyType enum as the authoritative source.
  */
 public class Fat12ImageWriter implements FloppyImageWriter {
 
