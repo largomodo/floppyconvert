@@ -338,7 +338,8 @@ public class FloppyConvert implements Callable<Integer> {
                         romPath.toFile(),
                         targetBaseDir,
                         uniqueSuffix,
-                        format
+                        format,
+                        false
                 );
                 observer.onSuccess(romPath, diskCount);
             } catch (CleanupException e) {
@@ -401,7 +402,8 @@ public class FloppyConvert implements Callable<Integer> {
                     inputPath.toFile(),
                     outputBase,
                     "single",
-                    config.format
+                    config.format,
+                    true
             );
             log.info("Conversion complete: {}", inputPath.getFileName());
         } catch (CleanupException e) {
@@ -415,9 +417,25 @@ public class FloppyConvert implements Callable<Integer> {
     @Override
     public Integer call() throws Exception {
         if (verbose) {
+            // Root logger level controls which events are generated.
+            // The STDOUT appender's ThresholdFilter(INFO) is a second gate that blocks
+            // DEBUG events from reaching the console even when root level is DEBUG.
+            // Both must be relaxed together for --verbose to produce visible console output.
+            // ThresholdFilter is already registered in reflect-config.json for native-image. (ref: DL-001)
             ch.qos.logback.classic.Logger root =
                     (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
             root.setLevel(ch.qos.logback.classic.Level.DEBUG);
+            ch.qos.logback.core.Appender<ch.qos.logback.classic.spi.ILoggingEvent> stdoutAppender =
+                    root.getAppender("STDOUT");
+            if (stdoutAppender instanceof ch.qos.logback.core.UnsynchronizedAppenderBase) {
+                for (ch.qos.logback.core.filter.Filter<?> filter :
+                        stdoutAppender.getCopyOfAttachedFiltersList()) {
+                    if (filter instanceof ch.qos.logback.classic.filter.ThresholdFilter tf) {
+                        tf.setLevel("DEBUG");
+                        break;
+                    }
+                }
+            }
         }
 
         if (!inputPath.exists()) {

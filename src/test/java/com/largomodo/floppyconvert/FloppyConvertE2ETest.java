@@ -127,17 +127,13 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed");
 
-        // Verify output structure
+        // Verify output structure - single-file mode places output directly in outputDir
         String baseName = inputRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        // Output folder uses original base name (preserves special characters)
-        Path gameOutputDir = outputDir.resolve(baseName);
-
-        assertTrue(Files.exists(gameOutputDir), "Game output directory not created: " + baseName);
-        assertTrue(Files.isDirectory(gameOutputDir), "Expected directory: " + gameOutputDir);
 
         // Verify .img files were created and are non-empty
-        try (var imgFiles = Files.list(gameOutputDir)) {
+        try (var imgFiles = Files.list(outputDir)) {
             var images = imgFiles
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.toString().endsWith(".img"))
                     .toList();
 
@@ -151,7 +147,7 @@ class FloppyConvertE2ETest {
 
         // Verify cleanup: no split parts should remain
         // Format-specific patterns: SWC/FIG use .1, .2, .3; UFO uses .1gm, .2gm, .3gm; GD3 uses .078
-        try (var stream = Files.list(gameOutputDir)) {
+        try (var stream = Files.list(outputDir)) {
             String formatPattern = switch (format) {
                 case UFO -> ".*\\.(\\d+)gm$";
                 case GD3 -> "SF\\d+[A-Z_]+\\.078$";
@@ -159,6 +155,7 @@ class FloppyConvertE2ETest {
             };
 
             long partFileCount = stream
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().matches(formatPattern))
                     .count();
             assertEquals(0, partFileCount,
@@ -170,8 +167,9 @@ class FloppyConvertE2ETest {
         // Small ROMs (≤4 Mbit) don't get split, so the intermediate file IS the part - don't check cleanup
         boolean isLargeRom = romResourcePath.contains("Chrono Trigger");
         if (isLargeRom) {
-            try (var files = Files.list(gameOutputDir)) {
+            try (var files = Files.list(outputDir)) {
                 long intermediateCount = files
+                        .filter(Files::isRegularFile)
                         .filter(p -> p.toString().endsWith(".fig") ||
                                 p.toString().endsWith(".swc") ||
                                 p.toString().endsWith(".ufo") ||
@@ -201,14 +199,13 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed");
 
-        // Verify output structure - output folder uses original base name
+        // Verify output structure - single-file mode places .img directly in outputDir (no game-name subdirectory)
         String baseName = testRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        Path gameOutputDir = outputDir.resolve(baseName);
-        assertTrue(Files.exists(gameOutputDir), "Output directory should exist");
-        assertTrue(Files.isDirectory(gameOutputDir), "Output should be a directory");
+        assertFalse(Files.exists(outputDir.resolve(baseName)),
+                "Single-file mode should not create game-name subdirectory");
 
-        // Verify .img files were created
-        try (var stream = Files.list(gameOutputDir)) {
+        // Verify .img files were created directly in outputDir
+        try (var stream = Files.list(outputDir)) {
             List<Path> imgFiles = stream
                     .filter(p -> p.toString().endsWith(".img"))
                     .toList();
@@ -226,7 +223,7 @@ class FloppyConvertE2ETest {
 
         // Verify cleanup: no split parts should remain (small ROM doesn't split)
         // FIG format uses .1, .2, .3 extensions
-        try (var stream = Files.list(gameOutputDir)) {
+        try (var stream = Files.list(outputDir)) {
             long partFileCount = stream
                     .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
                     .count();
@@ -234,7 +231,7 @@ class FloppyConvertE2ETest {
         }
 
         // Verify cleanup: no intermediate format files remain (converted to .img)
-        try (var files = Files.list(gameOutputDir)) {
+        try (var files = Files.list(outputDir)) {
             long intermediateCount = files
                     .filter(p -> p.toString().endsWith(".fig") ||
                             p.toString().endsWith(".swc") ||
@@ -278,15 +275,14 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed even with special characters in filename");
 
-        // Verify output structure - output folder uses ORIGINAL base name (preserves special characters)
-        String expectedBaseName = "VLDC10 [#053] - ERROR CODE #1D4 (Update) by Sayuri [2017-04-02] (SMW Hack)";
-        Path gameOutputDir = outputDir.resolve(expectedBaseName);
-        assertTrue(Files.exists(gameOutputDir), "Output directory should exist");
-        assertTrue(Files.isDirectory(gameOutputDir), "Output should be a directory");
+        // Verify output structure - single-file mode places output directly in outputDir
+        assertTrue(Files.exists(outputDir), "Output directory should exist");
+        assertTrue(Files.isDirectory(outputDir), "Output should be a directory");
 
         // Verify .img files were created
-        try (var stream = Files.list(gameOutputDir)) {
+        try (var stream = Files.list(outputDir)) {
             List<Path> imgFiles = stream
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.toString().endsWith(".img"))
                     .toList();
             assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
@@ -301,15 +297,17 @@ class FloppyConvertE2ETest {
 
         // Verify cleanup: no split parts should remain
         // FIG format uses .1, .2, .3 extensions
-        try (var stream = Files.list(gameOutputDir)) {
+        try (var stream = Files.list(outputDir)) {
             long partFileCount = stream
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
                     .count();
             assertEquals(0, partFileCount, "No split parts should remain after processing");
         }
 
-        try (var files = Files.list(gameOutputDir)) {
+        try (var files = Files.list(outputDir)) {
             long intermediateCount = files
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.toString().endsWith(".fig") ||
                             p.toString().endsWith(".swc") ||
                             p.toString().endsWith(".ufo") ||
@@ -352,16 +350,14 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed with shell-sensitive characters (&, $, !, space)");
 
-        // Verify output structure - output folder uses ORIGINAL base name (preserves special characters)
-        String expectedBaseName = "Ren & Stimpy Show, The - Buckeroo$! (USA)";
-        Path gameOutputDir = outputDir.resolve(expectedBaseName);
-
+        // Verify output structure - single-file mode places output directly in outputDir
         assertTrue(Files.exists(outputDir), "Output directory should exist");
         assertTrue(Files.isDirectory(outputDir), "Output should be a directory");
 
         // Verify .img files were created
-        try (var stream = Files.list(gameOutputDir)) {
+        try (var stream = Files.list(outputDir)) {
             List<Path> imgFiles = stream
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.toString().endsWith(".img"))
                     .toList();
             assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
@@ -376,15 +372,17 @@ class FloppyConvertE2ETest {
 
         // Verify cleanup: no split parts should remain
         // FIG format uses .1, .2, .3 extensions
-        try (var stream = Files.list(gameOutputDir)) {
+        try (var stream = Files.list(outputDir)) {
             long partFileCount = stream
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
                     .count();
             assertEquals(0, partFileCount, "No split parts should remain after processing");
         }
 
-        try (var files = Files.list(gameOutputDir)) {
+        try (var files = Files.list(outputDir)) {
             long intermediateCount = files
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.toString().endsWith(".fig") ||
                             p.toString().endsWith(".swc") ||
                             p.toString().endsWith(".ufo") ||
@@ -415,12 +413,9 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed with .fig extension");
 
-        Path gameOutputDir = outputDir.resolve("ChronoTrigger");
-        assertTrue(Files.exists(gameOutputDir), "Output directory should exist");
-        assertTrue(Files.isDirectory(gameOutputDir), "Output should be a directory");
-
-        try (var imgFiles = Files.list(gameOutputDir)) {
+        try (var imgFiles = Files.list(outputDir)) {
             var images = imgFiles
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.toString().endsWith(".img"))
                     .toList();
 
@@ -448,13 +443,9 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed for 8 Mbit LoROM");
 
-        // Output folder uses original base name
-        String baseName = syntheticRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        Path gameOutputDir = outputDir.resolve(baseName);
-        assertTrue(Files.exists(gameOutputDir), "Game output directory not created");
-
-        try (var imgFiles = Files.list(gameOutputDir)) {
+        try (var imgFiles = Files.list(outputDir)) {
             var images = imgFiles
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.toString().endsWith(".img"))
                     .toList();
             assertFalse(images.isEmpty(), "Should generate at least one .img file");
@@ -476,13 +467,9 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed for 16 Mbit HiROM with GD3");
 
-        // Output folder uses original base name
-        String baseName = syntheticRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        Path gameOutputDir = outputDir.resolve(baseName);
-        assertTrue(Files.exists(gameOutputDir), "Game output directory not created");
-
-        try (var imgFiles = Files.list(gameOutputDir)) {
+        try (var imgFiles = Files.list(outputDir)) {
             var images = imgFiles
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.toString().endsWith(".img"))
                     .toList();
             assertFalse(images.isEmpty(), "Should generate .img files for 16 Mbit HiROM with GD3");
@@ -494,8 +481,9 @@ class FloppyConvertE2ETest {
             }
         }
 
-        try (var stream = Files.list(gameOutputDir)) {
+        try (var stream = Files.list(outputDir)) {
             long partFileCount = stream
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().matches("SF\\d+[A-Z_]+\\.078$"))
                     .count();
             assertEquals(0, partFileCount, "GD3 split parts (SF*.078) should be cleaned up");
@@ -517,13 +505,9 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed for 12 Mbit HiROM with GD3");
 
-        // Output folder uses original base name
-        String baseName = syntheticRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        Path gameOutputDir = outputDir.resolve(baseName);
-        assertTrue(Files.exists(gameOutputDir), "Game output directory not created");
-
-        try (var imgFiles = Files.list(gameOutputDir)) {
+        try (var imgFiles = Files.list(outputDir)) {
             var images = imgFiles
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.toString().endsWith(".img"))
                     .toList();
             assertFalse(images.isEmpty(), "Should generate .img files for 12 Mbit HiROM with GD3");
@@ -534,8 +518,9 @@ class FloppyConvertE2ETest {
             }
         }
 
-        try (var stream = Files.list(gameOutputDir)) {
+        try (var stream = Files.list(outputDir)) {
             long partFileCount = stream
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().matches(".*\\.(078|\\d+)$"))
                     .count();
             assertEquals(0, partFileCount, "Split parts should be cleaned up after conversion");
@@ -557,13 +542,9 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed for 8 Mbit HiROM with 64KB SRAM");
 
-        // Output folder uses original base name
-        String baseName = syntheticRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        Path gameOutputDir = outputDir.resolve(baseName);
-        assertTrue(Files.exists(gameOutputDir), "Game output directory not created");
-
-        try (var imgFiles = Files.list(gameOutputDir)) {
+        try (var imgFiles = Files.list(outputDir)) {
             var images = imgFiles
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.toString().endsWith(".img"))
                     .toList();
             assertFalse(images.isEmpty(), "Should generate at least one .img file");
@@ -585,13 +566,9 @@ class FloppyConvertE2ETest {
 
         assertEquals(0, exitCode, "Conversion should succeed for 12 Mbit LoROM with DSP");
 
-        // Output folder uses original base name
-        String baseName = syntheticRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        Path gameOutputDir = outputDir.resolve(baseName);
-        assertTrue(Files.exists(gameOutputDir), "Game output directory not created");
-
-        try (var imgFiles = Files.list(gameOutputDir)) {
+        try (var imgFiles = Files.list(outputDir)) {
             var images = imgFiles
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.toString().endsWith(".img"))
                     .toList();
             assertFalse(images.isEmpty(), "Should generate at least one .img file");
@@ -604,7 +581,7 @@ class FloppyConvertE2ETest {
         Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.SUPER_BOMBERMAN_2, tempDir);
 
         RomProcessor processor = createProcessor();
-        int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3);
+        int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3, false);
 
         assertEquals(1, diskCount, "8Mbit ROM should fit on 1 disk");
 
@@ -621,7 +598,7 @@ class FloppyConvertE2ETest {
         Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.ART_OF_FIGHTING, tempDir);
 
         RomProcessor processor = createProcessor();
-        int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3);
+        int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3, false);
 
         assertTrue(diskCount >= 2, "16Mbit ROM should span multiple disks");
 
@@ -635,7 +612,7 @@ class FloppyConvertE2ETest {
         Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.STREET_FIGHTER_II, tempDir);
 
         RomProcessor processor = createProcessor();
-        int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3);
+        int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3, false);
 
         assertTrue(diskCount >= 2, "20Mbit ROM should span multiple disks");
 
@@ -649,7 +626,7 @@ class FloppyConvertE2ETest {
         Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.ACTRAISER_2, tempDir);
 
         RomProcessor processor = createProcessor();
-        int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.UFO);
+        int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.UFO, false);
 
         assertTrue(diskCount >= 1, "12Mbit ROM should produce at least 1 disk");
 
@@ -667,7 +644,7 @@ class FloppyConvertE2ETest {
         Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.BREATH_OF_FIRE, tempDir);
 
         RomProcessor processor = createProcessor();
-        int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.UFO);
+        int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.UFO, false);
 
         assertTrue(diskCount >= 1, "12Mbit ROM should produce at least 1 disk");
 
@@ -694,7 +671,7 @@ class FloppyConvertE2ETest {
         RomProcessor processor = createProcessor();
 
         assertThrows(UnsupportedHardwareException.class, () ->
-                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.UFO)
+                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.UFO, false)
         );
     }
 
@@ -711,7 +688,7 @@ class FloppyConvertE2ETest {
         Files.write(romFile, romData);
 
         RomProcessor processor = createProcessor();
-        processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.GD3);
+        processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.GD3, false);
     }
 
     @Test
@@ -720,7 +697,7 @@ class FloppyConvertE2ETest {
         Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.EXHIROM_48MBIT, tempDir);
 
         RomProcessor processor = createProcessor();
-        processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3);
+        processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3, false);
 
         List<Path> images = listDiskImages(romPath.getFileName().toString().replaceFirst("\\.[^.]+$", ""));
 

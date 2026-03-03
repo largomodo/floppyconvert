@@ -126,7 +126,7 @@ class NativeRomSplitterTest {
     @Test
     void testSplit12MbitRomSwc_ThreeFiles() throws IOException {
         File inputRom = createRomFile("test.sfc");
-        byte[] romData = createRomData(1536 * 1024); // 12 Mbit = 1.5 MB
+        byte[] romData = createRomData(1536 * 1024); // 12 Mbit = 1.5 MB, padded to 16 Mbit
         SnesRom rom = createLoRom(romData);
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
@@ -137,13 +137,14 @@ class NativeRomSplitterTest {
 
         verify(mockReader, times(1)).load(inputRom.toPath());
         verify(mockHeaderFactory, times(1)).get(CopierFormat.SWC);
-        verify(mockHeaderGenerator, times(3)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte());
+        verify(mockHeaderGenerator, times(4)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte());
         verifyNoInteractions(mockInterleaver);
 
-        assertEquals(3, parts.size());
+        assertEquals(4, parts.size());
         assertEquals("test.1", parts.getFirst().getName());
         assertEquals("test.2", parts.get(1).getName());
         assertEquals("test.3", parts.get(2).getName());
+        assertEquals("test.4", parts.get(3).getName());
     }
 
     @Test
@@ -226,7 +227,7 @@ class NativeRomSplitterTest {
     @Test
     void testHeaderGeneratorCalledWithCorrectIndices() throws IOException {
         File inputRom = createRomFile("test.sfc");
-        byte[] romData = createRomData(1536 * 1024); // 12 Mbit = 3 parts
+        byte[] romData = createRomData(1536 * 1024); // 12 Mbit, padded to 16 Mbit = 4 parts
         SnesRom rom = createLoRom(romData);
 
         when(mockReader.load(inputRom.toPath())).thenReturn(rom);
@@ -237,7 +238,8 @@ class NativeRomSplitterTest {
 
         verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(0), eq(false), anyByte());
         verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(1), eq(false), anyByte());
-        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(2), eq(true), anyByte());
+        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(2), eq(false), anyByte());
+        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(3), eq(true), anyByte());
     }
 
     @Test
@@ -445,6 +447,136 @@ class NativeRomSplitterTest {
         assertTrue(exception.getMessage().contains("Work directory is not a directory"));
     }
 
+    // Padding tests verify sub-chunk-size ROMs are mirrored to the nearest format-appropriate
+    // Mbit boundary before splitting. UFO HiROM uses chunker-supported sizes {2,4,12,20,32}.
+    // All others use power-of-2 boundaries {2,4,8,16,32}. (ref: DL-003, RA-004)
+
+    @Test
+    void testSmallRomPaddedToMbitBoundary_2Mbit() throws IOException {
+        File inputRom = createRomFile("test.sfc");
+        byte[] romData = createRomData(128 * 1024); // 1 Mbit = 128 KB
+        SnesRom rom = createLoRom(romData);
+
+        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
+        when(mockHeaderFactory.get(CopierFormat.SWC)).thenReturn(mockHeaderGenerator);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
+
+        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.SWC);
+
+        assertEquals(1, parts.size(), "1Mbit ROM should produce single part after padding to 2Mbit");
+        // 2Mbit = 256KB + 512-byte header
+        assertEquals(256 * 1024 + 512, parts.getFirst().length(),
+                "Padded 1Mbit ROM should produce 2Mbit data (256KB) + 512-byte header");
+    }
+
+    @Test
+    void testSmallRomPaddedToMbitBoundary_4Mbit() throws IOException {
+        File inputRom = createRomFile("test.sfc");
+        byte[] romData = createRomData(384 * 1024); // 3 Mbit = 384 KB
+        SnesRom rom = createLoRom(romData);
+
+        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
+        when(mockHeaderFactory.get(CopierFormat.FIG)).thenReturn(mockHeaderGenerator);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
+
+        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.FIG);
+
+        assertEquals(1, parts.size(), "3Mbit ROM should produce single part after padding to 4Mbit");
+        // 4Mbit = 512KB + 512-byte header
+        assertEquals(512 * 1024 + 512, parts.getFirst().length(),
+                "Padded 3Mbit ROM should produce 4Mbit data (512KB) + 512-byte header");
+    }
+
+    @Test
+    void testExactMbitBoundaryNotPadded() throws IOException {
+        File inputRom = createRomFile("test.sfc");
+        byte[] romData = createRomData(512 * 1024); // Exactly 4 Mbit
+        SnesRom rom = createLoRom(romData);
+
+        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
+        when(mockHeaderFactory.get(CopierFormat.SWC)).thenReturn(mockHeaderGenerator);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
+
+        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.SWC);
+
+        assertEquals(1, parts.size(), "Exact 4Mbit ROM should produce single part without padding");
+        assertEquals(512 * 1024 + 512, parts.getFirst().length(),
+                "Exact 4Mbit ROM should produce exactly 512KB + 512-byte header");
+    }
+
+    @Test
+    void testGd3HiRomPaddingHandledByInterleaver() throws IOException {
+        File inputRom = createRomFile("test.sfc");
+        byte[] romData = createRomData(384 * 1024); // 3 Mbit - small HiROM
+        byte[] interleavedData = new byte[8 * SnesConstants.MBIT]; // Interleaver pads to 8Mbit
+        SnesRom rom = createHiRom(romData);
+
+        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
+        when(mockInterleaver.interleave(any(byte[].class), any(RomType.class))).thenReturn(interleavedData);
+        when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
+
+        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
+
+        // GD3 HiROM uses interleaved data (8Mbit), force-split to 4Mbit = 2 parts
+        verify(mockInterleaver, times(1)).interleave(any(byte[].class), any(RomType.class));
+        assertEquals(2, parts.size(), "GD3 HiROM small ROM uses interleaver result size for splitting");
+    }
+
+    @Test
+    void testGd3LoRomSmallRomPadded() throws IOException {
+        File inputRom = createRomFile("test.sfc");
+        byte[] romData = createRomData(128 * 1024); // 1 Mbit LoROM
+        SnesRom rom = createLoRom(romData);
+
+        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
+        when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
+
+        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
+
+        // GD3 LoROM: no interleaving, padded to 2Mbit (power-of-2 boundary)
+        verifyNoInteractions(mockInterleaver);
+        assertEquals(1, parts.size(), "GD3 LoROM 1Mbit should produce single part after padding");
+        // GD3 uses 8Mbit chunks but padded data is 2Mbit, so one chunk
+        assertEquals(256 * 1024 + 512, parts.getFirst().length(),
+                "GD3 LoROM padded to 2Mbit: 256KB data + 512-byte header (only first part gets header)");
+    }
+
+    @Test
+    void testUfoHiRomPadsToChunkerSupportedSize_6Mbit() throws IOException {
+        File inputRom = createRomFile("test.sfc");
+        byte[] romData = createRomData(6 * SnesConstants.MBIT); // 6 Mbit HiROM
+        SnesRom rom = createHiRom(romData);
+
+        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
+        when(mockHeaderFactory.get(CopierFormat.UFO)).thenReturn(mockHeaderGenerator);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
+
+        // 6Mbit pads to 12Mbit (next UFO-supported size), which produces 4 parts via UfoHiRomChunker
+        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.UFO);
+
+        assertEquals(4, parts.size(),
+                "6Mbit UFO HiROM should pad to 12Mbit (next chunker-supported size), producing 4 parts");
+    }
+
+    @Test
+    void testUfoHiRomPadsToChunkerSupportedSize_3Mbit() throws IOException {
+        File inputRom = createRomFile("test.sfc");
+        byte[] romData = createRomData(3 * SnesConstants.MBIT); // 3 Mbit HiROM
+        SnesRom rom = createHiRom(romData);
+
+        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
+        when(mockHeaderFactory.get(CopierFormat.UFO)).thenReturn(mockHeaderGenerator);
+        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
+
+        // 3Mbit pads to 4Mbit (next UFO-supported size after 2Mbit), which is in chunker table
+        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.UFO);
+
+        assertEquals(2, parts.size(),
+                "3Mbit UFO HiROM should pad to 4Mbit (chunker-supported), producing 2 parts per chunker table");
+    }
+
     private File createRomFile(String name) throws IOException {
         Path romPath = tempDir.resolve(name);
         Files.write(romPath, new byte[]{0x01, 0x02, 0x03});
@@ -633,7 +765,7 @@ class NativeRomSplitterTest {
     @Test
     void testUfo_12MbitLoRom_StandardChunks() throws IOException {
         File inputRom = createRomFile("test.sfc");
-        byte[] romData = createRomData(1536 * 1024);
+        byte[] romData = createRomData(1536 * 1024); // 12 Mbit LoROM, padded to 16 Mbit
         SnesRom rom = createLoRom(romData);
 
         HeaderGenerator spyHeaderGen = spy(HeaderGenerator.class);
@@ -644,15 +776,17 @@ class NativeRomSplitterTest {
 
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.UFO);
 
-        assertEquals(3, parts.size(), "12Mbit LoROM UFO should produce 3 parts (standard 4Mbit chunks)");
+        assertEquals(4, parts.size(), "12Mbit LoROM UFO pads to 16Mbit, producing 4 standard 4Mbit chunks");
 
         assertEquals("test.1gm", parts.getFirst().getName());
         assertEquals("test.2gm", parts.get(1).getName());
         assertEquals("test.3gm", parts.get(2).getName());
+        assertEquals("test.4gm", parts.get(3).getName());
 
         verify(spyHeaderGen).generateHeader(eq(rom), eq(512 * 1024), eq(0), eq(false), anyByte());
         verify(spyHeaderGen).generateHeader(eq(rom), eq(512 * 1024), eq(1), eq(false), anyByte());
-        verify(spyHeaderGen).generateHeader(eq(rom), eq(512 * 1024), eq(2), eq(true), anyByte());
+        verify(spyHeaderGen).generateHeader(eq(rom), eq(512 * 1024), eq(2), eq(false), anyByte());
+        verify(spyHeaderGen).generateHeader(eq(rom), eq(512 * 1024), eq(3), eq(true), anyByte());
     }
 
     @Test
