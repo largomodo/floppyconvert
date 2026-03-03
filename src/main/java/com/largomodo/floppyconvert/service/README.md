@@ -42,6 +42,42 @@ NativeRomSplitter.split():
 - UFO HiROM uses UfoHiRomChunker for irregular chunk sequences; LoROM uses standard 4Mbit chunks
 - chunkFlag parameter passes UFO lookup table flags (0x40/0x10/0x00) to header generators
 
+<!-- Chunk size rationale and small ROM padding rules documented below. ref: DL-003, RA-004, RA-005 -->
+
+## Chunk Size Rationale
+
+### Why 4 Mbit (512KB) for FIG/SWC/UFO?
+
+SNES copier hardware (Super Magic Drive, Pro Fighter, Super UFO) transfers ROM data in 4 Mbit banks. Each bank aligns with the SNES address space bank size: $8000 (32KB) per bank, 16 banks = 512KB = 4 Mbit. The 512KB chunk size is not arbitrary; it matches the copier's hardware DMA transfer unit. Each chunk becomes one split file with its own 512-byte copier header describing the transfer parameters.
+
+### Why 8 Mbit (1MB) for GD3?
+
+Game Doctor SF3 hardware has wider memory banks (8 Mbit = 1MB). Chunks larger than the bank size would require multi-bank scatter-gather, which the GD3 firmware does not support. Exception: GD3 HiROM ROMs ≤16 Mbit force 4 Mbit chunks to trigger the multi-file split and X-padding in SF-Code naming (hardware firmware identifies HiROM files by the X-prefix pattern).
+
+### Small ROM Padding
+
+ROMs smaller than the standard chunk size are padded to a format-appropriate Mbit boundary before splitting. Padding uses data mirroring (repeating source bytes cyclically) rather than zero-fill, which keeps the SNES address space valid for shadow reads at unmapped addresses.
+
+**Format-aware padding rules:**
+
+| Format | ROM type | Padding target | Rationale |
+|--------|----------|----------------|-----------|
+| FIG/SWC | Any | Nearest power-of-2 Mbit {2,4,8,16,32} | Standard chunk-aligned sizes |
+| UFO | LoROM | Nearest power-of-2 Mbit {2,4,8,16,32} | Standard chunks, no lookup table |
+| UFO | HiROM | Nearest UfoHiRomChunker-supported size {2,4,12,20,32} | Chunker throws for unsupported sizes |
+| GD3 | LoROM | Nearest power-of-2 Mbit {2,4,8,16,32} | Standard 8Mbit chunks |
+| GD3 | HiROM | **Not padded by NativeRomSplitter** | SnesInterleaver.mirrorTo8Mbit() handles alignment |
+
+**UFO HiROM constraint:** UfoHiRomChunker.computeChunks() only accepts totalSizeMbit in {2,4,12,20,32}. Passing an unsupported size (e.g., 8 from padding a 6Mbit ROM) throws IllegalArgumentException. The padToUfoHiRomBoundary() method rounds up to the next chunker-supported size.
+
+**GD3 HiROM exclusion:** SnesInterleaver.interleave() calls mirrorTo8Mbit() internally, padding the data to 8 Mbit boundary before NativeRomSplitter applies chunk logic. Double-padding would produce incorrect interleaving results.
+
+**Examples:**
+- 128KB (1 Mbit) SWC LoROM → padded to 256KB (2 Mbit) → 1 split part
+- 384KB (3 Mbit) FIG LoROM → padded to 512KB (4 Mbit) → 1 split part
+- 6 Mbit UFO HiROM → padded to 12 Mbit (next UFO-supported size) → 4 parts per chunker table
+- 3 Mbit UFO HiROM → padded to 4 Mbit (UFO-supported) → 2 parts per chunker table
+
 ## Format-Specific Naming
 
 ### FIG/SWC Format

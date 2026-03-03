@@ -92,6 +92,16 @@ public class NativeRomSplitter implements RomSplitter {
             data = interleaver.interleave(data, rom.type());
         }
 
+        // Pad small ROMs to format-appropriate Mbit boundary before chunk calculation.
+        // GD3 HiROM is excluded: SnesInterleaver.mirrorTo8Mbit() handles alignment during interleaving.
+        if (!(format == CopierFormat.GD3 && rom.isHiRom())) {
+            if (format == CopierFormat.UFO && rom.isHiRom()) {
+                data = padToUfoHiRomBoundary(data);
+            } else {
+                data = padToMbitBoundary(data);
+            }
+        }
+
         // Force 4Mbit chunks for GD3 HiROM <= 16Mbit to trigger X-padding
         // Matches ucon64 condition (size <= 16 * MBIT) for copier naming compatibility
         int chunkSize = (format == CopierFormat.GD3) ? MBIT_8 : MBIT_4;
@@ -253,5 +263,64 @@ public class NativeRomSplitter implements RomSplitter {
         String name = file.getName();
         int lastDot = name.lastIndexOf('.');
         return (lastDot > 0) ? name.substring(0, lastDot) : name;
+    }
+
+    /**
+     * Pads ROM data to the nearest power-of-2 Mbit boundary {2, 4, 8, 16, 32} using data mirroring.
+     * If data is already at a boundary, returns it unmodified.
+     * ROMs smaller than 2 Mbit are padded to 2 Mbit.
+     * Mirroring repeats source bytes cyclically to fill the padding gap.
+     * Used by FIG, SWC, UFO LoROM, and GD3 LoROM. UFO HiROM uses
+     * {@link #padToUfoHiRomBoundary(byte[])} instead. (ref: DL-003)
+     */
+    private byte[] padToMbitBoundary(byte[] data) {
+        int[] boundaries = {2 * SnesConstants.MBIT, 4 * SnesConstants.MBIT, 8 * SnesConstants.MBIT,
+                16 * SnesConstants.MBIT, 32 * SnesConstants.MBIT};
+        int targetSize = boundaries[boundaries.length - 1];
+        for (int boundary : boundaries) {
+            if (data.length <= boundary) {
+                targetSize = boundary;
+                break;
+            }
+        }
+        if (data.length == targetSize) {
+            return data;
+        }
+        return mirrorTo(data, targetSize);
+    }
+
+    /**
+     * Pads ROM data to the nearest UfoHiRomChunker-supported size {2, 4, 12, 20, 32} Mbit using data mirroring.
+     * If data is already at a supported size, returns it unmodified.
+     * ROMs smaller than 2 Mbit are padded to 2 Mbit.
+     * Supported sizes match {@link UfoHiRomChunker#computeChunks(int)} input domain;
+     * power-of-2 padding would produce unsupported sizes (e.g., 8, 16 Mbit) causing
+     * {@code IllegalArgumentException}. (ref: DL-003, RA-004)
+     */
+    private byte[] padToUfoHiRomBoundary(byte[] data) {
+        int[] boundaries = {2 * SnesConstants.MBIT, 4 * SnesConstants.MBIT, 12 * SnesConstants.MBIT,
+                20 * SnesConstants.MBIT, 32 * SnesConstants.MBIT};
+        int targetSize = boundaries[boundaries.length - 1];
+        for (int boundary : boundaries) {
+            if (data.length <= boundary) {
+                targetSize = boundary;
+                break;
+            }
+        }
+        if (data.length == targetSize) {
+            return data;
+        }
+        return mirrorTo(data, targetSize);
+    }
+
+    /**
+     * Fills a new byte array of targetSize by mirroring source data cyclically.
+     */
+    private byte[] mirrorTo(byte[] source, int targetSize) {
+        byte[] result = new byte[targetSize];
+        for (int i = 0; i < targetSize; i++) {
+            result[i] = source[i % source.length];
+        }
+        return result;
     }
 }

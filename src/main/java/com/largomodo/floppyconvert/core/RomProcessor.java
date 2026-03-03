@@ -84,19 +84,22 @@ public class RomProcessor {
      * Multi-disk naming: GameName_1.img, GameName_2.img (explicit numbering for manual sorting).
      * Single-disk naming: GameName.img (no suffix needed).
      *
-     * @param romFile       Source ROM file (.sfc format)
-     * @param outputBaseDir Base output directory (final .img location)
-     * @param uniqueSuffix  Unique suffix to prevent workspace collisions (e.g., UUID for concurrent execution)
-     * @param format        Backup unit format for ROM splitting
+     * @param romFile        Source ROM file (.sfc format)
+     * @param outputBaseDir  Base output directory (final .img location)
+     * @param uniqueSuffix   Unique suffix to prevent workspace collisions (e.g., UUID for concurrent execution)
+     * @param format         Backup unit format for ROM splitting
+     * @param singleFileMode When true, places .img files directly in outputBaseDir (no game-name subdirectory)
      * @return Number of disk images created (for observer reporting)
      * @throws IOException                                          if any pipeline step fails
      * @throws com.largomodo.floppyconvert.core.workspace.CleanupException if workspace cleanup fails
      */
+
     public int processRom(
             File romFile,
             Path outputBaseDir,
             String uniqueSuffix,
-            CopierFormat format
+            CopierFormat format,
+            boolean singleFileMode
     ) throws IOException {
 
         BaseName baseName = extractAndSanitizeBaseName(romFile);
@@ -127,7 +130,7 @@ public class RomProcessor {
 
             List<Path> createdImages = writeDisksFromLayout(diskLayouts, gameOutputDir, sanitizedBaseName, ws);
 
-            promoteFinalOutputs(createdImages, outputBaseDir, baseName.original(), ws);
+            promoteFinalOutputs(createdImages, outputBaseDir, baseName.original(), ws, singleFileMode);
 
             log.info("Success: {} -> {} disk(s) [{}]", romFile.getName(), diskLayouts.size(), format.name());
 
@@ -267,14 +270,24 @@ public class RomProcessor {
      * Promote disk images from workspace to final output directory.
      * Uses atomic move to ensure outputs appear complete.
      * <p>
+     * In single-file mode, images land directly in outputBaseDir (no subdirectory created).
+     * In batch mode, images land in outputBaseDir/romName/ subdirectory to prevent collisions
+     * between different ROMs processed in the same batch.
+     * <p>
      * Output folder name uses original ROM filename (preserves user's special characters).
      * Disk image filenames inside the folder use sanitized names (tool-safe).
      */
-    private void promoteFinalOutputs(List<Path> createdImages, Path outputBaseDir,
-                                     String originalBaseName, ConversionWorkspace ws) throws IOException {
-        Path finalGameDir = outputBaseDir.resolve(originalBaseName);
-        Files.createDirectories(finalGameDir);
 
+    private void promoteFinalOutputs(List<Path> createdImages, Path outputBaseDir,
+                                     String originalBaseName, ConversionWorkspace ws,
+                                     boolean singleFileMode) throws IOException {
+        Path finalGameDir;
+        if (singleFileMode) {
+            finalGameDir = outputBaseDir;
+        } else {
+            finalGameDir = outputBaseDir.resolve(originalBaseName);
+            Files.createDirectories(finalGameDir);
+        }
         for (Path imgFile : createdImages) {
             ws.promoteToFinal(imgFile, finalGameDir);
         }

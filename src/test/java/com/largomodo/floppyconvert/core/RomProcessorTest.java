@@ -113,7 +113,7 @@ class RomProcessorTest {
         });
 
         // Execute
-        int diskCount = processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG);
+        int diskCount = processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG, false);
 
         // Verify facade.splitRom was called
         verify(mockFacade).splitRom(eq(romFile.toFile()), any(Path.class), eq(CopierFormat.FIG));
@@ -169,7 +169,7 @@ class RomProcessorTest {
         });
 
         // Execute
-        int diskCount = processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.SWC);
+        int diskCount = processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.SWC, false);
 
         // Verify return value matches layouts.size()
         assertEquals(3, diskCount, "Should return number of disk layouts (3)");
@@ -190,7 +190,7 @@ class RomProcessorTest {
 
         // Execute and expect exception
         IOException ex = assertThrows(IOException.class, () ->
-                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.UFO)
+                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.UFO, false)
         );
 
         assertEquals("Splitter failure", ex.getMessage());
@@ -225,7 +225,7 @@ class RomProcessorTest {
 
         // Execute and expect exception
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
-                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.GD3)
+                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.GD3, false)
         );
 
         assertEquals("Part too large", ex.getMessage());
@@ -272,7 +272,7 @@ class RomProcessorTest {
 
         // Execute and expect exception
         IOException ex = assertThrows(IOException.class, () ->
-                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG)
+                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG, false)
         );
 
         assertEquals("Disk full", ex.getMessage());
@@ -294,7 +294,7 @@ class RomProcessorTest {
 
         // Execute and expect exception
         IOException ex = assertThrows(IOException.class, () ->
-                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG)
+                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG, false)
         );
 
         assertTrue(ex.getMessage().contains("Cannot extract base name"),
@@ -334,7 +334,7 @@ class RomProcessorTest {
         });
 
         // Execute
-        processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.SWC);
+        processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.SWC, false);
 
         // Verify output directory contains SingleDisk/SingleDisk.img (not SingleDisk_1.img)
         // After processRom completes, .img files are moved from workspace to outputDir/GameName/
@@ -377,11 +377,83 @@ class RomProcessorTest {
             return List.of(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
         });
 
-        processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG);
+        processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG, false);
 
         assertTrue(Files.exists(outputDir.resolve("Game#123")),
                 "Output folder should use original ROM name (unsanitized)");
         assertTrue(Files.exists(outputDir.resolve("Game#123").resolve("Game_123.img")),
                 "Disk image should use sanitized name");
+    }
+
+    @Test
+    void testSingleFileModeOutputsDirectlyToOutputDir() throws IOException {
+        Path romFile = tempDir.resolve("SingleMode.sfc");
+        Files.write(romFile, new byte[]{0x01});
+
+        Path outputDir = tempDir.resolve("output");
+        Files.createDirectories(outputDir);
+
+        File part1 = tempDir.resolve("work").resolve("SingleMode.1").toFile();
+        Files.createDirectories(part1.getParentFile().toPath());
+        Files.write(part1.toPath(), new byte[]{0x01});
+
+        when(mockFacade.splitRom(any(File.class), any(Path.class), eq(CopierFormat.FIG)))
+                .thenReturn(List.of(part1));
+
+        doAnswer(invocation -> {
+            Path targetPath = invocation.getArgument(1);
+            Files.write(targetPath, new byte[]{0x00});
+            return null;
+        }).when(mockTemplateFactory).createBlankDisk(any(FloppyType.class), any(Path.class));
+
+        when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
+            List<RomPartMetadata> metadata = invocation.getArgument(0);
+            return List.of(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
+        });
+
+        processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG, true);
+
+        Path expectedImage = outputDir.resolve("SingleMode.img");
+        assertTrue(Files.exists(expectedImage),
+                "Single-file mode should place .img directly in outputDir");
+
+        assertFalse(Files.exists(outputDir.resolve("SingleMode")),
+                "Single-file mode should not create game-name subdirectory");
+    }
+
+    @Test
+    void testBatchModeOutputsToSubdirectory() throws IOException {
+        Path romFile = tempDir.resolve("BatchMode.sfc");
+        Files.write(romFile, new byte[]{0x01});
+
+        Path outputDir = tempDir.resolve("output");
+        Files.createDirectories(outputDir);
+
+        File part1 = tempDir.resolve("work").resolve("BatchMode.1").toFile();
+        Files.createDirectories(part1.getParentFile().toPath());
+        Files.write(part1.toPath(), new byte[]{0x01});
+
+        when(mockFacade.splitRom(any(File.class), any(Path.class), eq(CopierFormat.SWC)))
+                .thenReturn(List.of(part1));
+
+        doAnswer(invocation -> {
+            Path targetPath = invocation.getArgument(1);
+            Files.write(targetPath, new byte[]{0x00});
+            return null;
+        }).when(mockTemplateFactory).createBlankDisk(any(FloppyType.class), any(Path.class));
+
+        when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
+            List<RomPartMetadata> metadata = invocation.getArgument(0);
+            return List.of(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
+        });
+
+        processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.SWC, false);
+
+        Path expectedGameDir = outputDir.resolve("BatchMode");
+        Path expectedImage = expectedGameDir.resolve("BatchMode.img");
+        assertTrue(Files.exists(expectedGameDir),
+                "Batch mode should create game-name subdirectory");
+        assertTrue(Files.exists(expectedImage),
+                "Batch mode disk image should be inside game-name subdirectory");
     }
 }

@@ -90,6 +90,24 @@ This structure enables:
 
 **Rationale:** Correctness over simplicity. DOS name uniqueness is a per-disk invariant, not a cross-disk invariant.
 
+### Single-File vs Batch Output Mode
+
+**Chosen:** `singleFileMode` boolean parameter on `processRom()`, set by `FloppyConvert` at call site
+
+**Behavior:**
+- `singleFileMode=true`: disk images land directly in `outputBaseDir` (no game-name subdirectory). Used when CLI input is a single file.
+- `singleFileMode=false`: creates `outputBaseDir/romName/` subdirectory. Used for batch/directory input to prevent filename collisions between different ROMs.
+
+**Cost:** Additional boolean parameter on `processRom()` signature
+
+**Benefit:** Caller (`FloppyConvert`) already knows the input mode; passing it explicitly is testable and avoids RomProcessor needing batch-context awareness.
+
+**Alternative cost:** Detecting single-file mode inside RomProcessor (e.g., by counting input files) would require RomProcessor to know about CLI-level batch context, violating single responsibility. Separate methods (`processRomSingle`/`processRomBatch`) would duplicate the pipeline for a single behavioral difference.
+
+**Rationale:** Explicit parameter over inference. RomProcessor processes one ROM at a time with no knowledge of sibling ROMs. (ref: DL-002, DL-004)
+
+**Invariants preserved:** `promoteToFinal()` atomic move semantics apply in both modes. Multi-disk single-file output (e.g., `game_1.img`, `game_2.img`) places files directly in `outputBaseDir` without a wrapping subdirectory.
+
 ## Invariants
 
 **Facade Dependency:** Core package must not import concrete service implementations (`NativeRomSplitter`, `Fat12ImageWriter`, `Ucon64Driver`). All service access through `ConversionFacade` interface. Violation breaks dependency inversion.

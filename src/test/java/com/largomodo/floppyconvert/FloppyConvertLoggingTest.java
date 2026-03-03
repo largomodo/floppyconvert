@@ -3,9 +3,11 @@ package com.largomodo.floppyconvert;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.filter.ThresholdFilter;
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.FileAppender;
+import ch.qos.logback.core.filter.Filter;
 import ch.qos.logback.core.read.ListAppender;
 import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory;
 import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory.DspChipset;
@@ -28,8 +30,15 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>
  * Verifies:
  * - Verbose flag enables DEBUG level logging
+ * - Verbose flag adjusts STDOUT ThresholdFilter so DEBUG events reach the console (not just the log file)
+ *   (ref: DL-001, R-003)
  * - MDC context propagates ROM filename to log entries
  * - ERROR level logs reach FAILURES appender via LevelFilter
+ * <p>
+ * WARNING: Checking root logger level alone is insufficient for verifying verbose console output.
+ * The STDOUT appender has a separate ThresholdFilter gate. A test that only asserts
+ * {@code root.getLevel() == DEBUG} will pass even when ThresholdFilter blocks DEBUG events
+ * from reaching the console. Always verify the appender filter state, not just the logger level.
  */
 class FloppyConvertLoggingTest {
 
@@ -92,6 +101,15 @@ class FloppyConvertLoggingTest {
         if (originalLevel != null) {
             rootLogger.setLevel(originalLevel);
         }
+        // Reset STDOUT ThresholdFilter to INFO to prevent test pollution
+        ch.qos.logback.core.Appender<ILoggingEvent> stdoutAppender = rootLogger.getAppender("STDOUT");
+        if (stdoutAppender != null) {
+            for (Filter<?> filter : stdoutAppender.getCopyOfAttachedFiltersList()) {
+                if (filter instanceof ThresholdFilter tf) {
+                    tf.setLevel("INFO");
+                }
+            }
+        }
     }
 
     @Test
@@ -118,6 +136,81 @@ class FloppyConvertLoggingTest {
         // Verify root logger level is now DEBUG
         assertEquals(Level.DEBUG, rootLogger.getLevel(),
                 "Verbose flag should set root logger to DEBUG level");
+    }
+
+    @Test
+    void testVerboseFlagEnablesDebugOnConsole() throws Exception {
+        FloppyConvert floppyConvert = new FloppyConvert();
+        CommandLine cmd = new CommandLine(floppyConvert)
+                .setCaseInsensitiveEnumValuesAllowed(true);
+
+        cmd.parseArgs("-v", romPath.toString(), "--output-dir", tempDir.toString(), "--format", "fig");
+
+        try {
+            floppyConvert.call();
+        } catch (Exception e) {
+            // Expected to fail due to ROM validation or other issues
+        }
+
+        Logger logger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+        ch.qos.logback.core.Appender<ILoggingEvent> stdoutAppender = logger.getAppender("STDOUT");
+        assertNotNull(stdoutAppender, "STDOUT appender should exist");
+
+        boolean debugAllowed = false;
+        for (Filter<?> filter : stdoutAppender.getCopyOfAttachedFiltersList()) {
+            if (filter instanceof ThresholdFilter tf) {
+                ch.qos.logback.classic.spi.LoggingEvent debugEvent =
+                        new ch.qos.logback.classic.spi.LoggingEvent();
+                debugEvent.setLevel(Level.DEBUG);
+                ch.qos.logback.core.spi.FilterReply reply = tf.decide(debugEvent);
+                assertNotEquals(ch.qos.logback.core.spi.FilterReply.DENY, reply,
+                        "ThresholdFilter should not deny DEBUG events after --verbose");
+                debugAllowed = true;
+            }
+        }
+
+        assertTrue(debugAllowed || stdoutAppender.getCopyOfAttachedFiltersList().isEmpty(),
+                "Should have ThresholdFilter allowing DEBUG or no filters blocking DEBUG output");
+    }
+
+    @Test
+    void testNonVerboseStdoutFilterRemainsAtInfo() {
+        // Reset ThresholdFilter to INFO first (shared LoggerContext may have been modified by prior tests)
+        Logger logger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+        ch.qos.logback.core.Appender<ILoggingEvent> stdoutAppender = logger.getAppender("STDOUT");
+        if (stdoutAppender != null) {
+            for (Filter<?> filter : stdoutAppender.getCopyOfAttachedFiltersList()) {
+                if (filter instanceof ThresholdFilter tf) {
+                    tf.setLevel("INFO");
+                }
+            }
+        }
+
+        FloppyConvert floppyConvert = new FloppyConvert();
+        CommandLine cmd = new CommandLine(floppyConvert);
+
+        Path dummyInput = tempDir.resolve("dummy.sfc");
+        cmd.parseArgs(dummyInput.toString());
+
+        try {
+            floppyConvert.call();
+        } catch (Exception e) {
+            // Expected to fail due to missing file
+        }
+
+        // Re-fetch appender (same instance but defensive)
+        stdoutAppender = logger.getAppender("STDOUT");
+        if (stdoutAppender != null) {
+            for (Filter<?> filter : stdoutAppender.getCopyOfAttachedFiltersList()) {
+                if (filter instanceof ThresholdFilter tf) {
+                    ch.qos.logback.classic.spi.LoggingEvent debugEvent =
+                            new ch.qos.logback.classic.spi.LoggingEvent();
+                    debugEvent.setLevel(Level.DEBUG);
+                    assertEquals(ch.qos.logback.core.spi.FilterReply.DENY, tf.decide(debugEvent),
+                            "STDOUT ThresholdFilter should still deny DEBUG without --verbose");
+                }
+            }
+        }
     }
 
     @Test

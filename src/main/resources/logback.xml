@@ -1,4 +1,6 @@
 <configuration>
+    <!-- STDOUT appender ThresholdFilter(INFO) is programmatically adjusted to DEBUG when
+         --verbose is set (ref: DL-001). See FloppyConvert.call() for the adjustment logic. -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%msg%n</pattern>
