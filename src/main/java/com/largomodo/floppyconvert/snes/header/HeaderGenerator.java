@@ -26,4 +26,18 @@ public interface HeaderGenerator {
      * is required for this specific part index (e.g. SWC parts > 0).
      */
     byte[] generateHeader(SnesRom rom, int partSize, int splitPartIndex, boolean isLastPart, byte chunkFlag);
+
+    /**
+     * Encodes the part size as a block count into bytes 0-1 of the header (little-endian).
+     * One block = 8192 bytes (8 KB). Used by SWC, FIG, and UFO formats.
+     * GD3 format does not use block count in bytes 0-1 and does not call this method. (ref: DL-002)
+     *
+     * @param header   the 512-byte header array to write into
+     * @param partSize the size of ROM data in this split part (bytes)
+     */
+    static void encodeBlockCount(byte[] header, int partSize) {
+        int blocks = partSize / 8192;
+        header[0] = (byte) (blocks & 0xFF);
+        header[1] = (byte) ((blocks >> 8) & 0xFF);
+    }
 }

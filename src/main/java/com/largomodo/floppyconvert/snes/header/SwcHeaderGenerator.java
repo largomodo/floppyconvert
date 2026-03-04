@@ -22,10 +22,8 @@ public class SwcHeaderGenerator implements HeaderGenerator {
         byte[] header = new byte[HEADER_SIZE];
         Arrays.fill(header, (byte) 0);
 
-        // Hardware reads bytes 0-1 to determine sector count for this part
-        int blocks = partSize / 8192;
-        header[0] = (byte) (blocks & 0xFF);
-        header[1] = (byte) ((blocks >> 8) & 0xFF);
+        // Block count encoding shared with FIG and UFO; see HeaderGenerator.encodeBlockCount(). (ref: DL-002)
+        HeaderGenerator.encodeBlockCount(header, partSize);
 
         // Emulation Mode
         int emulation = 0;

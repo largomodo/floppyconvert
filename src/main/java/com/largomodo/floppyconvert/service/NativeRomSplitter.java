@@ -78,6 +78,11 @@ public class NativeRomSplitter implements RomSplitter {
 
         SnesRom rom = reader.load(inputRom.toPath());
 
+        // Named predicates evaluated once; used in 4+ branch conditions below.
+        // Single evaluation point: changing detection logic requires one edit. (ref: DL-003)
+        boolean isGd3HiRom = format == CopierFormat.GD3 && rom.isHiRom();
+        boolean isUfoHiRom = format == CopierFormat.UFO && rom.isHiRom();
+
         HardwareValidator validator = createValidator(format);
         try {
             validator.validate(rom, format);
@@ -87,15 +92,15 @@ public class NativeRomSplitter implements RomSplitter {
         }
 
         byte[] data = rom.rawData();
-        if (format == CopierFormat.GD3 && rom.isHiRom()) {
+        if (isGd3HiRom) {
             logger.debug("Applying GD3 HiROM interleaving for: {}", inputRom.getName());
             data = interleaver.interleave(data, rom.type());
         }
 
         // Pad small ROMs to format-appropriate Mbit boundary before chunk calculation.
         // GD3 HiROM is excluded: SnesInterleaver.mirrorTo8Mbit() handles alignment during interleaving.
-        if (!(format == CopierFormat.GD3 && rom.isHiRom())) {
-            if (format == CopierFormat.UFO && rom.isHiRom()) {
+        if (!isGd3HiRom) {
+            if (isUfoHiRom) {
                 data = padToUfoHiRomBoundary(data);
             } else {
                 data = padToMbitBoundary(data);
@@ -105,7 +110,7 @@ public class NativeRomSplitter implements RomSplitter {
         // Force 4Mbit chunks for GD3 HiROM <= 16Mbit to trigger X-padding
         // Matches ucon64 condition (size <= 16 * MBIT) for copier naming compatibility
         int chunkSize = (format == CopierFormat.GD3) ? MBIT_8 : MBIT_4;
-        if (format == CopierFormat.GD3 && rom.isHiRom() && data.length <= 2 * 1024 * 1024) {
+        if (isGd3HiRom && data.length <= 2 * 1024 * 1024) {
             chunkSize = MBIT_4;
         }
         int chunkCount = (int) Math.ceil((double) data.length / chunkSize);
@@ -117,7 +122,7 @@ public class NativeRomSplitter implements RomSplitter {
 
         // UFO HiROM requires irregular chunk sizes from lookup table
         // Matches ucon64 size_to_partsizes for copier bank allocation compatibility
-        if (format == CopierFormat.UFO && rom.isHiRom()) {
+        if (isUfoHiRom) {
             int totalSizeMbit = data.length / SnesConstants.MBIT;
             List<UfoChunk> chunks = UfoHiRomChunker.computeChunks(totalSizeMbit);
 

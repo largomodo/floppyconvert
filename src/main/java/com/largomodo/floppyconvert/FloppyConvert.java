@@ -1,19 +1,13 @@
 package com.largomodo.floppyconvert;
 
 import com.largomodo.floppyconvert.core.*;
-import com.largomodo.floppyconvert.service.fat.Fat12FormatFactory;
 import com.largomodo.floppyconvert.core.domain.DiskPacker;
 import com.largomodo.floppyconvert.core.domain.GreedyDiskPacker;
 import com.largomodo.floppyconvert.core.workspace.CleanupException;
 import com.largomodo.floppyconvert.format.CopierFormat;
+import com.largomodo.floppyconvert.service.ConversionServiceFactory;
 import com.largomodo.floppyconvert.service.DefaultConversionFacade;
-import com.largomodo.floppyconvert.service.FloppyImageWriter;
-import com.largomodo.floppyconvert.service.NativeRomSplitter;
-import com.largomodo.floppyconvert.service.RomSplitter;
-import com.largomodo.floppyconvert.service.fat.Fat12ImageWriter;
-import com.largomodo.floppyconvert.snes.SnesInterleaver;
-import com.largomodo.floppyconvert.snes.SnesRomReader;
-import com.largomodo.floppyconvert.snes.header.HeaderGeneratorFactory;
+import com.largomodo.floppyconvert.service.NativeConversionServiceFactory;
 import com.largomodo.floppyconvert.util.SnesRomMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,16 +111,11 @@ public class FloppyConvert implements Callable<Integer> {
     }
 
     /**
-     * Factory method for creating ROM splitter with native Java implementation.
-     * Instantiates NativeRomSplitter with required dependencies.
-     *
-     * @return configured NativeRomSplitter instance
+     * Creates the default service factory for the native implementation stack.
+     * Returns {@link NativeConversionServiceFactory}; call sites depend on the interface only. (ref: DL-007)
      */
-    private static RomSplitter createRomSplitter() {
-        SnesRomReader reader = new SnesRomReader();
-        SnesInterleaver interleaver = new SnesInterleaver();
-        HeaderGeneratorFactory headerFactory = new HeaderGeneratorFactory();
-        return new NativeRomSplitter(reader, interleaver, headerFactory);
+    private static ConversionServiceFactory createServiceFactory() {
+        return new NativeConversionServiceFactory();
     }
 
     // Package-private: enables test observability without exposing to CLI users
@@ -192,11 +181,12 @@ public class FloppyConvert implements Callable<Integer> {
         Path outputRoot = Paths.get(config.outputDir);
 
         // Dependency injection: instantiate service implementations
+        ConversionServiceFactory serviceFactory = createServiceFactory();
         DiskPacker packer = new GreedyDiskPacker();
-        RomSplitter splitter = createRomSplitter();
-        FloppyImageWriter writer = new Fat12ImageWriter();
-        ConversionFacade facade = new DefaultConversionFacade(splitter, writer);
-        DiskTemplateFactory templateFactory = new Fat12FormatFactory();
+        ConversionFacade facade = new DefaultConversionFacade(
+                serviceFactory.createRomSplitter(),
+                serviceFactory.createFloppyImageWriter());
+        DiskTemplateFactory templateFactory = serviceFactory.createDiskTemplateFactory();
         RomPartNormalizer normalizer = new RomPartNormalizer();
         RomProcessor processor = new RomProcessor(packer, facade, templateFactory, normalizer);
 
@@ -386,12 +376,12 @@ public class FloppyConvert implements Callable<Integer> {
         }
 
         // Dependency injection: instantiate service implementations
+        ConversionServiceFactory serviceFactory = createServiceFactory();
         DiskPacker packer = new GreedyDiskPacker();
-        RomSplitter splitter = createRomSplitter();
-        FloppyImageWriter writer = new Fat12ImageWriter();
-        // Facade layer enables dependency inversion - core depends on abstraction
-        ConversionFacade facade = new DefaultConversionFacade(splitter, writer);
-        DiskTemplateFactory templateFactory = new Fat12FormatFactory();
+        ConversionFacade facade = new DefaultConversionFacade(
+                serviceFactory.createRomSplitter(),
+                serviceFactory.createFloppyImageWriter());
+        DiskTemplateFactory templateFactory = serviceFactory.createDiskTemplateFactory();
         RomPartNormalizer normalizer = new RomPartNormalizer();
         RomProcessor processor = new RomProcessor(packer, facade, templateFactory, normalizer);
 
