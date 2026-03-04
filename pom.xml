@@ -172,6 +172,7 @@
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
                                 <buildArg>-H:IncludeResources=floppyconvert/.*|.*logback\.xml$</buildArg>
                                 <buildArg>-march=compatibility</buildArg>
+                                <buildArg>-H:IncludeResourceBundles=com.sun.org.apache.xerces.internal.impl.msg.XMLMessages</buildArg>
                             </buildArgs>
                             <metadataRepository>
                                 <enabled>true</enabled>
