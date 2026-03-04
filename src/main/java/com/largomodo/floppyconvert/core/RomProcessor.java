@@ -132,7 +132,8 @@ public class RomProcessor {
 
             promoteFinalOutputs(createdImages, outputBaseDir, baseName.original(), ws, singleFileMode);
 
-            log.info("Success: {} -> {} disk(s) [{}]", romFile.getName(), diskLayouts.size(), format.name());
+            log.debug("Success: {} -> {} disk(s) [{}]", romFile.getName(), diskLayouts.size(), format.name());
+            log.info("Conversion complete: {} -> {} disk(s) [{}]", romFile.getName(), diskLayouts.size(), format.name());
 
             return diskLayouts.size();
         }
@@ -247,7 +248,7 @@ public class RomProcessor {
             }
 
             facade.write(targetImage, diskParts, dosNameMap);
-            log.info("  Created: {} ({} parts)", diskName, layout.contents().size());
+            log.debug("  Created: {} ({} parts)", diskName, layout.contents().size());
             diskNumber++;
         }
 

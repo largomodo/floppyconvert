@@ -395,7 +395,6 @@ public class FloppyConvert implements Callable<Integer> {
                     config.format,
                     true
             );
-            log.info("Conversion complete: {}", inputPath.getFileName());
         } catch (CleanupException e) {
             // Log all suppressed cleanup failures for diagnostics
             log.error("Cleanup failed during conversion", e);
