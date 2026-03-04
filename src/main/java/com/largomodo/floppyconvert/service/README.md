@@ -250,3 +250,12 @@ To add a new ROM splitting format:
 8. Add E2E tests with real ROM files
 
 If the new format has complex naming (like GD3 SF-Code), consider extracting naming logic to strategy pattern at that point.
+
+## Service Factory
+
+`ConversionServiceFactory` (interface) and `NativeConversionServiceFactory` (implementation) live in this package
+to preserve the acyclic dependency direction: `FloppyConvert → core → service → snes → format`.
+
+Placing the factory in `core` would require `core` to import concrete `service` classes, violating the
+facade dependency inversion invariant. Placing it in `FloppyConvert` would scatter instantiation logic
+across the CLI entry point. (ref: DL-001, DL-007)

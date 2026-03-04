@@ -53,7 +53,7 @@ This structure enables:
 
 **Rationale:** Testability and architectural cleanliness prioritized over minimal indirection. I/O-bound ROM processing makes interface call overhead negligible.
 
-**Verification:** `grep "import.*service.*Native\|Fat12" src/main/java/de/nrq/floppyconvert/core/**/*.java` must return no results.
+**Verification:** `grep "import.*service.*Native\|Fat12" src/main/java/com/largomodo/floppyconvert/core/**/*.java` must return no results.
 
 ### God Method Decomposition
 

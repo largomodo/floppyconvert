@@ -25,10 +25,8 @@ public class UfoHeaderGenerator implements HeaderGenerator {
         byte[] header = new byte[HEADER_SIZE];
         Arrays.fill(header, (byte) 0);
 
-        // Bytes 0-1 encode THIS part size (hardware reads header for sector count)
-        int blocks = partSize / 8192;
-        header[0] = (byte) (blocks & 0xFF);
-        header[1] = (byte) ((blocks >> 8) & 0xFF);
+        // Bytes 0-1: per-part block count; byte 17 uses total ROM size (dual-source requirement). (ref: DL-002)
+        HeaderGenerator.encodeBlockCount(header, partSize);
 
         // 2: Multi-file flag from lookup table (UFO HiROM irregular chunk support)
         // 0x40 = multi-start (4Mbit bank), 0x10 = multi-continue (2Mbit bank), 0x00 = last

@@ -25,14 +25,17 @@ public class GreedyDiskPacker implements DiskPacker {
             return new ArrayList<>();
         }
 
+        // maxCapacity cached once; FLOPPY_160M is the largest supported disk type and sets the hard ceiling
+        final long maxCapacity = FloppyType.FLOPPY_160M.getUsableBytes();
+
         // Fail-fast validation: reject parts exceeding maximum capacity
         // Prevents unrecoverable packing failures deep in the algorithm
         for (RomPartMetadata part : parts) {
-            if (part.sizeInBytes() > FloppyType.FLOPPY_160M.getUsableBytes()) {
+            if (part.sizeInBytes() > maxCapacity) {
                 throw new IllegalArgumentException(
                         "ROM part exceeds maximum floppy capacity: " +
                                 part.originalPath().getFileName() + " (" + part.sizeInBytes() +
-                                " bytes > " + FloppyType.FLOPPY_160M.getUsableBytes() + " bytes)"
+                                " bytes > " + maxCapacity + " bytes)"
                 );
             }
         }
@@ -54,7 +57,7 @@ public class GreedyDiskPacker implements DiskPacker {
 
                 // First-fit: add part if it fits, otherwise start new disk
                 // Always add first part even if oversized (caught by fail-fast above)
-                if (diskUsed + partSize <= FloppyType.FLOPPY_160M.getUsableBytes() ||
+                if (diskUsed + partSize <= maxCapacity ||
                         currentDiskContents.isEmpty()) {
                     currentDiskContents.add(part);
                     diskUsed += partSize;

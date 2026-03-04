@@ -55,7 +55,7 @@ Moving `CopierFormat` to a dedicated `format` package provides:
 
 ## Invariants
 
-**No Dependencies:** The `format` package must not import from any other application package. It defines vocabulary, not behavior. Violation check: `grep "^import com.largomodo.floppyconvert" src/main/java/de/nrq/floppyconvert/format/*.java` must return no results (excluding test files).
+**No Dependencies:** The `format` package must not import from any other application package. It defines vocabulary, not behavior. Violation check: `grep "^import com.largomodo.floppyconvert" src/main/java/com/largomodo/floppyconvert/format/*.java` must return no results (excluding test files).
 
 **Single Enum:** This package contains exactly one enum (`CopierFormat`). If additional format-related types are needed, create new packages (e.g., `format.encoding`) rather than expanding this package's scope.
 

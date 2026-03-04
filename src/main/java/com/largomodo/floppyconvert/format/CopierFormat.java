@@ -64,11 +64,8 @@ public enum CopierFormat {
 
     public Predicate<File> getSplitPartFilter() {
         return switch (this) {
-            case FIG -> file -> {
-                String name = file.getName();
-                return name.matches(".*\\.[0-9]+$");
-            };
-            case SWC -> file -> {
+            // FIG and SWC share identical numeric-extension naming; combined case arm (ref: DL-004)
+            case FIG, SWC -> file -> {
                 String name = file.getName();
                 return name.matches(".*\\.[0-9]+$");
             };
