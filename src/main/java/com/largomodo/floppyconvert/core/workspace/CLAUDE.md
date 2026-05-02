@@ -1,0 +1,10 @@
+# workspace/
+
+Conversion workspace lifecycle (AutoCloseable artifact tracking) and its dedicated exception type.
+
+## Files
+
+| File                          | What                                                                                                                                                                                                                                                                                                                | When to read                                                                                                                                |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ConversionWorkspace.java`    | AutoCloseable workspace: artifact tracking, interrupt-flag handling, throws `CleanupException` with suppressed exceptions on cleanup failure; thread-safe when each instance is confined to a single thread (`promoteToFinal` is atomic move)                                                                       | Understanding resource-management pattern, debugging cleanup, troubleshooting interrupt behavior, handling `CleanupException`               |
+| `CleanupException.java`       | Exception for cleanup failures; supports suppressed exceptions                                                                                                                                                                                                                                                      | Understanding cleanup error handling                                                                                                        |
