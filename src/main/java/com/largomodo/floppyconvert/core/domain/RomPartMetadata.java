@@ -1,5 +1,6 @@
 package com.largomodo.floppyconvert.core.domain;
 
+import com.largomodo.floppyconvert.util.DosName;
 import java.nio.file.Path;
 
 /**
@@ -32,5 +33,28 @@ public record RomPartMetadata(Path originalPath, long sizeInBytes, String dosNam
                     "sizeInBytes must be positive, got: " + sizeInBytes
             );
         }
+    }
+
+    /**
+     * Production-boundary factory that validates the DOS name via DosName.of. (ref: DL-002, DL-008)
+     * <p>
+     * Called by RomPartNormalizer.normalize; the canonical constructor remains available for
+     * test fixtures that construct metadata directly without re-validation.
+     *
+     * @param originalPath Filesystem path to the ROM part file
+     * @param sizeInBytes  File size in bytes (must be positive)
+     * @param dosName      Raw DOS name string; validated via DosName.of and stored as the sanitized value
+     * @return RomPartMetadata with a validated DOS name
+     */
+    public static RomPartMetadata of(Path originalPath, long sizeInBytes, String dosName) {
+        String validated = DosName.of(dosName).value();
+        return new RomPartMetadata(originalPath, sizeInBytes, validated);
+    }
+
+    /**
+     * Accessor returning the DOS name wrapped in a typed DosName value.
+     */
+    public DosName dosNameTyped() {
+        return new DosName(dosName);
     }
 }

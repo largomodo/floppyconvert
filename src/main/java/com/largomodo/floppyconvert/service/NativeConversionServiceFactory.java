@@ -3,6 +3,7 @@ package com.largomodo.floppyconvert.service;
 import com.largomodo.floppyconvert.core.DiskTemplateFactory;
 import com.largomodo.floppyconvert.service.fat.Fat12FormatFactory;
 import com.largomodo.floppyconvert.service.fat.Fat12ImageWriter;
+import com.largomodo.floppyconvert.service.split.SplitStrategyFactory;
 import com.largomodo.floppyconvert.snes.SnesInterleaver;
 import com.largomodo.floppyconvert.snes.SnesRomReader;
 import com.largomodo.floppyconvert.snes.header.HeaderGeneratorFactory;
@@ -20,7 +21,12 @@ public class NativeConversionServiceFactory implements ConversionServiceFactory 
         SnesRomReader reader = new SnesRomReader();
         SnesInterleaver interleaver = new SnesInterleaver();
         HeaderGeneratorFactory headerFactory = new HeaderGeneratorFactory();
-        return new NativeRomSplitter(reader, interleaver, headerFactory);
+        // SplitStrategyFactory takes interleaver so Gd3HiRomSplitStrategy can be wired
+        // at construction time (constructor injection, one allocation per factory).
+        // Dependency direction: service.split depends on snes (SnesInterleaver); core does not
+        // depend on service.split. Inversion would break the ConversionFacade abstraction. (ref: DL-005)
+        SplitStrategyFactory strategyFactory = new SplitStrategyFactory(interleaver);
+        return new NativeRomSplitter(reader, headerFactory, strategyFactory);
     }
 
     @Override

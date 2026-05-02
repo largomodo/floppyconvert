@@ -1,6 +1,8 @@
+// createRom helpers use checksum=0x0001, complement=0xFFFE to satisfy the SnesRom checksum invariant.
 package com.largomodo.floppyconvert.service;
 
 import com.largomodo.floppyconvert.format.CopierFormat;
+import com.largomodo.floppyconvert.service.split.SplitStrategyFactory;
 import com.largomodo.floppyconvert.snes.RomType;
 import com.largomodo.floppyconvert.snes.SnesConstants;
 import com.largomodo.floppyconvert.snes.SnesInterleaver;
@@ -50,7 +52,10 @@ class NativeRomSplitterTest {
         mockInterleaver = mock(SnesInterleaver.class);
         mockHeaderFactory = mock(HeaderGeneratorFactory.class);
         mockHeaderGenerator = mock(HeaderGenerator.class);
-        splitter = new NativeRomSplitter(mockReader, mockInterleaver, mockHeaderFactory);
+        // SplitStrategyFactory uses real mockInterleaver so Gd3HiRomSplitStrategy
+        // receives the mock; strategy delegation tested in split-level tests. (ref: DL-004)
+        SplitStrategyFactory strategyFactory = new SplitStrategyFactory(mockInterleaver);
+        splitter = new NativeRomSplitter(mockReader, mockHeaderFactory, strategyFactory);
     }
 
     @Test
@@ -347,7 +352,8 @@ class NativeRomSplitterTest {
     }
 
     @Test
-    void testGd3MultiFileHiRomWithXPadding() throws IOException {
+    // X-padding triggers when sizeMbit < 10 — see testGd3_8MbitHiRom_ForceSplitTo4Mbit
+    void testGd3MultiFileHiRomNoXPadding16Mbit() throws IOException {
         File inputRom = createRomFile("ChronoTrigger.sfc");
         byte[] romData = createRomData(2 * 1024 * 1024);
         SnesRom rom = createHiRom(romData);
@@ -449,7 +455,7 @@ class NativeRomSplitterTest {
 
     // Padding tests verify sub-chunk-size ROMs are mirrored to the nearest format-appropriate
     // Mbit boundary before splitting. UFO HiROM uses chunker-supported sizes {2,4,12,20,32}.
-    // All others use power-of-2 boundaries {2,4,8,16,32}. (ref: DL-003, RA-004)
+    // All others use power-of-2 boundaries {2,4,8,16,32}.
 
     @Test
     void testSmallRomPaddedToMbitBoundary_2Mbit() throws IOException {
@@ -601,8 +607,8 @@ class NativeRomSplitterTest {
                 0,
                 0,
                 0,
-                0,
-                0
+                0x0001,
+                0xFFFE
         );
     }
 
@@ -616,8 +622,8 @@ class NativeRomSplitterTest {
                 0,
                 0,
                 0,
-                0,
-                0
+                0x0001,
+                0xFFFE
         );
     }
 
@@ -631,8 +637,8 @@ class NativeRomSplitterTest {
                 0,
                 0,
                 0,
-                0,
-                0
+                0x0001,
+                0xFFFE
         );
     }
 

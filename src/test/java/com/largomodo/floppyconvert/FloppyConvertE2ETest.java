@@ -8,6 +8,7 @@ import com.largomodo.floppyconvert.format.CopierFormat;
 import com.largomodo.floppyconvert.service.DefaultConversionFacade;
 import com.largomodo.floppyconvert.service.NativeRomSplitter;
 import com.largomodo.floppyconvert.service.fat.Fat12ImageWriter;
+import com.largomodo.floppyconvert.service.split.SplitStrategyFactory;
 import com.largomodo.floppyconvert.snes.SnesConstants;
 import com.largomodo.floppyconvert.snes.SnesInterleaver;
 import com.largomodo.floppyconvert.snes.SnesRomReader;
@@ -73,10 +74,11 @@ class FloppyConvertE2ETest {
     }
 
     private RomProcessor createProcessor() {
+        SnesInterleaver interleaver = new SnesInterleaver();
         NativeRomSplitter splitter = new NativeRomSplitter(
                 new SnesRomReader(),
-                new SnesInterleaver(),
-                new HeaderGeneratorFactory()
+                new HeaderGeneratorFactory(),
+                new SplitStrategyFactory(interleaver)
         );
         Fat12ImageWriter writer = new Fat12ImageWriter();
         DefaultConversionFacade facade = new DefaultConversionFacade(splitter, writer);
@@ -666,6 +668,11 @@ class FloppyConvertE2ETest {
         romData[HIROM_HEADER_OFFSET + 0x1D] = (byte) 0xFF;
         romData[HIROM_HEADER_OFFSET + 0x1E] = 0x00;
         romData[HIROM_HEADER_OFFSET + 0x1F] = 0x00;
+        // Write valid checksum/complement at reader-expected offsets (base+0x2C/0x2E)
+        romData[HIROM_HEADER_OFFSET + 0x2C] = (byte) 0xFE; // complement low
+        romData[HIROM_HEADER_OFFSET + 0x2D] = (byte) 0xFF; // complement high -> 0xFFFE
+        romData[HIROM_HEADER_OFFSET + 0x2E] = (byte) 0x01; // checksum low
+        romData[HIROM_HEADER_OFFSET + 0x2F] = (byte) 0x00; // checksum high -> 0x0001
         Files.write(romFile, romData);
 
         RomProcessor processor = createProcessor();
@@ -685,6 +692,11 @@ class FloppyConvertE2ETest {
         romData[headerOffset + 0x1D] = (byte) 0xBB;
         romData[headerOffset + 0x1E] = (byte) 0x55;
         romData[headerOffset + 0x1F] = (byte) 0x44;
+        // Write valid checksum/complement at reader-expected offsets (base+0x2C/0x2E)
+        romData[headerOffset + 0x2C] = (byte) 0xFE; // complement low
+        romData[headerOffset + 0x2D] = (byte) 0xFF; // complement high -> 0xFFFE
+        romData[headerOffset + 0x2E] = (byte) 0x01; // checksum low
+        romData[headerOffset + 0x2F] = (byte) 0x00; // checksum high -> 0x0001
         Files.write(romFile, romData);
 
         RomProcessor processor = createProcessor();

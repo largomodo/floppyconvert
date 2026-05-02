@@ -1,3 +1,4 @@
+// createRom helpers use checksum=0x0001, complement=0xFFFE to satisfy the SnesRom invariant. (ref: DL-003)
 package com.largomodo.floppyconvert.snes;
 
 import com.largomodo.floppyconvert.format.CopierFormat;
@@ -104,8 +105,8 @@ class HardwareValidatorTest {
                 0x00,
                 0x00,
                 0x00,
-                0x0000,
-                0xFFFF
+                0x0001,
+                0xFFFE
         );
     }
 
@@ -119,8 +120,8 @@ class HardwareValidatorTest {
                 0x00,
                 0x00,
                 0x00,
-                0x0000,
-                0xFFFF
+                0x0001,
+                0xFFFE
         );
     }
 
@@ -134,8 +135,8 @@ class HardwareValidatorTest {
                 0x00,
                 0x00,
                 0x00,
-                0x0000,
-                0xFFFF
+                0x0001,
+                0xFFFE
         );
     }
 }

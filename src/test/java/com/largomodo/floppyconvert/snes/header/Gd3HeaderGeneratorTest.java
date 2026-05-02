@@ -1,3 +1,4 @@
+// createRom helpers use checksum=0x0001, complement=0xFFFE to satisfy the SnesRom invariant. (ref: DL-003)
 package com.largomodo.floppyconvert.snes.header;
 
 import com.largomodo.floppyconvert.snes.RomType;
@@ -329,8 +330,8 @@ class Gd3HeaderGeneratorTest {
                 (byte) 0x00,  // region
                 (byte) 0x00,  // maker
                 (byte) 0x00,  // version
-                0,            // checksum
-                0             // complement
+                0x0001,       // checksum
+                0xFFFE        // complement
         );
     }
 

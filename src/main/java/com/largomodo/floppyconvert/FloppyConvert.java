@@ -405,12 +405,37 @@ public class FloppyConvert implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
+        // Four named phases: each addresses one distinct concern (logging, validation,
+        // output-dir defaulting, dispatch). (ref: DL-006)
+        // Field injection (verbose, inputPath, outputDir, spec, format) completes before call()
+        // executes per Picocli's contract; all four methods read the same injected fields.
+        configureLogging();
+        validateInput();
+        resolveOutputDirectory();
+        dispatchProcessing();
+        return 0;
+    }
+
+    /**
+     * Bridges Picocli field-based arguments to runBatch/runSingleFile method
+     * signatures (avoids cascading changes to RomProcessor integration points).
+     */
+    private record Config(String inputDir, String outputDir,
+                          CopierFormat format, String inputFile) {
+    }
+
+    /**
+     * Relaxes root logger level and STDOUT ThresholdFilter to DEBUG when --verbose is set.
+     * Both gates must be relaxed together; ThresholdFilter is registered in reflect-config.json
+     * for GraalVM native-image compatibility.
+     */
+    private void configureLogging() {
         if (verbose) {
             // Root logger level controls which events are generated.
-            // The STDOUT appender's ThresholdFilter(INFO) is a second gate that blocks
+            // The STDOUT appender ThresholdFilter(INFO) is a second gate that blocks
             // DEBUG events from reaching the console even when root level is DEBUG.
             // Both must be relaxed together for --verbose to produce visible console output.
-            // ThresholdFilter is already registered in reflect-config.json for native-image. (ref: DL-001)
+            // ThresholdFilter is already registered in reflect-config.json for native-image.
             ch.qos.logback.classic.Logger root =
                     (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
             root.setLevel(ch.qos.logback.classic.Level.DEBUG);
@@ -426,17 +451,24 @@ public class FloppyConvert implements Callable<Integer> {
                 }
             }
         }
+    }
 
+    private void validateInput() {
+        // Existence checked before readability: avoids a confusing "not readable" error
+        // when the real problem is the file does not exist.
         if (!inputPath.exists()) {
             throw new ParameterException(spec.commandLine(),
                     "Input path does not exist: " + inputPath.getAbsolutePath());
         }
-
         if (!inputPath.canRead()) {
             throw new ParameterException(spec.commandLine(),
                     "Input path is not readable (check permissions): " + inputPath.getAbsolutePath());
         }
+    }
 
+    private void resolveOutputDirectory() throws IOException {
+        // Default: file input -> current working directory; directory input -> <input>/output.
+        // outputDir field is mutated here; dispatchProcessing reads the resolved value.
         if (outputDir == null) {
             if (inputPath.isFile()) {
                 outputDir = new File(".");
@@ -444,7 +476,6 @@ public class FloppyConvert implements Callable<Integer> {
                 outputDir = new File(inputPath, "output");
             }
         }
-
         if (outputDir.exists() && !outputDir.isDirectory()) {
             throw new ParameterException(spec.commandLine(),
                     "Output path must be a directory, not a file: " + outputDir.getAbsolutePath());
@@ -453,32 +484,20 @@ public class FloppyConvert implements Callable<Integer> {
             throw new ParameterException(spec.commandLine(),
                     "Output directory is not writable (check permissions): " + outputDir.getAbsolutePath());
         }
-
         Files.createDirectories(outputDir.toPath());
+    }
 
+    private void dispatchProcessing() throws Exception {
+        // Single-file mode auto-detects format from the ROM header.
+        // Batch mode requires explicit --format for predictability across mixed-ROM directories.
         if (inputPath.isFile()) {
-            // Single-file only: batch mode uses explicit format for predictability
             effectiveFormat = resolveEffectiveFormat();
             runSingleFile(
-                    new Config(null, outputDir.getAbsolutePath(),
-                            effectiveFormat, inputPath.getAbsolutePath()),
+                    new Config(null, outputDir.getAbsolutePath(), effectiveFormat, inputPath.getAbsolutePath()),
                     outputDir.toPath()
             );
         } else {
-            runBatch(
-                    new Config(inputPath.getAbsolutePath(), outputDir.getAbsolutePath(),
-                            format, null)
-            );
+            runBatch(new Config(inputPath.getAbsolutePath(), outputDir.getAbsolutePath(), format, null));
         }
-
-        return 0;
-    }
-
-    /**
-     * Bridges Picocli field-based arguments to runBatch/runSingleFile method
-     * signatures (avoids cascading changes to RomProcessor integration points).
-     */
-    private record Config(String inputDir, String outputDir,
-                          CopierFormat format, String inputFile) {
     }
 }

@@ -1,6 +1,7 @@
 package com.largomodo.floppyconvert.service.fat;
 
 import com.largomodo.floppyconvert.service.FloppyImageWriter;
+import com.largomodo.floppyconvert.util.DosName;
 
 import java.io.File;
 import java.io.IOException;
@@ -84,13 +85,18 @@ public class Fat12ImageWriter implements FloppyImageWriter {
                     throw new IllegalArgumentException("No DOS name mapping for source: " + source);
                 }
 
+                // Re-validate at the consumer boundary: the map value was validated at
+                // RomPartNormalizer, but explicit validation here is defensive against
+                // direct callers that bypass the factory path. (ref: DL-002)
+                String validatedDosName = DosName.of(dosName).value();
+
                 int dirEntryOffset = findFreeDirEntry(buffer, rootDirStart, rootEntries);
                 if (dirEntryOffset == -1) {
                     throw new IOException("Root directory full in " + targetImage.getName());
                 }
 
                 int startCluster = writeData(buffer, fileData, fatStart, totalClusters, dataStart, bytesPerSector, sectorsPerCluster);
-                writeDirEntry(buffer, dirEntryOffset, dosName, startCluster, fileData.length);
+                writeDirEntry(buffer, dirEntryOffset, validatedDosName, startCluster, fileData.length);
 
                 if (numberOfFats > 1) {
                     mirrorFat(buffer, fatStart, fatSize, numberOfFats);
