@@ -1,11 +1,12 @@
 package com.largomodo.floppyconvert.service;
 
 import com.largomodo.floppyconvert.format.CopierFormat;
-import com.largomodo.floppyconvert.service.UfoHiRomChunker.UfoChunk;
+import com.largomodo.floppyconvert.service.split.FilenameProvider;
+import com.largomodo.floppyconvert.service.split.SplitStrategy;
+import com.largomodo.floppyconvert.service.split.SplitStrategyFactory;
 import com.largomodo.floppyconvert.snes.Gd3HardwareValidator;
 import com.largomodo.floppyconvert.snes.HardwareValidator;
 import com.largomodo.floppyconvert.snes.SnesConstants;
-import com.largomodo.floppyconvert.snes.SnesInterleaver;
 import com.largomodo.floppyconvert.snes.SnesRom;
 import com.largomodo.floppyconvert.snes.SnesRomReader;
 import com.largomodo.floppyconvert.snes.UfoHardwareValidator;
@@ -17,11 +18,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -31,15 +28,13 @@ import java.util.Locale;
  * Processes SNES ROMs using pure Java logic:
  * <ul>
  *   <li>Direct ROM parsing using {@link SnesRomReader}</li>
- *   <li>Conditional interleaving for GD3 HiROM ROMs via {@link SnesInterleaver}</li>
  *   <li>Format-specific header generation via {@link HeaderGeneratorFactory}</li>
- *   <li>Efficient I/O using {@link FileChannel}</li>
+ *   <li>Split policy delegated to SplitStrategy implementations via {@link SplitStrategyFactory}</li>
  * </ul>
  * <p>
  * <b>Splitting Strategy:</b>
  * <ul>
- *   <li>Standard formats (FIG/SWC/UFO): 4 Mbit (512KB) chunks</li>
- *   <li>Game Doctor (GD3): 8 Mbit (1MB) chunks</li>
+ *   <li>Chunk sizes and interleaving are strategy-determined per format and ROM type</li>
  *   <li>File naming: .1, .2, .3... for standard; .078 suffix for GD3 with 8.3 enforcement</li>
  * </ul>
  */
@@ -47,24 +42,22 @@ public class NativeRomSplitter implements RomSplitter {
 
     private static final Logger logger = LoggerFactory.getLogger(NativeRomSplitter.class);
 
-    private static final int MBIT_4 = 512 * 1024;  // 4 Mbit = 512 KB
-    private static final int MBIT_8 = 1024 * 1024; // 8 Mbit = 1 MB
-
     private final SnesRomReader reader;
-    private final SnesInterleaver interleaver;
     private final HeaderGeneratorFactory headerFactory;
+    private final SplitStrategyFactory strategyFactory;
 
     /**
      * Constructs a NativeRomSplitter with required dependencies.
      *
-     * @param reader        ROM metadata reader
-     * @param interleaver   Interleaver for GD3 HiROM transformation
-     * @param headerFactory Factory for format-specific header generators
+     * @param reader          ROM metadata reader
+     * @param headerFactory   Factory for format-specific header generators
+     * @param strategyFactory Factory for per-format split strategies
      */
-    public NativeRomSplitter(SnesRomReader reader, SnesInterleaver interleaver, HeaderGeneratorFactory headerFactory) {
+    public NativeRomSplitter(SnesRomReader reader,
+                             HeaderGeneratorFactory headerFactory, SplitStrategyFactory strategyFactory) {
         this.reader = reader;
-        this.interleaver = interleaver;
         this.headerFactory = headerFactory;
+        this.strategyFactory = strategyFactory;
     }
 
     @Override
@@ -78,11 +71,6 @@ public class NativeRomSplitter implements RomSplitter {
 
         SnesRom rom = reader.load(inputRom.toPath());
 
-        // Named predicates evaluated once; used in 4+ branch conditions below.
-        // Single evaluation point: changing detection logic requires one edit. (ref: DL-003)
-        boolean isGd3HiRom = format == CopierFormat.GD3 && rom.isHiRom();
-        boolean isUfoHiRom = format == CopierFormat.UFO && rom.isHiRom();
-
         HardwareValidator validator = createValidator(format);
         try {
             validator.validate(rom, format);
@@ -91,75 +79,35 @@ public class NativeRomSplitter implements RomSplitter {
             throw e;
         }
 
-        byte[] data = rom.rawData();
-        if (isGd3HiRom) {
-            logger.debug("Applying GD3 HiROM interleaving for: {}", inputRom.getName());
-            data = interleaver.interleave(data, rom.type());
-        }
-
-        // Pad small ROMs to format-appropriate Mbit boundary before chunk calculation.
-        // GD3 HiROM is excluded: SnesInterleaver.mirrorTo8Mbit() handles alignment during interleaving.
-        if (!isGd3HiRom) {
-            if (isUfoHiRom) {
-                data = padToUfoHiRomBoundary(data);
-            } else {
-                data = padToMbitBoundary(data);
-            }
-        }
-
-        // Force 4Mbit chunks for GD3 HiROM <= 16Mbit to trigger X-padding
-        // Matches ucon64 condition (size <= 16 * MBIT) for copier naming compatibility
-        int chunkSize = (format == CopierFormat.GD3) ? MBIT_8 : MBIT_4;
-        if (isGd3HiRom && data.length <= 2 * 1024 * 1024) {
-            chunkSize = MBIT_4;
-        }
-        int chunkCount = (int) Math.ceil((double) data.length / chunkSize);
-
         HeaderGenerator headerGen = headerFactory.get(format);
         String baseName = getBaseName(inputRom);
 
-        List<File> parts = new ArrayList<>(chunkCount);
+        // prepareData separates data preparation from chunk iteration; Gd3HiRomSplitStrategy
+        // handles its own interleaving so receives unprepared rawData. (ref: DL-004)
+        // Dependency direction: NativeRomSplitter (service) depends on SplitStrategy (service.split)
+        // which depends on snes/format abstractions. SplitStrategy impls must not import core/.
+        byte[] preparedData = prepareData(rom, format);
 
-        // UFO HiROM requires irregular chunk sizes from lookup table
-        // Matches ucon64 size_to_partsizes for copier bank allocation compatibility
-        if (isUfoHiRom) {
-            int totalSizeMbit = data.length / SnesConstants.MBIT;
-            List<UfoChunk> chunks = UfoHiRomChunker.computeChunks(totalSizeMbit);
+        // Strategy selection: strategyFactory.get(format, rom.type()) dispatches the (format, isHiRom)
+        // combination. (ref: DL-004)
+        SplitStrategy strategy = strategyFactory.get(format, rom.type());
+        FilenameProvider filenameProvider = (wd, bn, partIndex, totalParts, r) ->
+                createFilename(wd, bn, format, partIndex, totalParts, r);
 
-            int offset = 0;
-            for (int i = 0; i < chunks.size(); i++) {
-                UfoChunk chunk = chunks.get(i);
-                int chunkBytes = chunk.sizeMbit() * SnesConstants.MBIT;
-                int length = Math.min(chunkBytes, data.length - offset);
-                boolean isLastPart = (i == chunks.size() - 1);
-
-                byte[] header = headerGen.generateHeader(rom, length, i, isLastPart, chunk.flag());
-
-                File outputFile = createFilename(workDir, baseName, format, i, chunks.size(), rom);
-                writeChunk(outputFile, header, data, offset, length);
-
-                parts.add(outputFile);
-                logger.debug("Created UFO HiROM part {}/{}: {} ({}MB)", i + 1, chunks.size(), outputFile.getName(), chunk.sizeMbit());
-                offset += length;
-            }
-        } else {
-            for (int i = 0; i < chunkCount; i++) {
-                int offset = i * chunkSize;
-                int length = Math.min(chunkSize, data.length - offset);
-                boolean isLastPart = (i == chunkCount - 1);
-                byte chunkFlag = (byte) (isLastPart ? 0x00 : 0x40);
-
-                byte[] header = headerGen.generateHeader(rom, length, i, isLastPart, chunkFlag);
-
-                File outputFile = createFilename(workDir, baseName, format, i, chunkCount, rom);
-                writeChunk(outputFile, header, data, offset, length);
-
-                parts.add(outputFile);
-                logger.debug("Created split part {}/{}: {}", i + 1, chunkCount, outputFile.getName());
-            }
-        }
-
+        List<File> parts = strategy.split(rom, preparedData, headerGen, workDir, baseName, filenameProvider);
+        logger.debug("Split {} into {} parts [{}]", inputRom.getName(), parts.size(), format.name());
         return parts;
+    }
+
+    private byte[] prepareData(SnesRom rom, CopierFormat format) {
+        if (format == CopierFormat.GD3 && rom.isHiRom()) {
+            // Gd3HiRomSplitStrategy applies interleaving internally
+            return rom.rawData();
+        }
+        if (format == CopierFormat.UFO && rom.isHiRom()) {
+            return padToUfoHiRomBoundary(rom.rawData());
+        }
+        return padToMbitBoundary(rom.rawData());
     }
 
     /**
@@ -183,19 +131,15 @@ public class NativeRomSplitter implements RomSplitter {
      *   <li>GD3: SF-Code format (SF + Mbit + 3-char name + suffix + .078).
      *       Single-file: underscore-padded to 8 chars (e.g., SF4SUP__.078).
      *       Multi-file: sequence letters A, B, C... (e.g., SF16STRA.078).
-     *       HiROM ≤16Mbit: X-padding before sequence letter (e.g., SF16CHRXA.078).
-     *       Follows ucon64 `snes_gd_make_names` logic for hardware compatibility.</li>
+     *       HiROM &lt;10Mbit: X-padding inserted before the sequence letter (e.g., {@code SF8TESXA.078}).
+     *       HiROM ≥10Mbit: no X-padding (e.g., {@code SF16CHRA.078}).
+     *       Follows ucon64 {@code snes_gd_make_names} logic for hardware compatibility.</li>
      * </ul>
      */
     private File createFilename(Path workDir, String baseName, CopierFormat format, int partIndex, int totalParts, SnesRom rom) {
-        String filename;
-
-        switch (format) {
-            case FIG, SWC -> filename = baseName + "." + (partIndex + 1);
-            case UFO -> {
-                String ext = (partIndex + 1) + "gm";
-                filename = baseName + "." + ext;
-            }
+        String filename = switch (format) {
+            case FIG, SWC -> baseName + "." + (partIndex + 1);
+            case UFO -> baseName + "." + (partIndex + 1) + "gm";
             case GD3 -> {
                 // GD3 SF-Code format: SF + Mbit + 3-char name + suffix
                 int sizeMbit = rom.rawData().length / SnesConstants.MBIT;
@@ -224,41 +168,10 @@ public class NativeRomSplitter implements RomSplitter {
                     sb.append((char) ('A' + partIndex));
                 }
 
-                filename = sb + ".078";
+                yield sb + ".078";
             }
-            default -> throw new IllegalArgumentException("Unsupported format: " + format);
-        }
+        };
         return workDir.resolve(filename).toFile();
-    }
-
-    /**
-     * Writes a ROM chunk to disk with optional header.
-     *
-     * @param outputFile Target file
-     * @param header     512-byte header (may be empty for headerless parts)
-     * @param data       ROM data buffer
-     * @param offset     Offset into data buffer
-     * @param length     Number of bytes to write
-     * @throws IOException if write fails
-     */
-    private void writeChunk(File outputFile, byte[] header, byte[] data, int offset, int length) throws IOException {
-        try (FileChannel channel = FileChannel.open(outputFile.toPath(),
-                StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
-
-            if (header != null && header.length > 0) {
-                ByteBuffer headerBuffer = ByteBuffer.wrap(header);
-                int headerBytesWritten = channel.write(headerBuffer);
-                if (headerBytesWritten != header.length) {
-                    throw new IOException("Partial header write: expected " + header.length + " bytes, wrote " + headerBytesWritten);
-                }
-            }
-
-            ByteBuffer dataBuffer = ByteBuffer.wrap(data, offset, length);
-            int dataBytesWritten = channel.write(dataBuffer);
-            if (dataBytesWritten != length) {
-                throw new IOException("Partial data write: expected " + length + " bytes, wrote " + dataBytesWritten);
-            }
-        }
     }
 
     /**
@@ -276,7 +189,7 @@ public class NativeRomSplitter implements RomSplitter {
      * ROMs smaller than 2 Mbit are padded to 2 Mbit.
      * Mirroring repeats source bytes cyclically to fill the padding gap.
      * Used by FIG, SWC, UFO LoROM, and GD3 LoROM. UFO HiROM uses
-     * {@link #padToUfoHiRomBoundary(byte[])} instead. (ref: DL-003)
+     * {@link #padToUfoHiRomBoundary(byte[])} instead.
      */
     private byte[] padToMbitBoundary(byte[] data) {
         int[] boundaries = {2 * SnesConstants.MBIT, 4 * SnesConstants.MBIT, 8 * SnesConstants.MBIT,
@@ -300,7 +213,9 @@ public class NativeRomSplitter implements RomSplitter {
      * ROMs smaller than 2 Mbit are padded to 2 Mbit.
      * Supported sizes match {@link UfoHiRomChunker#computeChunks(int)} input domain;
      * power-of-2 padding would produce unsupported sizes (e.g., 8, 16 Mbit) causing
-     * {@code IllegalArgumentException}. (ref: DL-003, RA-004)
+     * {@code IllegalArgumentException}. UFO HiROM uses irregular chunk sizes defined by the
+     * {@link UfoHiRomChunker#computeChunks(int)} lookup table; power-of-2 padding would produce
+     * unsupported sizes (e.g., 8, 16 Mbit) that the chunker does not recognize.
      */
     private byte[] padToUfoHiRomBoundary(byte[] data) {
         int[] boundaries = {2 * SnesConstants.MBIT, 4 * SnesConstants.MBIT, 12 * SnesConstants.MBIT,

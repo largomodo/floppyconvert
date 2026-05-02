@@ -1,3 +1,4 @@
+// createRom helpers use checksum=0x0001, complement=0xFFFE to satisfy the SnesRom invariant. (ref: DL-003)
 package com.largomodo.floppyconvert.snes.header;
 
 import com.largomodo.floppyconvert.snes.RomType;
@@ -169,7 +170,7 @@ class UfoHeaderGeneratorTest {
     void chronoTrigger32MbitRomHasCorrectSizeCode() {
         int chronoTriggerSize = 4 * 1024 * 1024;
         byte[] data = new byte[chronoTriggerSize];
-        SnesRom rom = new SnesRom(data, RomType.HiROM, 0, "CHRONO TRIGGER", false, (byte) 0, (byte) 0, (byte) 0, 0, 0);
+        SnesRom rom = new SnesRom(data, RomType.HiROM, 0, "CHRONO TRIGGER", false, (byte) 0, (byte) 0, (byte) 0, 0x0001, 0xFFFE);
 
         byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
@@ -181,7 +182,7 @@ class UfoHeaderGeneratorTest {
     void header8MbitRomHasCorrectSizeCode() {
         int size8Mbit = 1024 * 1024;
         byte[] data = new byte[size8Mbit];
-        SnesRom rom = new SnesRom(data, RomType.LoROM, 0, "TEST ROM", false, (byte) 0, (byte) 0, (byte) 0, 0, 0);
+        SnesRom rom = new SnesRom(data, RomType.LoROM, 0, "TEST ROM", false, (byte) 0, (byte) 0, (byte) 0, 0x0001, 0xFFFE);
 
         byte[] header = generator.generateHeader(rom, 512 * 1024, 0, true, (byte) 0x00);
 
@@ -334,8 +335,8 @@ class UfoHeaderGeneratorTest {
                 (byte) 0,
                 (byte) 0,
                 (byte) 0,
-                0,
-                0
+                0x0001,
+                0xFFFE
         );
     }
 }

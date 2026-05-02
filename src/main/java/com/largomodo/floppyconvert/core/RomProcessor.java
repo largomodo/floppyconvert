@@ -189,8 +189,11 @@ public class RomProcessor {
     /**
      * Create DOS 8.3 name mapping for ROM parts.
      * <p>
-     * RomPartMetadata provides pre-computed DOS names from RomPartNormalizer.
-     * Centralized mapping enables validation of DOS name collisions per disk.
+     * RomPartMetadata carries pre-validated DOS names from RomPartNormalizer.of.
+     * Centralized mapping enables collision detection per disk via validateNoDosCollisions.
+     * <p>
+     * Map&lt;File, String&gt; signature is preserved to match ConversionFacade.write; the String
+     * values are invariant-validated at the RomPartMetadata.of boundary. (ref: DL-007)
      */
     private Map<File, String> createDosNameMapping(List<RomPartMetadata> parts) {
         Map<File, String> dosNameMap = new LinkedHashMap<>();

@@ -1,3 +1,4 @@
+// createRom helpers use checksum=0x0001, complement=0xFFFE to satisfy the SnesRom invariant. (ref: DL-003)
 package com.largomodo.floppyconvert.snes.header;
 
 import com.largomodo.floppyconvert.snes.RomType;
@@ -116,7 +117,7 @@ class FigHeaderGeneratorTest {
         byte[] romData = new byte[4 * 1024 * 1024];
         int partSize = 512 * 1024;
         SnesRom rom = new SnesRom(romData, RomType.HiROM, 8192, "CHRONO TRIGGER",
-                false, 0x01, 0x00, 0x00, 0, 0);
+                false, 0x01, 0x00, 0x00, 0x0001, 0xFFFE);
 
         byte[] header = generator.generateHeader(rom, partSize, 0, true, (byte) 0x00);
 
@@ -131,7 +132,7 @@ class FigHeaderGeneratorTest {
     void headerContainsValidDataForFirstPart() {
         byte[] romData = new byte[2 * 1024 * 1024];
         SnesRom rom = new SnesRom(romData, RomType.LoROM, 0, "TEST ROM",
-                false, 0x01, 0x00, 0x00, 0, 0);
+                false, 0x01, 0x00, 0x00, 0x0001, 0xFFFE);
 
         byte[] header = generator.generateHeader(rom, 512 * 1024, 0, false, (byte) 0x00);
 
@@ -144,7 +145,7 @@ class FigHeaderGeneratorTest {
     void headerContainsValidDataForLastPart() {
         byte[] romData = new byte[2 * 1024 * 1024];
         SnesRom rom = new SnesRom(romData, RomType.HiROM, 8192, "TEST ROM",
-                false, 0x01, 0x00, 0x00, 0, 0);
+                false, 0x01, 0x00, 0x00, 0x0001, 0xFFFE);
 
         byte[] header = generator.generateHeader(rom, 512 * 1024, 2, true, (byte) 0x00);
 
@@ -179,21 +180,21 @@ class FigHeaderGeneratorTest {
     @Provide
     Arbitrary<SnesRom> loRomNoSram() {
         return RomDataGenerator.loRomData().map(data ->
-                new SnesRom(data, RomType.LoROM, 0, "TEST ROM", false, 0x01, 0x00, 0x00, 0, 0)
+                new SnesRom(data, RomType.LoROM, 0, "TEST ROM", false, 0x01, 0x00, 0x00, 0x0001, 0xFFFE)
         );
     }
 
     @Provide
     Arbitrary<SnesRom> loRomSmallSram() {
         return RomDataGenerator.loRomData().map(data ->
-                new SnesRom(data, RomType.LoROM, 2048, "TEST ROM", false, 0x01, 0x00, 0x00, 0, 0)
+                new SnesRom(data, RomType.LoROM, 2048, "TEST ROM", false, 0x01, 0x00, 0x00, 0x0001, 0xFFFE)
         );
     }
 
     @Provide
     Arbitrary<SnesRom> hiRomWithSram() {
         return RomDataGenerator.hiRomData().map(data ->
-                new SnesRom(data, RomType.HiROM, 8192, "TEST ROM", false, 0x01, 0x00, 0x00, 0, 0)
+                new SnesRom(data, RomType.HiROM, 8192, "TEST ROM", false, 0x01, 0x00, 0x00, 0x0001, 0xFFFE)
         );
     }
 
@@ -203,14 +204,14 @@ class FigHeaderGeneratorTest {
     }
 
     private SnesRom createLoRomFromData(byte[] data) {
-        return new SnesRom(data, RomType.LoROM, 0, "TEST ROM", false, 0x01, 0x00, 0x00, 0, 0);
+        return new SnesRom(data, RomType.LoROM, 0, "TEST ROM", false, 0x01, 0x00, 0x00, 0x0001, 0xFFFE);
     }
 
     private SnesRom createHiRomFromData(byte[] data) {
-        return new SnesRom(data, RomType.HiROM, 0, "TEST ROM", false, 0x01, 0x00, 0x00, 0, 0);
+        return new SnesRom(data, RomType.HiROM, 0, "TEST ROM", false, 0x01, 0x00, 0x00, 0x0001, 0xFFFE);
     }
 
     private SnesRom createRomWithDsp(byte[] data, RomType type) {
-        return new SnesRom(data, type, 0, "TEST ROM", true, 0x01, 0x00, 0x00, 0, 0);
+        return new SnesRom(data, type, 0, "TEST ROM", true, 0x01, 0x00, 0x00, 0x0001, 0xFFFE);
     }
 }

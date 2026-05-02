@@ -2,7 +2,6 @@ package com.largomodo.floppyconvert.core;
 
 import com.largomodo.floppyconvert.core.domain.RomPartMetadata;
 import com.largomodo.floppyconvert.core.workspace.ConversionWorkspace;
-import com.largomodo.floppyconvert.util.DosNameUtil;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,7 +28,7 @@ public class RomPartNormalizer {
      * DOS-compliant names for floppy image injection.
      * <p>
      * Two-stage naming: sanitizeForShell produces filesystem paths safe for external tool
-     * invocation, DosNameUtil produces 8.3 names for FAT12 directory entries.
+     * invocation, DosName.of produces 8.3 names for FAT12 directory entries.
      *
      * @param rawParts  Split ROM parts from RomSplitter (may have shell-unsafe names)
      * @param workspace Conversion workspace for tracking artifact lifecycle
@@ -62,12 +61,12 @@ public class RomPartNormalizer {
             workspace.markAsOutput(part.toPath());  // Remove old path
             workspace.track(sanitizedPath);         // Add new path
 
-            String dosName = DosNameUtil.sanitize(sanitizedName);
-
-            metadata.add(new RomPartMetadata(
+            // Validate 8.3 invariant at the producer site via RomPartMetadata.of;
+            // downstream consumers receive a pre-validated String via dosName(). (ref: DL-002, DL-007, DL-008)
+            metadata.add(RomPartMetadata.of(
                     sanitizedPath,
                     Files.size(sanitizedPath),
-                    dosName
+                    sanitizedName
             ));
         }
 

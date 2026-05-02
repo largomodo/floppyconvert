@@ -25,6 +25,14 @@ public record SnesRom(
         Objects.requireNonNull(rawData, "rawData must not be null");
         Objects.requireNonNull(type, "type must not be null");
         Objects.requireNonNull(title, "title must not be null");
+        // (checksum + complement) & 0xFFFF == 0xFFFF holds for all real SNES ROMs;
+        // SnesRomReader already asserts this during scoring and all E2E fixture ROMs satisfy it.
+        // Enforcing it here makes validity a property of the type, matching the null-check pattern
+        // for reference fields. (ref: DL-003)
+        if (((checksum + complement) & 0xFFFF) != 0xFFFF) {
+            throw new IllegalArgumentException(
+                    String.format("Invalid checksum/complement pair: checksum=0x%04X complement=0x%04X (sum must be 0xFFFF)", checksum, complement));
+        }
     }
 
     /**
