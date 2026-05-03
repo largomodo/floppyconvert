@@ -95,4 +95,28 @@ class DosNameTest {
                     "DosName.of must produce same result as DosNameUtil.sanitize for: " + input);
         }
     }
+
+    // Input-output assertions for truncation, special-char removal, multi-dot, no-extension,
+    // and all-special-chars edge cases — exercises the DosNameUtil.sanitize delegation
+    // path via DosName's compact constructor.
+    @ParameterizedTest
+    @CsvSource({
+            "Super Mario.sfc, SUPERMAR.SFC",
+            "LongGameName.1, LONGGAME.1",
+            "Zelda: Link.2, ZELDALIN.2",
+            "Final-Fantasy.sfc, FINALFAN.SFC",
+            "game.99, GAME.99",
+            "game.v1.0.rom, GAMEV10.ROM",
+            "noext, NOEXT",
+    })
+    void dosNameUtilParityCases(String input, String expected) {
+        assertEquals(expected, DosName.of(input).value());
+    }
+
+    // Degenerate input where only two letter characters survive — verifies the sanitize
+    // boundary preserves them with the canonical "A.B" 8.3 form.
+    @Test
+    void allSpecialCharactersExceptTwoLetters() {
+        assertEquals("A.B", DosName.of("!@#$a%^&*.!@#b$%^").value());
+    }
 }

@@ -22,6 +22,6 @@ CLI / E2E / integration tests plus shared test ROM provisioning utilities.
 | Directory   | What                                                                                  | When to read                                                       |
 | ----------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | `core/`     | Tests for orchestration layer (`FloppyType`, `RomPartComparator`, `RomProcessor`, ...) | Verifying orchestration logic, packing, workspace cleanup          |
-| `service/`  | Tests for service layer (`DefaultConversionFacade`, `NativeRomSplitter`, factory, FAT12 writer/factory) | Verifying split logic, FAT12 image generation, factory wiring  |
+| `service/`  | Tests for service layer (`DefaultConversionFacade`, `NativeRomSplitter`, factory, FAT12 writer/factory, per-format SplitStrategy tests) | Verifying split logic, FAT12 image generation, factory wiring  |
 | `snes/`     | Tests for SNES parsing/validation/interleaving and per-format header generation        | Verifying ROM detection, hardware validation, interleaving        |
-| `util/`     | Tests for `DosNameUtil` and `SnesRomMatcher`                                           | Verifying filename sanitization and ROM-extension detection        |
+| `util/`     | Tests for `DosName` value type and `SnesRomMatcher`                                    | Verifying DOS 8.3 name invariant and ROM-extension detection       |

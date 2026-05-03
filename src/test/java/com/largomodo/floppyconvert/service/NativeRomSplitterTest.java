@@ -28,12 +28,14 @@ import static org.mockito.Mockito.*;
 /**
  * Integration tests for NativeRomSplitter with mocked dependencies.
  * <p>
- * Tests verify:
- * - Orchestration logic without real file I/O
- * - Split boundary calculations
- * - File naming for all formats
- * - Conditional interleaving (GD3 + HiROM only)
- * - Header generation delegation
+ * Tests verify NativeRomSplitter orchestration: filename construction (FIG/UFO/GD3
+ * SF-Code, X-padding, sanitization), padding boundaries, validator wiring, IOException
+ * propagation, null-input and non-directory work-dir guards, and ExHiROM
+ * acceptance/rejection. (ref: DL-005)
+ * <p>
+ * Split-mechanics (chunk count, flag sequencing, HiROM threshold dispatch, interleave)
+ * are covered by StandardSplitStrategyTest, Gd3HiRomSplitStrategyTest,
+ * UfoHiRomSplitStrategyTest, and SplitStrategyFactoryTest.strategyMatrix. (ref: DL-004)
  */
 class NativeRomSplitterTest {
 
@@ -59,195 +61,6 @@ class NativeRomSplitterTest {
     }
 
     @Test
-    void testSplit4MbitLoRomSwc_SingleFile() throws IOException {
-        File inputRom = createRomFile("test.sfc");
-        byte[] romData = createRomData(512 * 1024); // 4 Mbit = 512 KB
-        SnesRom rom = createLoRom(romData);
-
-        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockHeaderFactory.get(CopierFormat.SWC)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
-
-        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.SWC);
-
-        verify(mockReader, times(1)).load(inputRom.toPath());
-        verify(mockHeaderFactory, times(1)).get(CopierFormat.SWC);
-        verify(mockHeaderGenerator, times(1)).generateHeader(eq(rom), eq(512 * 1024), eq(0), eq(true), anyByte());
-        verifyNoInteractions(mockInterleaver);
-
-        assertEquals(1, parts.size());
-        assertEquals("test.1", parts.getFirst().getName());
-    }
-
-    @Test
-    void testSplit32MbitHiRomSwc_EightFiles() throws IOException {
-        File inputRom = createRomFile("test.sfc");
-        byte[] romData = createRomData(4 * 1024 * 1024); // 32 Mbit = 4 MB
-        SnesRom rom = createHiRom(romData);
-
-        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockHeaderFactory.get(CopierFormat.SWC)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
-
-        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.SWC);
-
-        verify(mockReader, times(1)).load(inputRom.toPath());
-        verify(mockHeaderFactory, times(1)).get(CopierFormat.SWC);
-        verify(mockHeaderGenerator, times(8)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte());
-        verifyNoInteractions(mockInterleaver);
-
-        assertEquals(8, parts.size());
-        for (int i = 0; i < 8; i++) {
-            assertEquals("test." + (i + 1), parts.get(i).getName());
-        }
-    }
-
-    @Test
-    void testSplit32MbitHiRomGd3_FourFiles() throws IOException {
-        File inputRom = createRomFile("test.sfc");
-        byte[] romData = createRomData(4 * 1024 * 1024);
-        byte[] interleavedData = new byte[romData.length];
-        SnesRom rom = createHiRom(romData);
-
-        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockInterleaver.interleave(any(byte[].class), any(RomType.class))).thenReturn(interleavedData);
-        when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
-
-        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
-
-        verify(mockReader, times(1)).load(inputRom.toPath());
-        verify(mockInterleaver, times(1)).interleave(any(byte[].class), any(RomType.class));
-        verify(mockHeaderFactory, times(1)).get(CopierFormat.GD3);
-        verify(mockHeaderGenerator, times(4)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte());
-
-        assertEquals(4, parts.size());
-        assertEquals("SF32TESA.078", parts.getFirst().getName());
-        assertEquals("SF32TESB.078", parts.get(1).getName());
-        assertEquals("SF32TESC.078", parts.get(2).getName());
-        assertEquals("SF32TESD.078", parts.get(3).getName());
-    }
-
-    @Test
-    void testSplit12MbitRomSwc_ThreeFiles() throws IOException {
-        File inputRom = createRomFile("test.sfc");
-        byte[] romData = createRomData(1536 * 1024); // 12 Mbit = 1.5 MB, padded to 16 Mbit
-        SnesRom rom = createLoRom(romData);
-
-        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockHeaderFactory.get(CopierFormat.SWC)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
-
-        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.SWC);
-
-        verify(mockReader, times(1)).load(inputRom.toPath());
-        verify(mockHeaderFactory, times(1)).get(CopierFormat.SWC);
-        verify(mockHeaderGenerator, times(4)).generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte());
-        verifyNoInteractions(mockInterleaver);
-
-        assertEquals(4, parts.size());
-        assertEquals("test.1", parts.getFirst().getName());
-        assertEquals("test.2", parts.get(1).getName());
-        assertEquals("test.3", parts.get(2).getName());
-        assertEquals("test.4", parts.get(3).getName());
-    }
-
-    @Test
-    void testGd3HiRomCallsInterleaver() throws IOException {
-        File inputRom = createRomFile("test.sfc");
-        byte[] romData = createRomData(1024 * 1024); // 8 Mbit
-        byte[] interleavedData = new byte[romData.length];
-        SnesRom rom = createHiRom(romData);
-
-        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockInterleaver.interleave(any(byte[].class), any(RomType.class))).thenReturn(interleavedData);
-        when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
-
-        splitter.split(inputRom, tempDir, CopierFormat.GD3);
-
-        verify(mockInterleaver, times(1)).interleave(any(byte[].class), any(RomType.class));
-    }
-
-    @Test
-    void testGd3LoRomDoesNotCallInterleaver() throws IOException {
-        File inputRom = createRomFile("test.sfc");
-        byte[] romData = createRomData(1024 * 1024); // 8 Mbit
-        SnesRom rom = createLoRom(romData);
-
-        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
-
-        splitter.split(inputRom, tempDir, CopierFormat.GD3);
-
-        verifyNoInteractions(mockInterleaver);
-    }
-
-    @Test
-    void testSwcNeverCallsInterleaver() throws IOException {
-        File inputRom = createRomFile("test.sfc");
-        byte[] romData = createRomData(1024 * 1024);
-        SnesRom rom = createHiRom(romData);
-
-        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockHeaderFactory.get(CopierFormat.SWC)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
-
-        splitter.split(inputRom, tempDir, CopierFormat.SWC);
-
-        verifyNoInteractions(mockInterleaver);
-    }
-
-    @Test
-    void testFigNeverCallsInterleaver() throws IOException {
-        File inputRom = createRomFile("test.sfc");
-        byte[] romData = createRomData(1024 * 1024);
-        SnesRom rom = createHiRom(romData);
-
-        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockHeaderFactory.get(CopierFormat.FIG)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
-
-        splitter.split(inputRom, tempDir, CopierFormat.FIG);
-
-        verifyNoInteractions(mockInterleaver);
-    }
-
-    @Test
-    void testUfoNeverCallsInterleaver() throws IOException {
-        File inputRom = createRomFile("test.sfc");
-        byte[] romData = createRomData(512 * 1024);
-        SnesRom rom = createHiRom(romData);
-
-        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockHeaderFactory.get(CopierFormat.UFO)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
-
-        splitter.split(inputRom, tempDir, CopierFormat.UFO);
-
-        verifyNoInteractions(mockInterleaver);
-    }
-
-    @Test
-    void testHeaderGeneratorCalledWithCorrectIndices() throws IOException {
-        File inputRom = createRomFile("test.sfc");
-        byte[] romData = createRomData(1536 * 1024); // 12 Mbit, padded to 16 Mbit = 4 parts
-        SnesRom rom = createLoRom(romData);
-
-        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockHeaderFactory.get(CopierFormat.SWC)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
-
-        splitter.split(inputRom, tempDir, CopierFormat.SWC);
-
-        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(0), eq(false), anyByte());
-        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(1), eq(false), anyByte());
-        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(2), eq(false), anyByte());
-        verify(mockHeaderGenerator).generateHeader(eq(rom), eq(512 * 1024), eq(3), eq(true), anyByte());
-    }
-
-    @Test
     void testSnesRomReaderThrowsIOException() throws IOException {
         File inputRom = createRomFile("test.sfc");
 
@@ -261,24 +74,6 @@ class NativeRomSplitterTest {
         verify(mockReader, times(1)).load(inputRom.toPath());
         verifyNoInteractions(mockHeaderFactory);
         verifyNoInteractions(mockInterleaver);
-    }
-
-    @Test
-    void testGd3SingleFileSinglePart() throws IOException {
-        File inputRom = createRomFile("test.sfc");
-        byte[] romData = createRomData(512 * 1024);
-        byte[] interleavedData = new byte[romData.length];
-        SnesRom rom = createHiRom(romData);
-
-        when(mockReader.load(inputRom.toPath())).thenReturn(rom);
-        when(mockInterleaver.interleave(any(byte[].class), any(RomType.class))).thenReturn(interleavedData);
-        when(mockHeaderFactory.get(CopierFormat.GD3)).thenReturn(mockHeaderGenerator);
-        when(mockHeaderGenerator.generateHeader(eq(rom), anyInt(), anyInt(), anyBoolean(), anyByte())).thenReturn(new byte[512]);
-
-        List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
-
-        assertEquals(1, parts.size());
-        assertEquals("SF4TES__.078", parts.getFirst().getName());
     }
 
     @Test

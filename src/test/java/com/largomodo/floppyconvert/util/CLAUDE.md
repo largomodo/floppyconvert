@@ -4,5 +4,5 @@
 
 | File                          | What                                                                                                          | When to read                                                              |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `DosNameUtilTest.java`        | DOS 8.3 sanitization tests: truncation, special characters, extension preservation                            | Verifying filename truncation behavior, debugging name normalization      |
+| `DosNameTest.java`            | `DosName` value-type tests: construction, sanitization parity, equality, extension preservation               | Verifying DOS 8.3 name invariant, debugging sanitization behavior         |
 | `SnesRomMatcherTest.java`     | `isRom` tests for supported extensions and Game Doctor naming, directory rejection                             | Verifying ROM detection, adding new extension matchers                    |

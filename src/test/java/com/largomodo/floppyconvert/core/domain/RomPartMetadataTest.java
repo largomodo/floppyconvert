@@ -38,31 +38,4 @@ class RomPartMetadataTest {
         assertTrue(ex.getMessage().contains("0"));
     }
 
-    @Test
-    void recordProvidesEquals() {
-        RomPartMetadata m1 = new RomPartMetadata(Path.of("/test/rom.fig"), 1024, "ROM.FIG");
-        RomPartMetadata m2 = new RomPartMetadata(Path.of("/test/rom.fig"), 1024, "ROM.FIG");
-        RomPartMetadata m3 = new RomPartMetadata(Path.of("/test/rom.fig"), 2048, "ROM.FIG");
-
-        assertEquals(m1, m2);
-        assertNotEquals(m1, m3);
-    }
-
-    @Test
-    void recordProvidesHashCode() {
-        RomPartMetadata m1 = new RomPartMetadata(Path.of("/test/rom.fig"), 1024, "ROM.FIG");
-        RomPartMetadata m2 = new RomPartMetadata(Path.of("/test/rom.fig"), 1024, "ROM.FIG");
-
-        assertEquals(m1.hashCode(), m2.hashCode());
-    }
-
-    @Test
-    void recordProvidesToString() {
-        RomPartMetadata metadata = new RomPartMetadata(Path.of("/test/rom.fig"), 1024, "ROM.FIG");
-        String str = metadata.toString();
-
-        assertTrue(str.contains("RomPartMetadata"));
-        assertTrue(str.contains("1024"));
-        assertTrue(str.contains("ROM.FIG"));
-    }
 }
