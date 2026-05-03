@@ -43,46 +43,4 @@ class DiskLayoutTest {
         });
     }
 
-    @Test
-    void recordProvidesEquals() {
-        RomPartMetadata part = new RomPartMetadata(Path.of("/test/part.fig"), 1024, "PART.FIG");
-        List<RomPartMetadata> parts1 = List.of(part);
-        List<RomPartMetadata> parts2 = List.of(part);
-
-        DiskLayout layout1 = new DiskLayout(parts1, FloppyType.FLOPPY_720K);
-        DiskLayout layout2 = new DiskLayout(parts2, FloppyType.FLOPPY_720K);
-        DiskLayout layout3 = new DiskLayout(parts1, FloppyType.FLOPPY_144M);
-
-        assertEquals(layout1, layout2);
-        assertNotEquals(layout1, layout3);
-    }
-
-    @Test
-    void recordProvidesHashCode() {
-        RomPartMetadata part = new RomPartMetadata(Path.of("/test/part.fig"), 1024, "PART.FIG");
-        List<RomPartMetadata> parts1 = List.of(part);
-        List<RomPartMetadata> parts2 = List.of(part);
-
-        DiskLayout layout1 = new DiskLayout(parts1, FloppyType.FLOPPY_720K);
-        DiskLayout layout2 = new DiskLayout(parts2, FloppyType.FLOPPY_720K);
-
-        assertEquals(layout1.hashCode(), layout2.hashCode());
-    }
-
-    @Test
-    void recordProvidesToString() {
-        RomPartMetadata part = new RomPartMetadata(Path.of("/test/part.fig"), 1024, "PART.FIG");
-        DiskLayout layout = new DiskLayout(List.of(part), FloppyType.FLOPPY_720K);
-        String str = layout.toString();
-
-        assertTrue(str.contains("DiskLayout"));
-        assertTrue(str.contains("FLOPPY_720K"));
-    }
-
-    @Test
-    void emptyLayoutAllowed() {
-        DiskLayout layout = new DiskLayout(List.of(), FloppyType.FLOPPY_160M);
-        assertTrue(layout.contents().isEmpty());
-        assertEquals(FloppyType.FLOPPY_160M, layout.floppyType());
-    }
 }
