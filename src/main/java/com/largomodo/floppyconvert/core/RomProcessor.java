@@ -126,7 +126,9 @@ public class RomProcessor {
             trackIntermediateFiles(ws, format, gameOutputDir, existingFiles, sanitizedBaseName, parts);
 
             List<RomPartMetadata> partMetadata = normalizer.normalize(parts, ws);
-            List<DiskLayout> diskLayouts = packer.pack(partMetadata);
+            // GD3 firmware rejects 720K BPB (SPT=9 has no handler); all other formats accept 720K.
+            FloppyType minimum = FloppyType.minimumForFormat(format);
+            List<DiskLayout> diskLayouts = packer.pack(partMetadata, minimum);
 
             List<Path> createdImages = writeDisksFromLayout(diskLayouts, gameOutputDir, sanitizedBaseName, ws);
 

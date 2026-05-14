@@ -16,9 +16,13 @@ import java.util.List;
 public class GreedyDiskPacker implements DiskPacker {
 
     @Override
-    public List<DiskLayout> pack(List<RomPartMetadata> parts) {
+    public List<DiskLayout> pack(List<RomPartMetadata> parts, FloppyType minimum) {
         if (parts == null) {
             throw new IllegalArgumentException("Parts list cannot be null");
+        }
+
+        if (minimum == null) {
+            throw new IllegalArgumentException("Minimum floppy type cannot be null");
         }
 
         if (parts.isEmpty()) {
@@ -71,7 +75,7 @@ public class GreedyDiskPacker implements DiskPacker {
             // FloppyType.bestFit() selects smallest format that fits accumulated size
             FloppyType selectedType;
             try {
-                selectedType = FloppyType.bestFit(diskUsed);
+                selectedType = FloppyType.bestFit(diskUsed, minimum);
             } catch (IOException e) {
                 // Should never occur: fail-fast validation prevents oversized parts
                 throw new IllegalStateException("Unexpected capacity error after validation", e);

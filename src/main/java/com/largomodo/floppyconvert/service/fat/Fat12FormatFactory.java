@@ -70,7 +70,7 @@ public class Fat12FormatFactory implements DiskTemplateFactory {
      */
     private void writeBiosParameterBlock(ByteBuffer buffer, FloppyType type) {
         buffer.putShort((short) 512);
-        buffer.put((byte) 1);
+        buffer.put(type.getSectorsPerCluster());
         buffer.putShort((short) 1);
         buffer.put((byte) 2);
         buffer.putShort((short) type.getRootEntryCount());
