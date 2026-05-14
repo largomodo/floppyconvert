@@ -61,6 +61,9 @@ class Fat12FormatFactoryTest {
 
             // Verify sectors per FAT
             assertEquals((short) 3, buffer.getShort(0x16), "720KB should have 3 sectors per FAT");
+
+            // Verify sectors per cluster
+            assertEquals((byte) 2, buffer.get(0x0D), "720KB should have 2 sectors per cluster");
         }
     }
 
@@ -95,6 +98,9 @@ class Fat12FormatFactoryTest {
 
             // Verify sectors per FAT
             assertEquals((short) 9, buffer.getShort(0x16), "1.44MB should have 9 sectors per FAT");
+
+            // Verify sectors per cluster
+            assertEquals((byte) 1, buffer.get(0x0D), "1.44MB should have 1 sector per cluster");
         }
     }
 
@@ -129,6 +135,9 @@ class Fat12FormatFactoryTest {
 
             // Verify FAT size in header matches expected
             assertEquals((short) 10, buffer.getShort(0x16), "1.6MB should have 10 sectors per FAT");
+
+            // Verify sectors per cluster
+            assertEquals((byte) 1, buffer.get(0x0D), "1.6MB should have 1 sector per cluster");
         }
     }
 
@@ -193,7 +202,7 @@ class Fat12FormatFactoryTest {
             assertEquals((short) 512, buffer.getShort(0x0B), "Bytes per sector should be 512");
 
             // Verify sectors per cluster
-            assertEquals((byte) 1, buffer.get(0x0D), "Sectors per cluster should be 1");
+            assertEquals((byte) 1, buffer.get(0x0D), "Sectors per cluster should be 1 for 1.44MB");
 
             // Verify reserved sectors
             assertEquals((short) 1, buffer.getShort(0x0E), "Reserved sectors should be 1");

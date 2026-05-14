@@ -107,7 +107,7 @@ class RomProcessorTest {
         }).when(mockTemplateFactory).createBlankDisk(any(FloppyType.class), any(Path.class));
 
         // Mock packer to return single disk layout (normalizer will run in real code)
-        when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
+        when(mockPacker.pack(anyList(), any(FloppyType.class))).thenAnswer(invocation -> {
             List<RomPartMetadata> metadata = invocation.getArgument(0);
             return List.of(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
         });
@@ -120,9 +120,11 @@ class RomProcessorTest {
 
         // Verify packer was called with correct metadata (after normalization)
         ArgumentCaptor<List<RomPartMetadata>> packerArg = ArgumentCaptor.forClass(List.class);
-        verify(mockPacker).pack(packerArg.capture());
+        ArgumentCaptor<FloppyType> minimumCaptor = ArgumentCaptor.forClass(FloppyType.class);
+        verify(mockPacker).pack(packerArg.capture(), minimumCaptor.capture());
         List<RomPartMetadata> capturedMetadata = packerArg.getValue();
         assertEquals(2, capturedMetadata.size());
+        assertEquals(FloppyType.FLOPPY_720K, minimumCaptor.getValue(), "FIG format should use FLOPPY_720K minimum");
 
         // Verify templateFactory was called
         verify(mockTemplateFactory).createBlankDisk(eq(FloppyType.FLOPPY_144M), any(Path.class));
@@ -159,7 +161,7 @@ class RomProcessorTest {
         }).when(mockTemplateFactory).createBlankDisk(any(FloppyType.class), any(Path.class));
 
         // Mock packer to return THREE disk layouts (normalizer will run in real code)
-        when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
+        when(mockPacker.pack(anyList(), any(FloppyType.class))).thenAnswer(invocation -> {
             List<RomPartMetadata> metadata = invocation.getArgument(0);
             return Arrays.asList(
                     new DiskLayout(metadata, FloppyType.FLOPPY_720K),
@@ -221,7 +223,7 @@ class RomProcessorTest {
                 .thenReturn(List.of(part1));
 
         // Mock packer to throw exception (normalizer will run in real code)
-        when(mockPacker.pack(anyList())).thenThrow(new IllegalArgumentException("Part too large"));
+        when(mockPacker.pack(anyList(), any(FloppyType.class))).thenThrow(new IllegalArgumentException("Part too large"));
 
         // Execute and expect exception
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
@@ -232,7 +234,9 @@ class RomProcessorTest {
 
         // Verify calls
         verify(mockFacade).splitRom(any(File.class), any(Path.class), eq(CopierFormat.GD3));
-        verify(mockPacker).pack(anyList());
+        ArgumentCaptor<FloppyType> gd3MinCaptor = ArgumentCaptor.forClass(FloppyType.class);
+        verify(mockPacker).pack(anyList(), gd3MinCaptor.capture());
+        assertEquals(FloppyType.FLOPPY_144M, gd3MinCaptor.getValue(), "GD3 format should use FLOPPY_144M minimum");
         verifyNoMoreInteractions(mockFacade);
     }
 
@@ -261,7 +265,7 @@ class RomProcessorTest {
         }).when(mockTemplateFactory).createBlankDisk(any(FloppyType.class), any(Path.class));
 
         // Mock packer to return layout (normalizer will run in real code)
-        when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
+        when(mockPacker.pack(anyList(), any(FloppyType.class))).thenAnswer(invocation -> {
             List<RomPartMetadata> metadata = invocation.getArgument(0);
             return List.of(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
         });
@@ -279,7 +283,7 @@ class RomProcessorTest {
 
         // Verify all components were called
         verify(mockFacade).splitRom(any(File.class), any(Path.class), eq(CopierFormat.FIG));
-        verify(mockPacker).pack(anyList());
+        verify(mockPacker).pack(anyList(), any(FloppyType.class));
         verify(mockFacade).write(any(File.class), anyList(), anyMap());
     }
 
@@ -328,7 +332,7 @@ class RomProcessorTest {
         }).when(mockTemplateFactory).createBlankDisk(any(FloppyType.class), any(Path.class));
 
         // Mock packer to return layout (normalizer will run in real code)
-        when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
+        when(mockPacker.pack(anyList(), any(FloppyType.class))).thenAnswer(invocation -> {
             List<RomPartMetadata> metadata = invocation.getArgument(0);
             return List.of(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
         });
@@ -372,7 +376,7 @@ class RomProcessorTest {
             return null;
         }).when(mockTemplateFactory).createBlankDisk(any(FloppyType.class), any(Path.class));
 
-        when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
+        when(mockPacker.pack(anyList(), any(FloppyType.class))).thenAnswer(invocation -> {
             List<RomPartMetadata> metadata = invocation.getArgument(0);
             return List.of(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
         });
@@ -406,7 +410,7 @@ class RomProcessorTest {
             return null;
         }).when(mockTemplateFactory).createBlankDisk(any(FloppyType.class), any(Path.class));
 
-        when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
+        when(mockPacker.pack(anyList(), any(FloppyType.class))).thenAnswer(invocation -> {
             List<RomPartMetadata> metadata = invocation.getArgument(0);
             return List.of(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
         });
@@ -442,7 +446,7 @@ class RomProcessorTest {
             return null;
         }).when(mockTemplateFactory).createBlankDisk(any(FloppyType.class), any(Path.class));
 
-        when(mockPacker.pack(anyList())).thenAnswer(invocation -> {
+        when(mockPacker.pack(anyList(), any(FloppyType.class))).thenAnswer(invocation -> {
             List<RomPartMetadata> metadata = invocation.getArgument(0);
             return List.of(new DiskLayout(metadata, FloppyType.FLOPPY_144M));
         });

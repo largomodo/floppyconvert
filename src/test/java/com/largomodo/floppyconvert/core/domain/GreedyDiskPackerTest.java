@@ -22,7 +22,7 @@ class GreedyDiskPackerTest {
     @Test
     void testEmptyInput() {
         List<RomPartMetadata> parts = new ArrayList<>();
-        List<DiskLayout> result = packer.pack(parts);
+        List<DiskLayout> result = packer.pack(parts, FloppyType.FLOPPY_720K);
 
         assertTrue(result.isEmpty(), "Empty input should return empty list");
     }
@@ -33,7 +33,7 @@ class GreedyDiskPackerTest {
                 new RomPartMetadata(Path.of("test.bin"), 500_000, "TEST.BIN")
         );
 
-        List<DiskLayout> result = packer.pack(parts);
+        List<DiskLayout> result = packer.pack(parts, FloppyType.FLOPPY_720K);
 
         assertEquals(1, result.size(), "Should create exactly 1 disk");
         assertEquals(FloppyType.FLOPPY_720K, result.get(0).floppyType(),
@@ -56,7 +56,7 @@ class GreedyDiskPackerTest {
                 new RomPartMetadata(Path.of("part5.bin"), 600_000, "PART5.BIN")  // Disk 3
         );
 
-        List<DiskLayout> result = packer.pack(parts);
+        List<DiskLayout> result = packer.pack(parts, FloppyType.FLOPPY_720K);
 
         assertEquals(3, result.size(), "Should create exactly 3 disks");
 
@@ -91,7 +91,7 @@ class GreedyDiskPackerTest {
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> packer.pack(parts),
+                () -> packer.pack(parts, FloppyType.FLOPPY_720K),
                 "Should throw IllegalArgumentException for oversized part"
         );
 
@@ -110,7 +110,7 @@ class GreedyDiskPackerTest {
                 new RomPartMetadata(Path.of("part2.bin"), 800_000, "PART2.BIN")
         );
 
-        List<DiskLayout> result = packer.pack(parts);
+        List<DiskLayout> result = packer.pack(parts, FloppyType.FLOPPY_720K);
 
         assertFalse(result.isEmpty(), "Should create at least 1 disk");
 
@@ -127,7 +127,7 @@ class GreedyDiskPackerTest {
     @Test
     void testNullInputThrowsException() {
         assertThrows(IllegalArgumentException.class,
-                () -> packer.pack(null),
+                () -> packer.pack(null, FloppyType.FLOPPY_720K),
                 "Should throw IllegalArgumentException for null input");
     }
 
@@ -140,7 +140,7 @@ class GreedyDiskPackerTest {
                 new RomPartMetadata(Path.of("small3.bin"), 100_000, "SMALL3.BIN")
         );
 
-        List<DiskLayout> result = packer.pack(parts);
+        List<DiskLayout> result = packer.pack(parts, FloppyType.FLOPPY_720K);
 
         assertEquals(1, result.size(), "Should fit all parts in 1 disk");
         assertEquals(FloppyType.FLOPPY_720K, result.get(0).floppyType(),
@@ -158,7 +158,7 @@ class GreedyDiskPackerTest {
                         "EXACT.BIN")
         );
 
-        List<DiskLayout> result = packer.pack(parts);
+        List<DiskLayout> result = packer.pack(parts, FloppyType.FLOPPY_720K);
 
         assertEquals(1, result.size());
         assertEquals(FloppyType.FLOPPY_720K, result.get(0).floppyType(),
@@ -174,7 +174,7 @@ class GreedyDiskPackerTest {
                         "OVER720.BIN")
         );
 
-        List<DiskLayout> result = packer.pack(parts);
+        List<DiskLayout> result = packer.pack(parts, FloppyType.FLOPPY_720K);
 
         assertEquals(1, result.size());
         assertEquals(FloppyType.FLOPPY_144M, result.get(0).floppyType(),
@@ -191,7 +191,7 @@ class GreedyDiskPackerTest {
                 new RomPartMetadata(Path.of("part3.bin"), 100_000, "PART3.BIN")
         );
 
-        List<DiskLayout> result = packer.pack(parts);
+        List<DiskLayout> result = packer.pack(parts, FloppyType.FLOPPY_720K);
 
         // Greedy: part1 + part2 exceeds 1.6MB, so part2 goes to disk 2
         assertEquals(2, result.size(), "Greedy strategy should create 2 disks");
@@ -202,5 +202,44 @@ class GreedyDiskPackerTest {
         assertEquals("PART1.BIN", result.get(0).contents().get(0).dosName());
         assertEquals("PART2.BIN", result.get(1).contents().get(0).dosName());
         assertEquals("PART3.BIN", result.get(1).contents().get(1).dosName());
+    }
+
+    @Test
+    void testMinimumFloorApplied() {
+        // 500K fits 720K, but FLOPPY_144M minimum forces upgrade to 1.44M
+        List<RomPartMetadata> parts = List.of(
+                new RomPartMetadata(Path.of("small.bin"), 500_000, "SMALL.BIN")
+        );
+
+        List<DiskLayout> result = packer.pack(parts, FloppyType.FLOPPY_144M);
+
+        assertEquals(1, result.size());
+        assertEquals(FloppyType.FLOPPY_144M, result.get(0).floppyType(),
+                "Minimum floor should prevent 720K selection for small GD3 payload");
+    }
+
+    @Test
+    void testMinimumDoesNotCapUpward() {
+        // payload > 1.44M with FLOPPY_144M minimum -> selects FLOPPY_160M (minimum does not cap upward)
+        List<RomPartMetadata> parts = List.of(
+                new RomPartMetadata(Path.of("large.bin"), 1_460_000, "LARGE.BIN")
+        );
+
+        List<DiskLayout> result = packer.pack(parts, FloppyType.FLOPPY_144M);
+
+        assertEquals(1, result.size());
+        assertEquals(FloppyType.FLOPPY_160M, result.get(0).floppyType(),
+                "Minimum floor should not prevent upgrade to larger type when payload requires it");
+    }
+
+    @Test
+    void testNullMinimumThrowsException() {
+        List<RomPartMetadata> parts = List.of(
+                new RomPartMetadata(Path.of("test.bin"), 500_000, "TEST.BIN")
+        );
+
+        assertThrows(IllegalArgumentException.class,
+                () -> packer.pack(parts, null),
+                "Should throw IllegalArgumentException for null minimum");
     }
 }
