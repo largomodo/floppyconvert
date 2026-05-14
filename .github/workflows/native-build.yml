@@ -43,7 +43,7 @@ jobs:
             zip_name: floppyconvert-macos-arm64.zip
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Setup GraalVM (Java 21)
       - name: Set up GraalVM
@@ -79,7 +79,7 @@ jobs:
           
             # Upload Artifacts to Action Run
       - name: Upload Build Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: floppyconvert-${{ matrix.name }}
           path: dist/${{ matrix.executable }}
@@ -87,6 +87,6 @@ jobs:
           # Attach to Release (if applicable)
       - name: Upload Release Asset
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.zip_name }}
