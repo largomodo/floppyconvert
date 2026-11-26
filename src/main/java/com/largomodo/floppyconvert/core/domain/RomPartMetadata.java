@@ -50,11 +50,4 @@ public record RomPartMetadata(Path originalPath, long sizeInBytes, String dosNam
         String validated = DosName.of(dosName).value();
         return new RomPartMetadata(originalPath, sizeInBytes, validated);
     }
-
-    /**
-     * Accessor returning the DOS name wrapped in a typed DosName value.
-     */
-    public DosName dosNameTyped() {
-        return new DosName(dosName);
-    }
 }

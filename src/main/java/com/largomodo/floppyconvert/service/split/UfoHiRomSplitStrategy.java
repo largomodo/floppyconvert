@@ -1,7 +1,6 @@
 package com.largomodo.floppyconvert.service.split;
 
-import com.largomodo.floppyconvert.service.UfoHiRomChunker;
-import com.largomodo.floppyconvert.service.UfoHiRomChunker.UfoChunk;
+import com.largomodo.floppyconvert.service.split.UfoHiRomChunker.UfoChunk;
 import com.largomodo.floppyconvert.snes.SnesConstants;
 import com.largomodo.floppyconvert.snes.SnesRom;
 import com.largomodo.floppyconvert.snes.header.HeaderGenerator;

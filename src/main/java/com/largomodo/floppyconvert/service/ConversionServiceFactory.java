@@ -6,8 +6,9 @@ import com.largomodo.floppyconvert.core.DiskTemplateFactory;
  * Factory interface for creating native service implementations.
  * Decouples the CLI entry point from concrete service and SNES classes.
  * <p>
- * Placed in the service package (not core) to preserve the acyclic dependency direction:
- * FloppyConvert -> core -> service -> snes -> format. (ref: DL-001, DL-007)
+ * Placed in the service package (not core) because core must not import service:
+ * the direction is FloppyConvert -> service -> core -> format, and service -> snes -> format.
+ * (ref: DL-001, DL-007)
  */
 public interface ConversionServiceFactory {
 

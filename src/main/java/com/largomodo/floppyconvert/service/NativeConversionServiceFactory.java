@@ -12,7 +12,7 @@ import com.largomodo.floppyconvert.snes.header.HeaderGeneratorFactory;
  * Native Java implementation of {@link ConversionServiceFactory}.
  * Instantiates the standard service stack: NativeRomSplitter, Fat12ImageWriter, Fat12FormatFactory.
  * <p>
- * Centralizes concrete class instantiation; FloppyConvert depends only on the factory interface. (ref: DL-007)
+ * Centralizes concrete service instantiation for FloppyConvert's composition root. (ref: DL-007)
  */
 public class NativeConversionServiceFactory implements ConversionServiceFactory {
 

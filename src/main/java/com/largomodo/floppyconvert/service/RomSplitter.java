@@ -10,13 +10,8 @@ import java.util.List;
 /**
  * Service interface for splitting SNES ROM files into backup unit format parts.
  * <p>
- * Abstracts the ROM splitting process to enable alternative implementations beyond ucon64.
- * Primary use cases:
- * <ul>
- *   <li>Production: ucon64-based splitting (current implementation)</li>
- *   <li>Testing: Mock implementations for unit testing without external dependencies</li>
- *   <li>Future: Alternative splitters (nsrt, unf, custom implementations)</li>
- * </ul>
+ * The production implementation is {@link NativeRomSplitter}; the interface exists so
+ * orchestration tests can substitute a mock.
  * <p>
  * <b>Contract Guarantees:</b>
  * <ul>
@@ -30,7 +25,6 @@ import java.util.List;
  * <ul>
  *   <li>Work-in-place strategy: direct output to workDir, no temporary directories</li>
  *   <li>Format-specific naming: must honor backup unit conventions (e.g., .1/.2 for FIG/SWC, .078A/.078B for GD3)</li>
- *   <li>Cleanup: delete intermediate conversion artifacts (e.g., .fig file before .1/.2 split)</li>
  *   <li>Fail-fast: throw IOException immediately on conversion/split failure</li>
  * </ul>
  */
@@ -43,7 +37,6 @@ public interface RomSplitter {
      * <ol>
      *   <li>Convert input ROM (.sfc) to target backup unit format</li>
      *   <li>Split converted file into parts sized for floppy disk spanning</li>
-     *   <li>Clean up intermediate conversion artifacts</li>
      * </ol>
      * <p>
      * <b>Path Handling:</b> Implementation must use absolute paths for input ROM to avoid

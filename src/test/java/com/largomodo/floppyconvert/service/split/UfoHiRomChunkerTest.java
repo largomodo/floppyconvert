@@ -1,6 +1,6 @@
-package com.largomodo.floppyconvert.service;
+package com.largomodo.floppyconvert.service.split;
 
-import com.largomodo.floppyconvert.service.UfoHiRomChunker.UfoChunk;
+import com.largomodo.floppyconvert.service.split.UfoHiRomChunker.UfoChunk;
 import net.jqwik.api.*;
 import org.junit.jupiter.api.Test;
 

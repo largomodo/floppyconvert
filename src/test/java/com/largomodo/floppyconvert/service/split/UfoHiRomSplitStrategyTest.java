@@ -1,7 +1,6 @@
 // Unit tests for UfoHiRomSplitStrategy: chunk sequence matches lookup table, flags, byte output. (ref: DL-004)
 package com.largomodo.floppyconvert.service.split;
 
-import com.largomodo.floppyconvert.service.UfoHiRomChunker;
 import com.largomodo.floppyconvert.snes.RomType;
 import com.largomodo.floppyconvert.snes.SnesConstants;
 import com.largomodo.floppyconvert.snes.SnesRom;

@@ -13,7 +13,6 @@ import java.util.Map;
  * <ul>
  *   <li>Production: Fat12ImageWriter for native FAT12 image manipulation (current implementation)</li>
  *   <li>Testing: Mock implementations for unit testing without external dependencies</li>
- *   <li>Future: Direct FAT12 implementation (no external tools) or alternative image formats</li>
  * </ul>
  * <p>
  * <b>Contract Guarantees:</b>

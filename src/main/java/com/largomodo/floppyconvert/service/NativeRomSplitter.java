@@ -4,6 +4,7 @@ import com.largomodo.floppyconvert.format.CopierFormat;
 import com.largomodo.floppyconvert.service.split.FilenameProvider;
 import com.largomodo.floppyconvert.service.split.SplitStrategy;
 import com.largomodo.floppyconvert.service.split.SplitStrategyFactory;
+import com.largomodo.floppyconvert.service.split.UfoHiRomChunker;
 import com.largomodo.floppyconvert.snes.Gd3HardwareValidator;
 import com.largomodo.floppyconvert.snes.HardwareValidator;
 import com.largomodo.floppyconvert.snes.SnesConstants;

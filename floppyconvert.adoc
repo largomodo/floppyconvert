@@ -85,7 +85,7 @@ If a directory is provided, the tool scans it recursively for ROM files and conv
   Successful completion
 
 *1*::
-  General execution error (I/O, missing tools, etc.)
+  Execution error (I/O, unsupported ROM), or at least one ROM failed in batch mode
 
 *2*::
   Invalid command line arguments

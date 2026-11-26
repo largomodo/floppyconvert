@@ -1,4 +1,4 @@
-package com.largomodo.floppyconvert.service;
+package com.largomodo.floppyconvert.service.split;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +26,7 @@ public class UfoHiRomChunker {
      * Computes chunk sequence for UFO HiROM splitting.
      * <p>
      * For supported sizes (2, 4, 12, 20, 32 Mbit), returns specific chunk sequence.
-     * For unsupported sizes (e.g., 48 Mbit), falls back to 32Mbit table (ucon64 reference behavior).
+     * For any other size, throws; callers pad to a supported size first.
      * <p>
      * Example: 12 Mbit returns [(4, 0x40), (2, 0x10), (4, 0x10), (2, 0x00)]
      *

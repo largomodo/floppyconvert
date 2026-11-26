@@ -1,7 +1,9 @@
 package com.largomodo.floppyconvert;
 
-import com.largomodo.floppyconvert.core.*;
-import com.largomodo.floppyconvert.core.domain.DiskPacker;
+import com.largomodo.floppyconvert.core.BatchRunner;
+import com.largomodo.floppyconvert.core.ConversionFacade;
+import com.largomodo.floppyconvert.core.RomPartNormalizer;
+import com.largomodo.floppyconvert.core.RomProcessor;
 import com.largomodo.floppyconvert.core.domain.GreedyDiskPacker;
 import com.largomodo.floppyconvert.core.workspace.CleanupException;
 import com.largomodo.floppyconvert.format.CopierFormat;
@@ -11,24 +13,16 @@ import com.largomodo.floppyconvert.service.NativeConversionServiceFactory;
 import com.largomodo.floppyconvert.util.SnesRomMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import picocli.CommandLine;
 import picocli.CommandLine.*;
 import picocli.CommandLine.Model.CommandSpec;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.concurrent.Callable;
 
 /**
  * CLI entry point for SNES ROM to floppy image conversion.
@@ -59,7 +53,7 @@ import java.util.stream.Stream;
         exitCodeListHeading = "%nExit Codes:%n",
         exitCodeList = {
                 "0:Successful completion",
-                "1:General execution error (I/O, missing tools, etc.)",
+                "1:Execution error (I/O, unsupported ROM), or at least one ROM failed in batch mode",
                 "2:Invalid command line arguments"
         },
         footerHeading = "%nSee Also:%n",
@@ -111,11 +105,19 @@ public class FloppyConvert implements Callable<Integer> {
     }
 
     /**
-     * Creates the default service factory for the native implementation stack.
-     * Returns {@link NativeConversionServiceFactory}; call sites depend on the interface only. (ref: DL-007)
+     * Composition root: the one place that wires the conversion pipeline together.
+     * Both single-file and batch mode use it.
      */
-    private static ConversionServiceFactory createServiceFactory() {
-        return new NativeConversionServiceFactory();
+    private static RomProcessor createProcessor() {
+        ConversionServiceFactory serviceFactory = new NativeConversionServiceFactory();
+        ConversionFacade facade = new DefaultConversionFacade(
+                serviceFactory.createRomSplitter(),
+                serviceFactory.createFloppyImageWriter());
+        return new RomProcessor(
+                new GreedyDiskPacker(),
+                facade,
+                serviceFactory.createDiskTemplateFactory(),
+                new RomPartNormalizer());
     }
 
     // Package-private: enables test observability without exposing to CLI users
@@ -166,241 +168,37 @@ public class FloppyConvert implements Callable<Integer> {
     }
 
     /**
-     * Execute batch ROM processing with concurrent execution and fail-soft error handling.
-     * <p>
-     * Strategy: Fixed thread pool sized to CPU cores prevents oversubscription.
-     * Bounded queue provides backpressure. CallerRunsPolicy throttles submission.
-     * Each ROM processed in isolated workspace directory (UUID suffix prevents collisions).
-     * <p>
-     * Thread pool sizing: coreCount threads prevents CPU oversubscription (ucon64 is CPU-bound).
-     * Bounded queue (2 * coreCount) limits memory footprint on large ROM libraries (prevents OOM).
-     * CallerRunsPolicy throttles submission when queue full (main thread processes ROM).
-     */
-    private static void runBatch(Config config) throws IOException {
-        Path inputRoot = Paths.get(config.inputDir);
-        Path outputRoot = Paths.get(config.outputDir);
-
-        // Dependency injection: instantiate service implementations
-        ConversionServiceFactory serviceFactory = createServiceFactory();
-        DiskPacker packer = new GreedyDiskPacker();
-        ConversionFacade facade = new DefaultConversionFacade(
-                serviceFactory.createRomSplitter(),
-                serviceFactory.createFloppyImageWriter());
-        DiskTemplateFactory templateFactory = serviceFactory.createDiskTemplateFactory();
-        RomPartNormalizer normalizer = new RomPartNormalizer();
-        RomProcessor processor = new RomProcessor(packer, facade, templateFactory, normalizer);
-
-        ExecutorService executor = createBatchExecutor();
-        registerShutdownHook(executor);
-
-        final AtomicInteger successCount = new AtomicInteger(0);
-        final AtomicInteger failCount = new AtomicInteger(0);
-        ConversionObserver observer = createObserver(inputRoot, successCount, failCount);
-
-        try (Stream<Path> stream = Files.walk(inputRoot)) {
-            List<Path> romFiles = collectRomFiles(stream, inputRoot);
-
-            for (Path romPath : romFiles) {
-                submitRomProcessing(executor, romPath, inputRoot, outputRoot, observer, processor, config.format);
-            }
-        } catch (UncheckedIOException e) {
-            log.error("WARNING: Directory traversal interrupted - {}", e.getCause().getMessage());
-            log.error("Batch incomplete: {} successful, {} failed, some directories skipped",
-                    successCount.get(), failCount.get());
-            return;
-        } catch (IOException e) {
-            log.error("ERROR: Cannot traverse input directory: {}", e.getMessage());
-            return;
-        } finally {
-            try {
-                awaitBatchCompletion(executor);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-
-        log.info("Batch complete: {} successful, {} failed", successCount.get(), failCount.get());
-    }
-
-    /**
-     * Create thread pool for batch processing.
-     * Fixed pool sized to CPU cores prevents oversubscription.
-     */
-    private static ExecutorService createBatchExecutor() {
-        int coreCount = Runtime.getRuntime().availableProcessors();
-        return new ThreadPoolExecutor(
-                coreCount,
-                coreCount,
-                0L,
-                TimeUnit.MILLISECONDS,
-                new LinkedBlockingQueue<>(2 * coreCount),
-                new ThreadPoolExecutor.CallerRunsPolicy()
-        );
-    }
-
-    /**
-     * Register shutdown hook for graceful SIGINT handling.
-     * Ensures executor shutdown on interrupt - prevents orphaned tasks.
-     */
-    private static void registerShutdownHook(ExecutorService executor) {
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            if (!executor.isShutdown()) {
-                log.info("Interrupt received, shutting down gracefully...");
-                executor.shutdown();
-                try {
-                    if (!executor.awaitTermination(5, TimeUnit.MINUTES)) {
-                        executor.shutdownNow();
-                    }
-                } catch (InterruptedException e) {
-                    executor.shutdownNow();
-                }
-            }
-        }));
-    }
-
-    /**
-     * Wait for batch completion with timeout.
-     * Two-phase shutdown: graceful then forceful.
-     */
-    private static void awaitBatchCompletion(ExecutorService executor) throws InterruptedException {
-        executor.shutdown();
-        if (!executor.awaitTermination(5, TimeUnit.MINUTES)) {
-            executor.shutdownNow();
-        }
-    }
-
-    /**
-     * Collect ROM files from directory tree.
-     * Extracts file filtering logic for testability.
+     * Converts one ROM, writing its images directly into the output directory.
      *
-     * @param stream    Stream of paths to filter
-     * @param inputRoot Root directory for relative path logging
+     * @return process exit code
+     * @throws IOException if the input is not a ROM or the conversion fails
      */
-    private static List<Path> collectRomFiles(Stream<Path> stream, Path inputRoot) {
-        return stream.filter(path -> {
-                    try {
-                        return Files.isRegularFile(path);
-                    } catch (UncheckedIOException e) {
-                        log.warn("WARNING: Cannot access {} - skipping", inputRoot.relativize(path));
-                        return false;
-                    }
-                })
-                .filter(SnesRomMatcher::isRom)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Create observer for batch processing events.
-     * Extracts observer creation logic with thread-safe counters.
-     */
-    private static ConversionObserver createObserver(Path inputRoot, AtomicInteger successCount, AtomicInteger failCount) {
-        return new ConversionObserver() {
-            @Override
-            public void onSuccess(Path rom, int diskCount) {
-                successCount.incrementAndGet();
-            }
-
-            @Override
-            public void onFailure(Path rom, Exception e) {
-                failCount.incrementAndGet();
-                log.error("FAILED: {} - {}", inputRoot.relativize(rom), e.getMessage());
-            }
-        };
-    }
-
-    /**
-     * Submit ROM processing task to executor.
-     * Extracts ROM processing lambda for testability.
-     */
-    private static void submitRomProcessing(ExecutorService executor, Path romPath,
-                                            Path inputRoot, Path outputRoot, ConversionObserver observer,
-                                            RomProcessor processor, CopierFormat format) {
-        executor.submit(() -> {
-            try {
-                MDC.put("rom", romPath.getFileName().toString());
-                String uniqueSuffix = UUID.randomUUID().toString();
-                Path relativePath = inputRoot.relativize(romPath.getParent());
-                Path targetBaseDir = outputRoot.resolve(relativePath);
-                Files.createDirectories(targetBaseDir);
-
-                observer.onStart(romPath);
-                int diskCount = processor.processRom(
-                        romPath.toFile(),
-                        targetBaseDir,
-                        uniqueSuffix,
-                        format,
-                        false
-                );
-                observer.onSuccess(romPath, diskCount);
-            } catch (CleanupException e) {
-                // Log all suppressed cleanup failures for diagnostics
-                log.error("Cleanup failed for {}", romPath, e);
-                observer.onFailure(romPath, e);
-            } catch (Exception e) {
-                observer.onFailure(romPath, e);
-            } finally {
-                MDC.clear();
-            }
-            return null;
-        });
-    }
-
-    /**
-     * Execute single-file ROM processing with fail-fast error handling.
-     * <p>
-     * Accepts outputBase as parameter for testability: production passes Paths.get("."),
-     * tests pass tempDir to avoid filesystem pollution and enable parallel execution.
-     * <p>
-     * Validates input file existence/type, then delegates to RomProcessor.
-     * Exceptions propagate to main() (enables fail-fast with exit code 1).
-     *
-     * @param config     Configuration containing inputFile path and tool paths
-     * @param outputBase Directory where output will be written (CWD in production, tempDir in tests)
-     * @throws IOException if input file validation fails or processing encounters I/O error
-     */
-    private static void runSingleFile(Config config, Path outputBase) throws IOException {
-        Path inputPath = Paths.get(config.inputFile);
-
-        // Fail-fast validation with clear error messages
-        // Validation order: existence before type check (prevents confusing "not a file" for missing paths)
-        if (!Files.exists(inputPath)) {
-            throw new IOException("Input file does not exist: " + inputPath);
+    private int runSingleFile(CopierFormat format) throws IOException {
+        Path rom = inputPath.toPath();
+        if (!SnesRomMatcher.isRom(rom)) {
+            throw new IOException("Input file is not a recognized SNES ROM format: " + rom.toAbsolutePath());
         }
 
-        if (!Files.isRegularFile(inputPath)) {
-            throw new IOException("Input path is not a file: " + inputPath);
-        }
-
-        if (!SnesRomMatcher.isRom(inputPath)) {
-            throw new IOException("Input file is not a recognized SNES ROM format: " + inputPath);
-        }
-
-        // Dependency injection: instantiate service implementations
-        ConversionServiceFactory serviceFactory = createServiceFactory();
-        DiskPacker packer = new GreedyDiskPacker();
-        ConversionFacade facade = new DefaultConversionFacade(
-                serviceFactory.createRomSplitter(),
-                serviceFactory.createFloppyImageWriter());
-        DiskTemplateFactory templateFactory = serviceFactory.createDiskTemplateFactory();
-        RomPartNormalizer normalizer = new RomPartNormalizer();
-        RomProcessor processor = new RomProcessor(packer, facade, templateFactory, normalizer);
-
-        // Process ROM with provided outputBase (enables test isolation)
-        // Single file processing uses static suffix (no concurrent workspace collisions)
         try {
-            processor.processRom(
-                    inputPath.toFile(),
-                    outputBase,
-                    "single",
-                    config.format,
-                    true
-            );
+            // A fixed workspace suffix is enough: nothing else converts concurrently in this mode.
+            createProcessor().processRom(inputPath, outputDir.toPath(), "single", format, true);
+            return 0;
         } catch (CleanupException e) {
-            // Log all suppressed cleanup failures for diagnostics
+            // Logged with the exception so the suppressed cleanup failures reach the log file
             log.error("Cleanup failed during conversion", e);
             log.error("FAILED: Cleanup encountered {} error(s)", e.getSuppressed().length);
-            System.exit(1);
+            return 1;
         }
+    }
+
+    /**
+     * Converts every ROM under the input directory. Exit code 1 when any ROM failed
+     * or the directory could not be walked completely.
+     */
+    private int runBatch() {
+        BatchRunner.Result result = new BatchRunner(createProcessor())
+                .run(inputPath.toPath(), outputDir.toPath(), format);
+        return result.isClean() ? 0 : 1;
     }
 
     @Override
@@ -412,16 +210,7 @@ public class FloppyConvert implements Callable<Integer> {
         configureLogging();
         validateInput();
         resolveOutputDirectory();
-        dispatchProcessing();
-        return 0;
-    }
-
-    /**
-     * Bridges Picocli field-based arguments to runBatch/runSingleFile method
-     * signatures (avoids cascading changes to RomProcessor integration points).
-     */
-    private record Config(String inputDir, String outputDir,
-                          CopierFormat format, String inputFile) {
+        return dispatchProcessing();
     }
 
     /**
@@ -487,17 +276,13 @@ public class FloppyConvert implements Callable<Integer> {
         Files.createDirectories(outputDir.toPath());
     }
 
-    private void dispatchProcessing() throws Exception {
-        // Single-file mode auto-detects format from the ROM header.
-        // Batch mode requires explicit --format for predictability across mixed-ROM directories.
+    private int dispatchProcessing() throws IOException {
+        // Single-file mode infers the format from the file extension unless --format is given.
+        // Batch mode applies --format (default FIG) to every ROM, whatever its extension.
         if (inputPath.isFile()) {
             effectiveFormat = resolveEffectiveFormat();
-            runSingleFile(
-                    new Config(null, outputDir.getAbsolutePath(), effectiveFormat, inputPath.getAbsolutePath()),
-                    outputDir.toPath()
-            );
-        } else {
-            runBatch(new Config(inputPath.getAbsolutePath(), outputDir.getAbsolutePath(), format, null));
+            return runSingleFile(effectiveFormat);
         }
+        return runBatch();
     }
 }

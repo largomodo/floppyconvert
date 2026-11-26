@@ -276,4 +276,29 @@ class FloppyConvertConcurrencyTest {
             assertEquals(romCount, imgCount, "All ROMs should produce .img files");
         }
     }
+
+    /**
+     * A ROM that fails must not stop the batch, but must be visible in the exit code.
+     */
+    @Test
+    void testBatchWithFailingRomConvertsTheRestAndExitsNonZero() throws IOException {
+        Path inputDir = tempDir.resolve("input");
+        Path outputDir = tempDir.resolve("output");
+        Files.createDirectories(inputDir);
+
+        Files.write(inputDir.resolve("Good.sfc"), syntheticRomData);
+        Files.write(inputDir.resolve("Broken.sfc"), new byte[16]);
+
+        int exitCode = new CommandLine(new FloppyConvert())
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(
+                        inputDir.toString(),
+                        "--output-dir", outputDir.toString(),
+                        "--format", "fig"
+                );
+
+        assertEquals(1, exitCode, "A failed ROM should make the batch exit non-zero");
+        assertTrue(Files.exists(outputDir.resolve("Good").resolve("Good.img")),
+                "The valid ROM should still be converted");
+    }
 }
