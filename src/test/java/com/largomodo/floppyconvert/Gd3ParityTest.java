@@ -74,9 +74,13 @@ class Gd3ParityTest {
         Result ours = convertWithOurs(input, row.id());
         Result expected = Gd3ParityExpectations.expected(row.twinOf() != null ? row.twinOf() : row.id());
 
-        if (expected instanceof Rejected) {
+        if (expected instanceof Rejected rejected) {
             if (row.gaps().isEmpty()) {
-                assertInstanceOf(Rejected.class, ours, "ucon64 rejects " + row.id() + "; we must reject it too");
+                Rejected oursRejected = assertInstanceOf(Rejected.class, ours,
+                        "ucon64 rejects " + row.id() + "; we must reject it too");
+                // Rejecting for another reason (a bad checksum, say) is not parity: the wording is ucon64's.
+                assertEquals(rejected.errorLine(), "ERROR: " + oursRejected.errorLine(),
+                        "Rejection reason for " + row.id() + " differs from ucon64");
             } else {
                 assertFalse(ours instanceof Rejected, "Row " + row.id() + " is now rejected like ucon64: remove its tags " + row.gaps());
             }

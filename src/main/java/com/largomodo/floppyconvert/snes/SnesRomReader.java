@@ -281,8 +281,10 @@ public class SnesRomReader {
             score += 2;
         }
 
-        // Map Mode byte at 0x15 with value 0x25 indicates Extended HiROM mapping per SNES specification
-        if ((data[base + 0x15] & 0xFF) == 0x25) {
+        // Map mode 0x25 is Extended HiROM per SNES specification. Its low nibble fails the check above,
+        // so without this an extended header would score below a plain one.
+        // The map byte is at 0x25 from SNES_HEADER_START (0x15 from the title at 0x7FC0).
+        if ((data[base + 0x25] & 0xFF) == 0x25) {
             score += 10;
         }
 

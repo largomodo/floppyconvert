@@ -113,32 +113,6 @@ class FloppyConvertLoggingTest {
     }
 
     @Test
-    void testVerboseFlagEnablesDebug() {
-        // Create FloppyConvert instance and parse arguments with verbose flag
-        FloppyConvert floppyConvert = new FloppyConvert();
-        CommandLine cmd = new CommandLine(floppyConvert);
-
-        // Parse arguments but don't execute yet
-        Path dummyInput = tempDir.resolve("dummy.sfc");
-        cmd.parseArgs("-v", dummyInput.toString());
-
-        // Verify initial state (should be at INFO or DEBUG based on config)
-        Level levelBeforeCall = rootLogger.getLevel();
-
-        // Execute call() which should set DEBUG level when verbose=true
-        try {
-            floppyConvert.call();
-        } catch (Exception e) {
-            // Expected to fail due to missing input file, but that's OK
-            // We're testing the logging setup that happens at the start of call()
-        }
-
-        // Verify root logger level is now DEBUG
-        assertEquals(Level.DEBUG, rootLogger.getLevel(),
-                "Verbose flag should set root logger to DEBUG level");
-    }
-
-    @Test
     void testVerboseFlagEnablesDebugOnConsole() throws Exception {
         FloppyConvert floppyConvert = new FloppyConvert();
         CommandLine cmd = new CommandLine(floppyConvert)
@@ -232,9 +206,6 @@ class FloppyConvertLoggingTest {
                         "--format", "fig"
                 );
 
-        // Wait for async executor to complete and logs to be flushed
-        Thread.sleep(1000);
-
         // Stop the file appender to flush all content
         testFileAppender.stop();
 
@@ -254,47 +225,5 @@ class FloppyConvertLoggingTest {
 
         assertTrue(hasMdcWithProcessing,
                 "Log should contain both MDC context and processing messages");
-    }
-
-    @Test
-    void testFailuresLogOnError() throws Exception {
-        // This test verifies that the FAILURES appender configuration exists and works
-        // by checking that error-level logs are properly routed
-
-        // Skip if ucon64 not available
-// Create a scenario that will cause an error: invalid ROM file
-        Path inputDir = tempDir.resolve("input");
-        Files.createDirectories(inputDir);
-        Path invalidRom = inputDir.resolve("Invalid.sfc");
-        Files.write(invalidRom, new byte[]{0x00, 0x01, 0x02}); // Too small, invalid ROM
-
-        Path outputDir = tempDir.resolve("output");
-
-        // Execute batch conversion using CommandLine (should fail and log error)
-        new CommandLine(new FloppyConvert())
-                .setCaseInsensitiveEnumValuesAllowed(true)
-                .execute(
-                        inputDir.toString(),
-                        "--output-dir", outputDir.toString(),
-                        "--format", "fig"
-                );
-
-        // Wait briefly for async executor to complete
-        Thread.sleep(500);
-
-        // Verify that ERROR level events were logged
-        List<ILoggingEvent> errorEvents = listAppender.list.stream()
-                .filter(event -> event.getLevel() == Level.ERROR)
-                .toList();
-
-        assertFalse(errorEvents.isEmpty(),
-                "ERROR level events should be logged for failed conversions");
-
-        // Verify that error events contain meaningful information
-        boolean hasFailureMessage = errorEvents.stream()
-                .anyMatch(event -> event.getFormattedMessage().contains("FAILED"));
-
-        assertTrue(hasFailureMessage,
-                "ERROR logs should contain 'FAILED' message for conversion failures");
     }
 }

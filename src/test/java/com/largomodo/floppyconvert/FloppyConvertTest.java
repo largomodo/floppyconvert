@@ -211,4 +211,60 @@ class FloppyConvertTest {
 
         assertEquals(CopierFormat.FIG, floppyConvert.getEffectiveFormat());
     }
+
+    private static int run(String... args) {
+        return new CommandLine(new FloppyConvert()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+    }
+
+    private static java.util.List<String> filesUnder(Path root) throws IOException {
+        if (!Files.exists(root)) {
+            return java.util.List.of();
+        }
+        try (Stream<Path> walk = Files.walk(root)) {
+            return walk.filter(Files::isRegularFile).map(p -> root.relativize(p).toString().replace('\\', '/'))
+                    .sorted().toList();
+        }
+    }
+
+    @Test
+    // The content is a valid ROM, so only the extension check can refuse it.
+    void singleFileWithoutARomExtensionIsAnExecutionError() throws IOException {
+        Path rom = Files.move(SyntheticRomFactory.generateLoRom(4, 0, DspChipset.ABSENT, tempDir), tempDir.resolve("game.bin"));
+        Path out = tempDir.resolve("out");
+
+        assertEquals(1, run(rom.toString(), "-o", out.toString(), "--format", "swc"));
+        assertEquals(java.util.List.of(), filesUnder(out));
+    }
+
+    @Test
+    void outputPathThatIsARegularFileIsAUsageError() throws IOException {
+        Path rom = SyntheticRomFactory.generateLoRom(4, 0, DspChipset.ABSENT, tempDir);
+        Path occupied = Files.writeString(tempDir.resolve("occupied"), "a file, not a directory");
+
+        assertEquals(2, run(rom.toString(), "-o", occupied.toString()));
+        assertEquals("a file, not a directory", Files.readString(occupied));
+    }
+
+    @Test
+    // A file that is not a ROM is skipped, not attempted: attempting it would fail and turn the exit code to 1.
+    void batchIgnoresFilesThatAreNotRoms() throws IOException {
+        Path input = Files.createDirectories(tempDir.resolve("in"));
+        Path out = tempDir.resolve("out");
+        Files.move(SyntheticRomFactory.generateLoRom(4, 0, DspChipset.ABSENT, tempDir), input.resolve("game.sfc"));
+        Files.writeString(input.resolve("readme.txt"), "not a ROM");
+
+        assertEquals(0, run(input.toString(), "-o", out.toString(), "--format", "swc"));
+        assertEquals(java.util.List.of("game/game.img"), filesUnder(out));
+    }
+
+    @Test
+    // Only the last dot starts the extension; the image name is sanitized, the game directory keeps the original.
+    void batchKeepsDotsInsideTheBaseName() throws IOException {
+        Path input = Files.createDirectories(tempDir.resolve("in"));
+        Path out = tempDir.resolve("out");
+        Files.move(SyntheticRomFactory.generateLoRom(4, 0, DspChipset.ABSENT, tempDir), input.resolve("Dr. Mario v1.1.sfc"));
+
+        assertEquals(0, run(input.toString(), "-o", out.toString(), "--format", "swc"));
+        assertEquals(java.util.List.of("Dr. Mario v1.1/Dr._Mario_v1.1.img"), filesUnder(out));
+    }
 }

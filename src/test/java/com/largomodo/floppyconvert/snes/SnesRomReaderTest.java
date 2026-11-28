@@ -89,10 +89,16 @@ class SnesRomReaderTest {
         assertArrayEquals(linear, rom.rawData(), "rawData must be the linear body");
     }
 
-    @Property(tries = 20)
-    void detectionIsInvariantUnderAddingACopierHeader(@ForAll Kind kind, @ForAll CopierHeader header) throws IOException {
-        // jqwik properties do not get JUnit's @TempDir injection, so the property owns its directory
-        Path dir = Files.createTempDirectory("reader-header-invariance-");
+    static Stream<Arguments> kindsAndHeaders() {
+        return Arrays.stream(Kind.values())
+                .flatMap(kind -> Stream.of(CopierHeader.SMC, CopierHeader.GD3).map(header -> Arguments.of(kind, header)));
+    }
+
+    // Under @TempDir so the multi-megabyte fixtures are removed afterwards.
+    @ParameterizedTest(name = "{0} / {1} header")
+    @MethodSource("kindsAndHeaders")
+    void detectionIsInvariantUnderAddingACopierHeader(Kind kind, CopierHeader header) throws IOException {
+        Path dir = Files.createDirectories(tempDir.resolve("invariance"));
         byte[] linear = Files.readAllBytes(generate(kind, dir));
         Path bare = dir.resolve("bare-" + kind + header + ".sfc");
         Path headered = dir.resolve("headered-" + kind + header + ".sfc");
@@ -107,6 +113,76 @@ class SnesRomReaderTest {
             assertEquals(a.title(), b.title(), format + " title");
             assertEquals(a.rawData().length, b.rawData().length, format + " body length");
         }
+    }
+
+    @Test
+    // Both headers of a synthetic extended HiROM score the same, and a tie stays at base 0 on the legacy path.
+    void legacyPipelineKeepsBaseZeroWhenExtendedHeaderOnlyTies() throws IOException {
+        SnesRom rom = reader.load(generate(Kind.EXTENDED_HIROM_48));
+
+        assertEquals(RomType.HiROM, rom.type());
+        assertEquals(0, rom.headerBase());
+    }
+
+    @Test
+    // Equal LoROM and HiROM scores resolve to LoROM.
+    void identicalHeadersAtBothPositionsLoadAsLoRom() throws IOException {
+        byte[] data = Files.readAllBytes(generate(Kind.LOROM_8));
+        System.arraycopy(data, 0x7FB0, data, 0xFFB0, 0x50);
+        Path file = tempDir.resolve("both-headers.sfc");
+        Files.write(file, data);
+
+        assertEquals(RomType.LoROM, reader.load(file).type());
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {93, 96})
+    // Street Fighter Alpha 2 repeats its header at all four positions; the size alone must make it the 96 Mbit
+    // LoROM class, or the extended probe turns it into a HiROM no Game Doctor layout exists for. (ref: DL-012)
+    void gd3Treats93To96MbitAsLoRomWhateverTheHeadersSay(int sizeMbit) throws IOException {
+        Path dir = Files.createDirectories(tempDir.resolve("lo" + sizeMbit));
+        Path file = SyntheticRomFactory.generateLoRom(sizeMbit, SyntheticRomFactory.SRAM_0KB, DspChipset.ABSENT, dir);
+        byte[] data = Files.readAllBytes(file);
+        for (int position : new int[]{0xFFB0, 0x407FB0, 0x40FFB0}) {
+            System.arraycopy(data, 0x7FB0, data, position, 0x50);
+        }
+        Files.write(file, data);
+
+        SnesRom rom = reader.load(file, CopierFormat.GD3);
+
+        assertEquals(RomType.LoROM, rom.type());
+        assertEquals(0, rom.headerBase());
+        assertTrue(Gd3Layout.of(rom).isLoRom96());
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = CopierFormat.class, names = {"FIG", "GD3"})
+    // 0x7FC5 is the sixth title character of a LoROM header, not a map byte: in a HiROM it is plain data and
+    // must not make the LoROM position win. (0x7FB0-0x7FFF is zeroed so nothing else there scores.)
+    void dataByte0x25AtTheLoRomTitlePositionDoesNotTurnAHiRomIntoLoRom(CopierFormat format) throws IOException {
+        Path dir = Files.createDirectories(tempDir.resolve("title-byte"));
+        Path file = SyntheticRomFactory.generateHiRom(8, SyntheticRomFactory.SRAM_0KB, DspChipset.ABSENT, dir);
+        byte[] data = Files.readAllBytes(file);
+        Arrays.fill(data, 0x7FB0, 0x8000, (byte) 0);
+        data[0x7FC5] = 0x25;
+        Files.write(file, data);
+
+        assertEquals(RomType.HiROM, reader.load(file, format).type());
+    }
+
+    @Test
+    // Map mode 0x25 marks Extended HiROM: with a plain HiROM map byte in the base-0 header, the extended header
+    // is the one that says so and must win on the legacy path.
+    void extendedMapModeMakesTheExtendedHeaderWin() throws IOException {
+        byte[] data = Files.readAllBytes(generate(Kind.EXTENDED_HIROM_48));
+        data[0xFFB0 + 0x25] = 0x21;
+        Path file = tempDir.resolve("ex-map-mode.sfc");
+        Files.write(file, data);
+
+        SnesRom rom = reader.load(file);
+
+        assertEquals(RomType.HiROM, rom.type());
+        assertEquals(SnesRom.EXTENDED_BASE, rom.headerBase());
     }
 
     @Test
@@ -269,16 +345,16 @@ class SnesRomReaderTest {
         }
     }
 
-    @Property
-    void checksumValidationWorks(@ForAll("loRomData") byte[] data) throws Exception {
-        Path tempFile = writeToTempFile(data);
-        try {
-            SnesRom rom = reader.load(tempFile);
-            int sum = rom.checksum() + rom.complement();
-            assertEquals(0xFFFF, sum, "Checksum + Complement should equal 0xFFFF");
-        } finally {
-            Files.deleteIfExists(tempFile);
-        }
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = CopierFormat.class, names = {"FIG", "GD3"})
+    // A ROM whose checksum and complement do not add up is refused by type, which the batch log reports as CHECKSUM.
+    void corruptedChecksumComplementIsRejected(CopierFormat format) throws IOException {
+        Path romPath = SyntheticRomFactory.generateLoRom(8, 0, DspChipset.ABSENT, "SYNBADSUM", tempDir);
+        byte[] data = Files.readAllBytes(romPath);
+        data[0x7FDC] ^= 0x01; // complement low byte of the LoROM header
+        Files.write(romPath, data);
+
+        assertThrows(InvalidChecksumException.class, () -> reader.load(romPath, format));
     }
 
     @Test

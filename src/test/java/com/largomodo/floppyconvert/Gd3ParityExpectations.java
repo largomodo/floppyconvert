@@ -508,7 +508,7 @@ public final class Gd3ParityExpectations {
                 sizeMbit, SRAM_0KB, DspChipset.ABSENT, "SYNEX" + sizeMbit + "T0", dir));
     }
 
-    // Real fixtures use the same classpath lookup as TestRomProvider and never fall back to a synthetic ROM:
+    // Real fixtures are looked up on the classpath and never fall back to a synthetic ROM:
     // the expected digests describe ucon64 output of the real bytes. (ref: DL-022)
     private static Row real(String id, String resource) {
         return new Row(id, dir -> copyResource(resource, dir, 0, fileName(resource)));

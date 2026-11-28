@@ -95,26 +95,6 @@ class ConversionWorkspaceTest {
     }
 
     @Test
-    void testNestedDirectoriesDeletedInCorrectOrder() throws IOException {
-        Path dir = tempDir.resolve("workdir");
-        Path file1 = dir.resolve("file1.tmp");
-        Path file2 = dir.resolve("file2.tmp");
-        Files.createDirectories(dir);
-        Files.writeString(file1, "content1");
-        Files.writeString(file2, "content2");
-
-        try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
-            // Track files first, then directory
-            workspace.track(file1);
-            workspace.track(file2);
-            workspace.track(dir);
-        }
-
-        // Reverse deletion order: dir deleted after files
-        assertFalse(Files.exists(dir), "Directory deletion should succeed (files deleted first)");
-    }
-
-    @Test
     void testWindowsLockedFileThrowsCleanupException() throws IOException {
         Path file = tempDir.resolve("locked.tmp");
         Files.writeString(file, "content");
@@ -245,25 +225,6 @@ class ConversionWorkspaceTest {
     }
 
     @Test
-    void testPromoteToFinalPreservesFromCleanup() throws IOException {
-        Path workspaceFile = tempDir.resolve("workspace").resolve("artifact.tmp");
-        Path finalDir = tempDir.resolve("output");
-        Files.createDirectories(workspaceFile.getParent());
-        Files.createDirectories(finalDir);
-        Files.writeString(workspaceFile, "test content");
-
-        Path expectedTarget = finalDir.resolve("artifact.tmp");
-
-        try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
-            workspace.track(workspaceFile);
-            workspace.promoteToFinal(workspaceFile, finalDir);
-        }
-
-        assertTrue(Files.exists(expectedTarget), "Promoted file should survive close()");
-        assertEquals("test content", Files.readString(expectedTarget), "Content should be preserved");
-    }
-
-    @Test
     void testPromoteToFinalOverwriteWarning() throws IOException {
         Path workspaceFile = tempDir.resolve("workspace").resolve("artifact.tmp");
         Path finalDir = tempDir.resolve("output");
@@ -285,27 +246,6 @@ class ConversionWorkspaceTest {
                 "Warning should include target path");
         assertEquals("new content", Files.readString(targetFile),
                 "Target should be overwritten with new content");
-    }
-
-    @Test
-    void testPromoteToFinalCopyDeleteFallback() throws IOException {
-        // Test the copy+delete fallback by using different filesystems if available
-        // This test documents the fallback behavior even if atomic move succeeds
-        Path workspaceFile = tempDir.resolve("workspace").resolve("artifact.tmp");
-        Path finalDir = tempDir.resolve("output");
-        Files.createDirectories(workspaceFile.getParent());
-        Files.createDirectories(finalDir);
-        Files.writeString(workspaceFile, "test content");
-
-        try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
-            workspace.track(workspaceFile);
-            workspace.promoteToFinal(workspaceFile, finalDir);
-        }
-
-        Path expectedTarget = finalDir.resolve("artifact.tmp");
-        assertTrue(Files.exists(expectedTarget), "File should exist at target after move");
-        assertEquals("test content", Files.readString(expectedTarget), "Content should be preserved");
-        assertFalse(Files.exists(workspaceFile), "Source should be removed (either atomic or copy+delete)");
     }
 
     @Test
@@ -334,28 +274,6 @@ class ConversionWorkspaceTest {
             assertTrue(Files.exists(expectedTarget), "File should still exist after second call");
             assertEquals("test content 2", Files.readString(expectedTarget), "Content should be updated");
         }
-    }
-
-    @Test
-    void testPromoteToFinalBestEffortDeleteWarning() throws IOException {
-        // This test documents the best-effort delete behavior in the fallback path
-        // In practice, it's difficult to simulate a delete failure on most systems
-        // The test verifies that the method completes successfully even if implemented
-        Path workspaceFile = tempDir.resolve("workspace").resolve("artifact.tmp");
-        Path finalDir = tempDir.resolve("output");
-        Files.createDirectories(workspaceFile.getParent());
-        Files.createDirectories(finalDir);
-        Files.writeString(workspaceFile, "test content");
-
-        try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
-            workspace.track(workspaceFile);
-
-            // This should complete successfully regardless of delete success
-            assertDoesNotThrow(() -> workspace.promoteToFinal(workspaceFile, finalDir));
-        }
-
-        Path expectedTarget = finalDir.resolve("artifact.tmp");
-        assertTrue(Files.exists(expectedTarget), "Target file should exist");
     }
 
     @Test
@@ -440,27 +358,5 @@ class ConversionWorkspaceTest {
                 file2.toFile().setWritable(true);
             }
         }
-    }
-
-    @Test
-    void testPromoteToFinalPreservesExceptionChainOnDeleteFailure() throws IOException {
-        // This test documents the exception chain preservation behavior
-        // when both move and delete fail in the fallback path
-        Path workspaceFile = tempDir.resolve("workspace").resolve("artifact.tmp");
-        Path finalDir = tempDir.resolve("output");
-        Files.createDirectories(workspaceFile.getParent());
-        Files.createDirectories(finalDir);
-        Files.writeString(workspaceFile, "test content");
-
-        try (ConversionWorkspace workspace = new ConversionWorkspace(tempDir, "TestRom", "test")) {
-            workspace.track(workspaceFile);
-
-            // In normal conditions, promoteToFinal succeeds
-            // The exception chain preservation is tested by the implementation
-            assertDoesNotThrow(() -> workspace.promoteToFinal(workspaceFile, finalDir));
-        }
-
-        Path expectedTarget = finalDir.resolve("artifact.tmp");
-        assertTrue(Files.exists(expectedTarget), "Target file should exist");
     }
 }

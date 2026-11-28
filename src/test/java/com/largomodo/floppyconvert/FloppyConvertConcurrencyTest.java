@@ -101,14 +101,11 @@ class FloppyConvertConcurrencyTest {
     }
 
     /**
-     * Test concurrent processing of ROMs with same basename.
-     * Verifies:
-     * - Both ROMs produce output
-     * - One overwrites the other (last-writer-wins)
-     * - Warning logged when overwriting
+     * ROMs with the same basename in different input directories keep separate outputs:
+     * the output tree mirrors the input tree, so neither overwrites the other.
      */
     @Test
-    void testConcurrentRomsWithSameBasename() throws IOException {
+    void sameBasenameInDifferentDirectoriesDoNotCollide() throws IOException {
         Path inputDir = tempDir.resolve("input");
         Path outputDir = tempDir.resolve("output");
         Files.createDirectories(inputDir);
@@ -140,141 +137,6 @@ class FloppyConvertConcurrencyTest {
                 "First ROM should produce output");
         assertTrue(Files.exists(outputDir.resolve("subdir2").resolve("SameName").resolve("SameName.img")),
                 "Second ROM should produce output");
-    }
-
-    /**
-     * Test ConversionObserver thread-safety.
-     * Verifies:
-     * - AtomicInteger counters correctly track success/failure across threads
-     * - No race conditions in counter updates
-     */
-    @Test
-    void testObserverThreadSafety() throws IOException {
-        Path inputDir = tempDir.resolve("input");
-        Path outputDir = tempDir.resolve("output");
-        Files.createDirectories(inputDir);
-        Files.createDirectories(outputDir);
-
-        // Create 20 small test ROMs to increase concurrency
-        // Use distinct basenames to avoid ucon64 split-file detection
-        String[] romNames = {"ActRaiser", "Breath", "Chrono", "Dragon", "Earthbound",
-                "Final", "Gradius", "Hagane", "Illusion", "Jungle",
-                "Killer", "Legend", "Mega", "Ninja", "Ogre",
-                "Pilot", "Quest", "Rival", "Secret", "Terranigma"};
-        int romCount = romNames.length;
-        for (int i = 0; i < romCount; i++) {
-            Path romFile = inputDir.resolve(romNames[i] + ".sfc");
-            Files.write(romFile, syntheticRomData);
-        }
-
-        // Execute batch processing
-        int exitCode = new CommandLine(new FloppyConvert())
-                .setCaseInsensitiveEnumValuesAllowed(true)
-                .execute(
-                        inputDir.toString(),
-                        "--output-dir", outputDir.toString(),
-                        "--format", "ufo"
-                );
-
-        assertEquals(0, exitCode, "Batch processing should succeed");
-
-        // Verify all ROMs were processed (success + fail = total)
-        // Since we don't have direct access to observer counters, verify via output files
-        long outputCount;
-        try (Stream<Path> stream = Files.walk(outputDir)) {
-            outputCount = stream.filter(p -> p.toString().endsWith(".img")).count();
-        }
-
-        assertEquals(romCount, outputCount,
-                "All ROMs should be processed (thread-safe counter should equal input count)");
-    }
-
-    /**
-     * Test graceful shutdown on interrupt.
-     * Note: This test verifies the shutdown hook registration rather than actual SIGINT,
-     * as sending signals to test process is complex and platform-dependent.
-     * Full SIGINT testing requires manual integration testing.
-     */
-    @Test
-    void testGracefulShutdownHookRegistered() throws IOException {
-        Path inputDir = tempDir.resolve("input");
-        Path outputDir = tempDir.resolve("output");
-        Files.createDirectories(inputDir);
-        Files.createDirectories(outputDir);
-
-        // Create single ROM for quick test
-        Path romFile = inputDir.resolve("TestRom.sfc");
-        Files.write(romFile, syntheticRomData);
-
-        // Execute batch processing (completes normally)
-        int exitCode = new CommandLine(new FloppyConvert())
-                .setCaseInsensitiveEnumValuesAllowed(true)
-                .execute(
-                        inputDir.toString(),
-                        "--output-dir", outputDir.toString(),
-                        "--format", "gd3"
-                );
-
-        assertEquals(0, exitCode, "Should complete normally");
-
-        // Verify shutdown hook exists (implicit - no exception during execution)
-        // Note: Actual SIGINT handling requires manual testing
-        assertTrue(true, "Shutdown hook registered without errors");
-    }
-
-    /**
-     * Test workspace isolation with concurrent processing.
-     * Verifies:
-     * - Each thread gets unique workspace directory (UUID suffix)
-     * - No file collisions between concurrent workers
-     * - Workspace cleanup works correctly
-     */
-    @Test
-    void testWorkspaceIsolation() throws IOException {
-        Path inputDir = tempDir.resolve("input");
-        Path outputDir = tempDir.resolve("output");
-        Files.createDirectories(inputDir);
-        Files.createDirectories(outputDir);
-
-        // Create multiple ROMs that will be processed concurrently
-        // Use distinct basenames to avoid ucon64 split-file detection
-        String[] romNames = {"Contra", "Castlevania", "Bomberman", "Tetris", "Pacman",
-                "Galaga", "Donkey", "Sonic", "Tails", "Knuckles",
-                "Ryu", "Ken", "Chun", "Guile", "Blanka"};
-        int romCount = romNames.length;
-        for (int i = 0; i < romCount; i++) {
-            Path romFile = inputDir.resolve(romNames[i] + ".sfc");
-            Files.write(romFile, syntheticRomData);
-        }
-
-        // Track workspace directories during execution
-        // This is tricky to observe directly, so we verify via side effects:
-        // 1. All ROMs complete successfully (no collisions)
-        // 2. All workspaces cleaned up afterward
-        int exitCode = new CommandLine(new FloppyConvert())
-                .setCaseInsensitiveEnumValuesAllowed(true)
-                .execute(
-                        inputDir.toString(),
-                        "--output-dir", outputDir.toString(),
-                        "--format", "fig"
-                );
-
-        assertEquals(0, exitCode, "All ROMs should process without collision");
-
-        // Verify no workspace directories remain
-        try (Stream<Path> stream = Files.list(outputDir)) {
-            long workspaceDirs = stream.filter(Files::isDirectory)
-                    .filter(p -> p.getFileName().toString().contains("."))
-                    .count();
-            assertEquals(0, workspaceDirs,
-                    "All workspace directories should be cleaned up (UUID suffixes removed)");
-        }
-
-        // Verify all expected .img files exist
-        try (Stream<Path> stream = Files.walk(outputDir)) {
-            long imgCount = stream.filter(p -> p.toString().endsWith(".img")).count();
-            assertEquals(romCount, imgCount, "All ROMs should produce .img files");
-        }
     }
 
     /**

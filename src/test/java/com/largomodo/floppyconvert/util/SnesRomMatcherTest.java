@@ -48,6 +48,8 @@ class SnesRomMatcherTest {
         assertFalse(SnesRomMatcher.isRom(createFile(tempDir, "sf")), "Too short for Game Doctor (no extension, only 2 chars)");
         assertFalse(SnesRomMatcher.isRom(createFile(tempDir, "sfa")), "Too short for Game Doctor (no extension, only 3 chars)");
         assertFalse(SnesRomMatcher.isRom(createFile(tempDir, "readme")), "No extension, doesn't match Game Doctor pattern");
+        assertFalse(SnesRomMatcher.isRom(createFile(tempDir, "sf123abcd")), "9 characters is not a DOS base name");
+        assertFalse(SnesRomMatcher.isRom(createFile(tempDir, "sf123abcd.078")), "9 characters is not a DOS base name");
     }
 
     @Test

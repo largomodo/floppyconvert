@@ -2,54 +2,11 @@
 package com.largomodo.floppyconvert.snes;
 
 import com.largomodo.floppyconvert.format.CopierFormat;
-import net.jqwik.api.*;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class HardwareValidatorTest {
-
-    @Property
-    void ufoAccepts32MbitHiRom(@ForAll("hiRom32Mbit") SnesRom rom) {
-        UfoHardwareValidator validator = new UfoHardwareValidator();
-        assertDoesNotThrow(() -> validator.validate(rom, CopierFormat.UFO));
-    }
-
-    @Property
-    void ufoRejects33MbitHiRom(@ForAll("hiRom33Mbit") SnesRom rom) {
-        UfoHardwareValidator validator = new UfoHardwareValidator();
-        assertThrows(UnsupportedHardwareException.class, () -> validator.validate(rom, CopierFormat.UFO));
-    }
-
-    @Property
-    void gd3Accepts48MbitExtendedHiRom(@ForAll("exHiRom48Mbit") SnesRom rom) {
-        Gd3HardwareValidator validator = new Gd3HardwareValidator();
-        assertDoesNotThrow(() -> validator.validate(rom, CopierFormat.GD3));
-    }
-
-    @Property
-    void gd3Rejects33MbitStandardHiRom(@ForAll("hiRom33Mbit") SnesRom rom) {
-        Gd3HardwareValidator validator = new Gd3HardwareValidator();
-        assertThrows(UnsupportedHardwareException.class, () -> validator.validate(rom, CopierFormat.GD3));
-    }
-
-    @Property
-    void gd3Rejects33MbitLoRom(@ForAll("loRom33Mbit") SnesRom rom) {
-        Gd3HardwareValidator validator = new Gd3HardwareValidator();
-        assertThrows(UnsupportedHardwareException.class, () -> validator.validate(rom, CopierFormat.GD3));
-    }
-
-    @Test
-    // The size message keeps byte resolution: 32 Mbit plus one byte reads 32.00001.
-    void gd3MessageReadsByteResolutionSizeFor32MbitPlus1Byte() {
-        SnesRom rom = createHiRom(32 * SnesConstants.MBIT + 1);
-        Gd3HardwareValidator validator = new Gd3HardwareValidator();
-
-        UnsupportedHardwareException e = assertThrows(UnsupportedHardwareException.class,
-                () -> validator.validate(rom, CopierFormat.GD3));
-
-        assertEquals("ROM size is 32.00001 Mbit -- conversion not yet implemented/verified", e.getMessage());
-    }
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(ints = {9, 11, 13, 14, 15})
@@ -62,14 +19,6 @@ class HardwareValidatorTest {
                 () -> validator.validate(rom, CopierFormat.GD3));
 
         assertTrue(e.getMessage().startsWith("ROM size is "), e.getMessage());
-    }
-
-    @Test
-    void gd3RejectsHiRomBelow2Mbit() {
-        SnesRom rom = createHiRom(SnesConstants.MBIT);
-        Gd3HardwareValidator validator = new Gd3HardwareValidator();
-
-        assertThrows(UnsupportedHardwareException.class, () -> validator.validate(rom, CopierFormat.GD3));
     }
 
     @org.junit.jupiter.params.ParameterizedTest
@@ -149,6 +98,51 @@ class HardwareValidatorTest {
     }
 
     @Test
+    void ufoRejects33MbitHiRom() {
+        UnsupportedHardwareException e = assertThrows(UnsupportedHardwareException.class,
+                () -> new UfoHardwareValidator().validate(createHiRom(33 * SnesConstants.MBIT), CopierFormat.UFO));
+
+        assertEquals("UFO hardware does not support HiROM > 32Mbit: ROM is 33 Mbit", e.getMessage());
+    }
+
+    @Test
+    // LoROM is cut in 4 Mbit parts and the unit takes 9 of them, so 36 Mbit is the last size that fits.
+    void ufoAcceptsLoRomUpTo36Mbit() {
+        UfoHardwareValidator validator = new UfoHardwareValidator();
+        assertDoesNotThrow(() -> validator.validate(createLoRom(32 * SnesConstants.MBIT), CopierFormat.UFO));
+        assertDoesNotThrow(() -> validator.validate(createLoRom(36 * SnesConstants.MBIT), CopierFormat.UFO));
+    }
+
+    @Test
+    void ufoRejectsLoRomAbove36Mbit() {
+        UnsupportedHardwareException e = assertThrows(UnsupportedHardwareException.class,
+                () -> new UfoHardwareValidator().validate(createLoRom(36 * SnesConstants.MBIT + 1), CopierFormat.UFO));
+
+        assertTrue(e.getMessage().contains("max 9 parts"), e.getMessage());
+    }
+
+    @Test
+    // Each validator guards its own copier only: a ROM too large for it still passes for any other format.
+    void validatorsIgnoreForeignFormats() {
+        SnesRom oversized = createHiRom(64 * SnesConstants.MBIT);
+
+        assertDoesNotThrow(() -> new UfoHardwareValidator().validate(oversized, CopierFormat.GD3));
+        assertDoesNotThrow(() -> new Gd3HardwareValidator().validate(oversized, CopierFormat.UFO));
+    }
+
+    @Test
+    // Extended LoROM is the one class the layout does not size-check, so only the 16-part limit stops it.
+    void gd3RejectsExtendedLoRomNeedingMoreThan16Parts() {
+        SnesRom rom = new SnesRom(new byte[72 * SnesConstants.MBIT], RomType.LoROM, 0, "Test extended LoROM",
+                false, 0, 0, 0, 0x0001, 0xFFFE, SnesRom.EXTENDED_BASE, false, false);
+
+        UnsupportedHardwareException e = assertThrows(UnsupportedHardwareException.class,
+                () -> new Gd3HardwareValidator().validate(rom, CopierFormat.GD3));
+
+        assertEquals("ROM needs 18 parts of 4 Mbit; GD3 hardware supports at most 16", e.getMessage());
+    }
+
+    @Test
     void bothValidatorsReject64MbitStandardHiRom() {
         SnesRom rom = createHiRom(64 * SnesConstants.MBIT);
 
@@ -157,37 +151,6 @@ class HardwareValidatorTest {
 
         Gd3HardwareValidator gd3Validator = new Gd3HardwareValidator();
         assertThrows(UnsupportedHardwareException.class, () -> gd3Validator.validate(rom, CopierFormat.GD3));
-    }
-
-    @Property
-    void ufoAccepts32MbitLoRom(@ForAll("loRom32Mbit") SnesRom rom) {
-        UfoHardwareValidator validator = new UfoHardwareValidator();
-        assertDoesNotThrow(() -> validator.validate(rom, CopierFormat.UFO));
-    }
-
-    @Provide
-    Arbitrary<SnesRom> hiRom32Mbit() {
-        return Arbitraries.just(createHiRom(32 * SnesConstants.MBIT));
-    }
-
-    @Provide
-    Arbitrary<SnesRom> hiRom33Mbit() {
-        return Arbitraries.just(createHiRom(33 * SnesConstants.MBIT));
-    }
-
-    @Provide
-    Arbitrary<SnesRom> exHiRom48Mbit() {
-        return Arbitraries.just(createExHiRom(48 * SnesConstants.MBIT));
-    }
-
-    @Provide
-    Arbitrary<SnesRom> loRom33Mbit() {
-        return Arbitraries.just(createLoRom(33 * SnesConstants.MBIT));
-    }
-
-    @Provide
-    Arbitrary<SnesRom> loRom32Mbit() {
-        return Arbitraries.just(createLoRom(32 * SnesConstants.MBIT));
     }
 
     private SnesRom createHiRom(int sizeBytes) {

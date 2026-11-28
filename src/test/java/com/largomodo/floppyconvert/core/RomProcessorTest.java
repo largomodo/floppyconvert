@@ -177,6 +177,13 @@ class RomProcessorTest {
         assertEquals(3, diskCount, "Should return number of disk layouts (3)");
     }
 
+    // A failed conversion leaves nothing in the output directory: no workspace directory, no half-written image.
+    private static void assertWorkspaceRemoved(Path outputDir) throws IOException {
+        try (java.util.stream.Stream<Path> leftovers = Files.list(outputDir)) {
+            assertEquals(List.of(), leftovers.toList(), "Failed conversion must leave the output directory empty");
+        }
+    }
+
     @Test
     void testExceptionInSplitterClosesWorkspace() throws IOException {
         // Setup: Create test ROM file
@@ -196,10 +203,8 @@ class RomProcessorTest {
         );
 
         assertEquals("Splitter failure", ex.getMessage());
+        assertWorkspaceRemoved(outputDir);
 
-        // If workspace cleanup worked, directory should not exist (or be empty if cleanup failed)
-        // We can't directly test ConversionWorkspace cleanup without integration test,
-        // but we verify exception propagates correctly
         verify(mockFacade).splitRom(any(File.class), any(Path.class), eq(CopierFormat.UFO));
         verifyNoInteractions(mockPacker);
         verifyNoMoreInteractions(mockFacade);
@@ -231,6 +236,7 @@ class RomProcessorTest {
         );
 
         assertEquals("Part too large", ex.getMessage());
+        assertWorkspaceRemoved(outputDir);
 
         // Verify calls
         verify(mockFacade).splitRom(any(File.class), any(Path.class), eq(CopierFormat.GD3));
@@ -280,6 +286,7 @@ class RomProcessorTest {
         );
 
         assertEquals("Disk full", ex.getMessage());
+        assertWorkspaceRemoved(outputDir);
 
         // Verify all components were called
         verify(mockFacade).splitRom(any(File.class), any(Path.class), eq(CopierFormat.FIG));
@@ -459,5 +466,41 @@ class RomProcessorTest {
                 "Batch mode should create game-name subdirectory");
         assertTrue(Files.exists(expectedImage),
                 "Batch mode disk image should be inside game-name subdirectory");
+    }
+
+    @Test
+    // Without parts there is nothing to put on a disk; returning 0 disks would report a conversion that produced nothing.
+    void splitterReturningNoPartsIsAnErrorNotAnEmptySuccess() throws IOException {
+        Path romFile = tempDir.resolve("Empty.sfc");
+        Files.write(romFile, new byte[]{0x01, 0x02, 0x03});
+        Path outputDir = Files.createDirectories(tempDir.resolve("output"));
+        when(mockFacade.splitRom(any(File.class), any(Path.class), eq(CopierFormat.FIG))).thenReturn(List.of());
+
+        IOException ex = assertThrows(IOException.class, () ->
+                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG, false));
+
+        assertEquals("ROM splitter produced no split parts for Empty.sfc", ex.getMessage());
+        assertWorkspaceRemoved(outputDir);
+    }
+
+    @Test
+    // Two parts whose names are equal once cut to 8.3 would overwrite each other on the disk.
+    void partsWithTheSameDosNameOnOneDiskAreRefused() throws IOException {
+        Path romFile = tempDir.resolve("Clash.sfc");
+        Files.write(romFile, new byte[]{0x01, 0x02, 0x03});
+        Path outputDir = Files.createDirectories(tempDir.resolve("output"));
+        Path work = Files.createDirectories(tempDir.resolve("work"));
+        File first = Files.write(work.resolve("LongNameA1.1"), new byte[]{0x01}).toFile();
+        File second = Files.write(work.resolve("LongNameA2.1"), new byte[]{0x02}).toFile();
+        when(mockFacade.splitRom(any(File.class), any(Path.class), eq(CopierFormat.FIG))).thenReturn(List.of(first, second));
+        RomProcessor withRealPacker = new RomProcessor(
+                new com.largomodo.floppyconvert.core.domain.GreedyDiskPacker(), mockFacade, mockTemplateFactory, normalizer);
+
+        IOException ex = assertThrows(IOException.class, () ->
+                withRealPacker.processRom(romFile.toFile(), outputDir, "test", CopierFormat.FIG, false));
+
+        assertTrue(ex.getMessage().startsWith("DOS name collision on disk 1: LONGNAME.1"), ex.getMessage());
+        verify(mockFacade, never()).write(any(File.class), anyList(), anyMap());
+        assertWorkspaceRemoved(outputDir);
     }
 }

@@ -274,41 +274,6 @@ public class SyntheticRomFactory {
         return sum & 0xFFFF;
     }
 
-    /**
-     * Generates the full test suite of synthetic ROMs.
-     * <p>
-     * Creates 6 edge case ROMs covering:
-     * - 8 Mbit (1 chunk for GD3)
-     * - 16 Mbit (2 chunks for GD3)
-     * - 12 Mbit (padding test)
-     * - Various SRAM sizes (0KB, 2KB, 8KB, 64KB, 256KB)
-     * - DSP chipset variations
-     * - Both LoROM and HiROM mappers
-     *
-     * @param outputDir directory to write ROM files (typically src/test/resources/snes/synthetic)
-     * @throws IOException if file writing fails
-     */
-    public static void generateTestSuite(Path outputDir) throws IOException {
-        Files.createDirectories(outputDir);
-
-        generateLoRom(8, SRAM_0KB, DspChipset.ABSENT, outputDir);
-        generateHiRom(8, SRAM_64KB, DspChipset.ABSENT, outputDir);
-        generateLoRom(16, SRAM_8KB, DspChipset.ABSENT, outputDir);
-        generateHiRom(16, SRAM_256KB, DspChipset.ABSENT, outputDir);
-        generateLoRom(12, SRAM_2KB, DspChipset.PRESENT, outputDir);
-        generateHiRom(12, SRAM_0KB, DspChipset.PRESENT, outputDir);
-        generateExHiRom(48, SRAM_0KB, DspChipset.ABSENT, "SYNEX48T0", outputDir);
-    }
-
-    /**
-     * Main method for standalone generation of test ROMs.
-     */
-    public static void main(String[] args) throws IOException {
-        Path outputDir = Path.of("src/test/resources/snes/synthetic");
-        generateTestSuite(outputDir);
-        System.out.println("Generated synthetic test ROMs in: " + outputDir.toAbsolutePath());
-    }
-
     public enum DspChipset {
         PRESENT, ABSENT
     }

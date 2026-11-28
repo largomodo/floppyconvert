@@ -155,9 +155,10 @@ class FloppyConvertRecursionTest {
     // The token sits between path and message so failures.log can be filtered with a plain grep.
     void testBatchFailureLineCarriesCategoryToken(@TempDir Path tempDir) throws Exception {
         Path inputRoot = tempDir.resolve("input");
-        Files.createDirectories(inputRoot);
+        // Below the root, so the line must carry the path relative to it and not just the file name
+        Path subDir = Files.createDirectories(inputRoot.resolve("sub"));
         // 33 Mbit LoROM: ucon64 refuses it, so GD3 fails with SIZE
-        Path tooBig = SyntheticRomFactory.generateLoRom(33, 0, DspChipset.ABSENT, "TOOBIG33L", inputRoot);
+        Path tooBig = SyntheticRomFactory.generateLoRom(33, 0, DspChipset.ABSENT, "TOOBIG33L", subDir);
 
         ch.qos.logback.classic.Logger batchLogger =
                 (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(BatchRunner.class);
@@ -174,9 +175,30 @@ class FloppyConvertRecursionTest {
         }
 
         assertEquals(1, exitCode, "A failed ROM makes the batch exit with 1");
-        String expectedPrefix = "FAILED: " + inputRoot.relativize(tooBig) + " - SIZE - ";
-        assertTrue(appender.list.stream().anyMatch(event -> event.getFormattedMessage().startsWith(expectedPrefix)),
-                "failures.log line must carry the SIZE token between path and message: " + appender.list);
+        assertEquals(
+                java.util.List.of("FAILED: " + Path.of("sub", tooBig.getFileName().toString())
+                        + " - SIZE - LoROM > 32 Mbit -- cannot convert"),
+                appender.list.stream().map(ILoggingEvent::getFormattedMessage)
+                        .filter(message -> message.startsWith("FAILED")).toList());
+    }
+
+    @Test
+    // A directory that cannot be walked may hide ROMs that were never tried, so the batch must not report success.
+    void batchOverATreeWithAnUnreadableDirectoryExitsNonZero(@TempDir Path tempDir) throws Exception {
+        Path inputRoot = Files.createDirectories(tempDir.resolve("input"));
+        SyntheticRomFactory.generateLoRom(4, 0, DspChipset.ABSENT, "GOOD4L", inputRoot);
+        Path locked = Files.createDirectories(inputRoot.resolve("locked"));
+        Assumptions.assumeTrue(locked.toFile().setReadable(false) && !Files.isReadable(locked),
+                "needs a file system that can deny read access (not Windows, not root)");
+        try {
+            int exitCode = new CommandLine(new FloppyConvert())
+                    .setCaseInsensitiveEnumValuesAllowed(true)
+                    .execute(inputRoot.toString(), "--output-dir", tempDir.resolve("output").toString(), "--format", "swc");
+
+            assertEquals(1, exitCode);
+        } finally {
+            locked.toFile().setReadable(true);
+        }
     }
 
     @Test

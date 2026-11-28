@@ -1,22 +1,7 @@
 package com.largomodo.floppyconvert;
 
-import com.largomodo.floppyconvert.service.fat.Fat12FormatFactory;
-import com.largomodo.floppyconvert.core.RomPartNormalizer;
-import com.largomodo.floppyconvert.core.RomProcessor;
-import com.largomodo.floppyconvert.core.domain.GreedyDiskPacker;
-import com.largomodo.floppyconvert.format.CopierFormat;
-import com.largomodo.floppyconvert.service.DefaultConversionFacade;
-import com.largomodo.floppyconvert.service.NativeRomSplitter;
-import com.largomodo.floppyconvert.service.fat.Fat12ImageWriter;
-import com.largomodo.floppyconvert.service.split.SplitStrategyFactory;
-import com.largomodo.floppyconvert.snes.SnesConstants;
-import com.largomodo.floppyconvert.snes.SnesInterleaver;
-import com.largomodo.floppyconvert.snes.SnesRomReader;
-import com.largomodo.floppyconvert.snes.UnsupportedHardwareException;
 import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory;
 import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory.DspChipset;
-import com.largomodo.floppyconvert.snes.header.HeaderGeneratorFactory;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -24,703 +9,148 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import picocli.CommandLine;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * End-to-end tests for the full ROM conversion pipeline.
- * Tests all supported backup unit formats (FIG, SWC, UFO, GD3) with real ROM files.
+ * End-to-end conversion through the CLI in single-file mode, checked at the only place that matters to a user:
+ * what is left in the output directory, and which files of which size each floppy image holds.
  * <p>
- * Tests now use native Java splitter and synthetic ROM data, no longer require ucon64.
- * Legacy tests with ucon64 skip gracefully when tools or copyrighted ROMs are unavailable.
+ * Every expectation is the complete output tree, so a leftover part, a surviving workspace directory, a blank
+ * image, a wrong disk size or a wrong disk number all fail the comparison. Part bytes are pinned elsewhere
+ * (Gd3ParityTest, CrossFormatStabilityTest, FloppyImageContentTest).
  */
 class FloppyConvertE2ETest {
 
-    // Chrono Trigger is 32 Mbit - large enough for split testing (produces multiple parts)
-    private static final String CHRONO_TRIGGER_RESOURCE = "/snes/Chrono Trigger (USA).sfc";
-    // Super Mario World is 4 Mbit - too small to split, tests single-file-per-disk path
-    private static final String SUPER_MARIO_WORLD_RESOURCE = "/snes/Super Mario World (USA).sfc";
-    private static final int LOROM_HEADER_OFFSET = 0x7FB0;
-    private static final int HIROM_HEADER_OFFSET = 0xFFB0;
+    // 4 Mbit of data plus the 512-byte copier header; 8 Mbit GD3 parts carry the header on part A only
+    private static final int PART_4M = 524_800;
+    private static final int PART_8M_HEADERED = 1_049_088;
+    private static final int PART_8M = 1_048_576;
+    private static final int DISK_720K = 737_280;
+    private static final int DISK_144M = 1_474_560;
+    private static final int DISK_160M = 1_638_400;
+
     @TempDir
     Path tempDir;
-    Path testResourcesDir;
-    Path outputDir;
 
-    static Stream<Arguments> formatAndRomProvider() {
+    enum Kind {LOROM, HIROM, EXTENDED_HIROM}
+
+    static Stream<Arguments> conversions() {
         return Stream.of(
-                // Multi-part tests: Chrono Trigger (32 Mbit - produces 8 split parts)
-                Arguments.of(CopierFormat.FIG, CHRONO_TRIGGER_RESOURCE),
-                Arguments.of(CopierFormat.SWC, CHRONO_TRIGGER_RESOURCE),
-                Arguments.of(CopierFormat.UFO, CHRONO_TRIGGER_RESOURCE),
-                Arguments.of(CopierFormat.GD3, CHRONO_TRIGGER_RESOURCE),
-                // Single-file tests: Super Mario World (4 Mbit - no split, 1 file per disk)
-                Arguments.of(CopierFormat.FIG, SUPER_MARIO_WORLD_RESOURCE),
-                Arguments.of(CopierFormat.SWC, SUPER_MARIO_WORLD_RESOURCE),
-                Arguments.of(CopierFormat.UFO, SUPER_MARIO_WORLD_RESOURCE),
-                Arguments.of(CopierFormat.GD3, SUPER_MARIO_WORLD_RESOURCE)
+                // One 4 Mbit part fits the smallest disk
+                Arguments.of("swc", Kind.LOROM, 4, List.of(
+                        image("game.img", DISK_720K, "GAME    1  ", PART_4M))),
+                // Three 4 Mbit parts fill a 1.6M disk (1,574,400 of 1,600,000 usable bytes); the last two take a 1.44M
+                Arguments.of("fig", Kind.HIROM, 32, List.of(
+                        image("game_1.img", DISK_160M, "GAME    1  ", PART_4M, "GAME    2  ", PART_4M, "GAME    3  ", PART_4M),
+                        image("game_2.img", DISK_160M, "GAME    4  ", PART_4M, "GAME    5  ", PART_4M, "GAME    6  ", PART_4M),
+                        image("game_3.img", DISK_144M, "GAME    7  ", PART_4M, "GAME    8  ", PART_4M))),
+                // 12 Mbit LoROM is mirrored to 16 Mbit
+                Arguments.of("ufo", Kind.LOROM, 12, List.of(
+                        image("game_1.img", DISK_160M, "GAME    1GM", PART_4M, "GAME    2GM", PART_4M, "GAME    3GM", PART_4M),
+                        image("game_2.img", DISK_720K, "GAME    4GM", PART_4M))),
+                // UFO HiROM 12 Mbit follows the 4-2-4-2 Mbit table (ucon64 snes.c size_to_partsizes)
+                Arguments.of("ufo", Kind.HIROM, 12, List.of(
+                        image("game.img", DISK_160M, "GAME    1GM", PART_4M, "GAME    2GM", 262_656,
+                                "GAME    3GM", PART_4M, "GAME    4GM", 262_656))),
+                // A Game Doctor does not read 720K disks, so even one small part goes on a 1.44M
+                Arguments.of("gd3", Kind.LOROM, 4, List.of(
+                        image("game.img", DISK_144M, "SF4GAM  078", PART_4M))),
+                // GD3 HiROM up to 16 Mbit is cut in two halves
+                Arguments.of("gd3", Kind.HIROM, 8, List.of(
+                        image("game.img", DISK_144M, "SF8GAMXA078", PART_4M, "SF8GAMXB078", 524_288))),
+                Arguments.of("gd3", Kind.HIROM, 16, List.of(
+                        image("game_1.img", DISK_144M, "SF16GAMA078", PART_8M_HEADERED),
+                        image("game_2.img", DISK_144M, "SF16GAMB078", PART_8M))),
+                // 20 Mbit HiROM is padded to 24 Mbit and named for it
+                Arguments.of("gd3", Kind.HIROM, 20, List.of(
+                        image("game_1.img", DISK_144M, "SF24GAMA078", PART_8M_HEADERED),
+                        image("game_2.img", DISK_144M, "SF24GAMB078", PART_8M),
+                        image("game_3.img", DISK_144M, "SF24GAMC078", PART_8M))),
+                Arguments.of("gd3", Kind.EXTENDED_HIROM, 48, List.of(
+                        image("game_1.img", DISK_144M, "SF48GAMA078", PART_8M_HEADERED),
+                        image("game_2.img", DISK_144M, "SF48GAMB078", PART_8M),
+                        image("game_3.img", DISK_144M, "SF48GAMC078", PART_8M),
+                        image("game_4.img", DISK_144M, "SF48GAMD078", PART_8M),
+                        image("game_5.img", DISK_144M, "SF48GAME078", PART_8M),
+                        image("game_6.img", DISK_144M, "SF48GAMF078", PART_8M)))
         );
     }
 
-    @BeforeEach
-    void setUp() {
-        testResourcesDir = Path.of("src/test/resources/snes");
-        outputDir = tempDir.resolve("output");
+    @ParameterizedTest(name = "{0} {1} {2} Mbit")
+    @MethodSource("conversions")
+    void conversionLeavesExactlyTheExpectedImages(String format, Kind kind, int sizeMbit, List<String> expected)
+            throws IOException {
+        Path rom = Files.move(generate(kind, sizeMbit), tempDir.resolve("game.sfc"));
+        Path out = tempDir.resolve("out");
+
+        assertEquals(0, run(rom.toString(), "--output-dir", out.toString(), "--format", format));
+
+        assertEquals(expected, describe(out));
     }
 
-    private RomProcessor createProcessor() {
-        SnesInterleaver interleaver = new SnesInterleaver();
-        NativeRomSplitter splitter = new NativeRomSplitter(
-                new SnesRomReader(),
-                new HeaderGeneratorFactory(),
-                new SplitStrategyFactory(),
-                interleaver
-        );
-        Fat12ImageWriter writer = new Fat12ImageWriter();
-        DefaultConversionFacade facade = new DefaultConversionFacade(splitter, writer);
+    @Test
+    // The image keeps a sanitized form of the whole file name; the 8.3 name on the disk keeps only letters and digits.
+    void specialCharactersAreSanitizedInImageAndDosNames() throws IOException {
+        Path rom = Files.move(generate(Kind.LOROM, 4),
+                tempDir.resolve("Ren & Stimpy Show, The - Buckeroo$! (USA).sfc"));
+        Path out = tempDir.resolve("out");
 
-        return new RomProcessor(
-                new GreedyDiskPacker(),
-                facade,
-                new Fat12FormatFactory(),
-                new RomPartNormalizer()
-        );
+        assertEquals(0, run(rom.toString(), "--output-dir", out.toString(), "--format", "fig"));
+
+        assertEquals(List.of(image("Ren___Stimpy_Show__The_-_Buckeroo____USA_.img", DISK_720K, "RENSTIMP1  ", PART_4M)),
+                describe(out));
     }
 
-    /**
-     * Lists disk images in output folder resolved by original ROM name.
-     * Resolution uses original name to match user-facing output folders
-     * (folders preserve ROM filename special characters for user recognition).
-     */
-    private List<Path> listDiskImages(String romName) throws Exception {
-        Path gameDir = outputDir.resolve(romName);
-        if (!Files.exists(gameDir)) {
-            return List.of();
+    private Path generate(Kind kind, int sizeMbit) throws IOException {
+        Path dir = Files.createDirectories(tempDir.resolve("gen"));
+        return switch (kind) {
+            case LOROM -> SyntheticRomFactory.generateLoRom(sizeMbit, 0, DspChipset.ABSENT, dir);
+            case HIROM -> SyntheticRomFactory.generateHiRom(sizeMbit, 0, DspChipset.ABSENT, dir);
+            case EXTENDED_HIROM -> SyntheticRomFactory.generateExHiRom(sizeMbit, 0, DspChipset.ABSENT, "SYNEX", dir);
+        };
+    }
+
+    private static int run(String... args) {
+        return new CommandLine(new FloppyConvert()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+    }
+
+    // "name:imageBytes[DIRNAME=fileBytes,...]"; nameAndSize alternates the 11-character directory field and the size
+    private static String image(String name, int imageBytes, Object... nameAndSize) {
+        List<String> files = new ArrayList<>();
+        for (int i = 0; i < nameAndSize.length; i += 2) {
+            files.add(nameAndSize[i] + "=" + nameAndSize[i + 1]);
         }
-        try (var stream = Files.list(gameDir)) {
-            return stream
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().endsWith(".img"))
-                    .sorted(Comparator.comparing(Path::toString))
-                    .toList();
-        }
+        return name + ":" + imageBytes + "[" + String.join(",", files) + "]";
     }
 
-    @ParameterizedTest(name = "{0} - {1}")
-    @MethodSource("formatAndRomProvider")
-    void testFullConversionPipeline(CopierFormat format, String romResourcePath, @TempDir Path tempDir) throws Exception {
-        // Use real ROM if available, fallback to synthetic ROM based on registry spec
-        Path inputRom = TestRomProvider.getRomOrSynthetic(romResourcePath, tempDir);
-
-        Path outputDir = tempDir.resolve("output");
-
-        // Invoke CLI via CommandLine.execute() with positional input parameter
-        int exitCode = new CommandLine(new FloppyConvert())
-                .setCaseInsensitiveEnumValuesAllowed(true)
-                .execute(
-                        inputRom.toString(),
-                        "--output-dir", outputDir.toString(),
-                        "--format", format.name().toLowerCase()
-                );
-
-        assertEquals(0, exitCode, "Conversion should succeed");
-
-        // Verify output structure - single-file mode places output directly in outputDir
-        String baseName = inputRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-
-        // Verify .img files were created and are non-empty
-        try (var imgFiles = Files.list(outputDir)) {
-            var images = imgFiles
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".img"))
-                    .toList();
-
-            assertFalse(images.isEmpty(), "No .img files produced for " + format + " / " + baseName);
-
-            for (Path img : images) {
-                long size = Files.size(img);
-                assertTrue(size > 0, "Empty floppy image: " + img.getFileName());
+    // Everything under the output directory, sorted by relative path; anything that is not an image shows up
+    // by its bare path and so breaks the comparison.
+    private static List<String> describe(Path out) throws IOException {
+        List<Path> entries;
+        try (Stream<Path> walk = Files.walk(out)) {
+            entries = walk.filter(p -> !p.equals(out)).sorted().toList();
+        }
+        List<String> described = new ArrayList<>();
+        for (Path entry : entries) {
+            String relative = out.relativize(entry).toString();
+            if (!Files.isRegularFile(entry) || !relative.endsWith(".img")) {
+                described.add(relative);
+                continue;
             }
+            Map<String, byte[]> files = new Fat12TestReader(entry).files();
+            described.add(relative + ":" + Files.size(entry) + "[" + files.entrySet().stream()
+                    .map(file -> file.getKey() + "=" + file.getValue().length)
+                    .collect(Collectors.joining(",")) + "]");
         }
-
-        // Verify cleanup: no split parts should remain
-        // Format-specific patterns: SWC/FIG use .1, .2, .3; UFO uses .1gm, .2gm, .3gm; GD3 uses .078
-        try (var stream = Files.list(outputDir)) {
-            String formatPattern = switch (format) {
-                case UFO -> ".*\\.(\\d+)gm$";
-                case GD3 -> "(?i)SF\\d{1,2}[^.]{0,6}\\.078$";
-                default -> ".*\\.\\d+$";
-            };
-
-            long partFileCount = stream
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().matches(formatPattern))
-                    .count();
-            assertEquals(0, partFileCount,
-                    "Split parts must not remain in output for " + format + " / " + baseName +
-                            " (pattern: " + formatPattern + ")");
-        }
-
-        // Verify cleanup removed intermediate format files (only for large ROMs that were split)
-        // Small ROMs (≤4 Mbit) don't get split, so the intermediate file IS the part - don't check cleanup
-        boolean isLargeRom = romResourcePath.contains("Chrono Trigger");
-        if (isLargeRom) {
-            try (var files = Files.list(outputDir)) {
-                long intermediateCount = files
-                        .filter(Files::isRegularFile)
-                        .filter(p -> p.toString().endsWith(".fig") ||
-                                p.toString().endsWith(".swc") ||
-                                p.toString().endsWith(".ufo") ||
-                                p.toString().endsWith(".gd3"))
-                        .count();
-                assertEquals(0, intermediateCount,
-                        "Intermediate format files must be cleaned up for large ROMs: " + format);
-            }
-        }
+        return described;
     }
-
-    @Test
-    void testSingleFileMode(@TempDir Path tempDir) throws Exception {
-        // Use real ROM if available, fallback to synthetic ROM
-        Path testRom = TestRomProvider.getRomOrSynthetic(SUPER_MARIO_WORLD_RESOURCE, tempDir);
-
-        Path outputDir = tempDir.resolve("output");
-
-        // Invoke CLI via CommandLine.execute() with positional input parameter (single file mode)
-        int exitCode = new CommandLine(new FloppyConvert())
-                .setCaseInsensitiveEnumValuesAllowed(true)
-                .execute(
-                        testRom.toString(),
-                        "--output-dir", outputDir.toString(),
-                        "--format", "fig"
-                );
-
-        assertEquals(0, exitCode, "Conversion should succeed");
-
-        // Verify output structure - single-file mode places .img directly in outputDir (no game-name subdirectory)
-        String baseName = testRom.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        assertFalse(Files.exists(outputDir.resolve(baseName)),
-                "Single-file mode should not create game-name subdirectory");
-
-        // Verify .img files were created directly in outputDir
-        try (var stream = Files.list(outputDir)) {
-            List<Path> imgFiles = stream
-                    .filter(p -> p.toString().endsWith(".img"))
-                    .toList();
-            assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
-
-            assertEquals(1, imgFiles.size(), "Should produce single disk for 4Mbit ROM");
-            assertTrue(imgFiles.getFirst().getFileName().toString().matches(".*\\.img"),
-                    "Output should be .img file");
-
-            // Super Mario World is 4Mbit (512KB) - should fit on 720K disk
-            long imageSize = Files.size(imgFiles.getFirst());
-            assertTrue(imageSize < 800_000,
-                    "Should use 720K template (~737KB) for 512KB ROM, got " + imageSize + " bytes");
-        }
-
-        // Verify cleanup: no split parts should remain (small ROM doesn't split)
-        // FIG format uses .1, .2, .3 extensions
-        try (var stream = Files.list(outputDir)) {
-            long partFileCount = stream
-                    .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
-                    .count();
-            assertEquals(0, partFileCount, "No split parts should exist for small ROM");
-        }
-
-        // Verify cleanup: no intermediate format files remain (converted to .img)
-        try (var files = Files.list(outputDir)) {
-            long intermediateCount = files
-                    .filter(p -> p.toString().endsWith(".fig") ||
-                            p.toString().endsWith(".swc") ||
-                            p.toString().endsWith(".ufo") ||
-                            p.toString().endsWith(".gd3"))
-                    .count();
-            assertEquals(0, intermediateCount, "Intermediate format files should be converted to .img");
-        }
-    }
-
-    @Test
-    void testSpecialCharactersInFilename(@TempDir Path tempDir) throws Exception {
-        // Copy ROM file with special characters in the filename
-        // Validates filename sanitization for special characters (#, [, ], (, ), space)
-        String problematicFilename = "VLDC10 [#053] - ERROR CODE #1D4 (Update) by Sayuri [2017-04-02] (SMW Hack).sfc";
-        Path testRom = tempDir.resolve(problematicFilename);
-
-        // Try to source from workspace or fallback to TestRomProvider
-        Path sourceRom = Path.of("/workspace", problematicFilename);
-        if (Files.exists(sourceRom)) {
-            Files.copy(sourceRom, testRom);
-        } else {
-            // Fallback to TestRomProvider (uses Super Mario World spec)
-            testRom = TestRomProvider.getRomOrSynthetic(SUPER_MARIO_WORLD_RESOURCE, tempDir);
-            // Rename to problematic filename for test
-            Path renamed = tempDir.resolve(problematicFilename);
-            Files.move(testRom, renamed);
-            testRom = renamed;
-        }
-
-        Path outputDir = tempDir.resolve("output");
-
-        // Invoke CLI - should handle special characters without truncation
-        int exitCode = new CommandLine(new FloppyConvert())
-                .setCaseInsensitiveEnumValuesAllowed(true)
-                .execute(
-                        testRom.toString(),
-                        "--output-dir", outputDir.toString(),
-                        "--format", "fig"
-                );
-
-        assertEquals(0, exitCode, "Conversion should succeed even with special characters in filename");
-
-        // Verify output structure - single-file mode places output directly in outputDir
-        assertTrue(Files.exists(outputDir), "Output directory should exist");
-        assertTrue(Files.isDirectory(outputDir), "Output should be a directory");
-
-        // Verify .img files were created
-        try (var stream = Files.list(outputDir)) {
-            List<Path> imgFiles = stream
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".img"))
-                    .toList();
-            assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
-
-            // Verify .img files inside use SANITIZED name
-            for (Path imgFile : imgFiles) {
-                String imgName = imgFile.getFileName().toString();
-                assertTrue(imgName.startsWith("VLDC10___053__"),
-                        ".img file should use sanitized name prefix: " + imgName);
-            }
-        }
-
-        // Verify cleanup: no split parts should remain
-        // FIG format uses .1, .2, .3 extensions
-        try (var stream = Files.list(outputDir)) {
-            long partFileCount = stream
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
-                    .count();
-            assertEquals(0, partFileCount, "No split parts should remain after processing");
-        }
-
-        try (var files = Files.list(outputDir)) {
-            long intermediateCount = files
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".fig") ||
-                            p.toString().endsWith(".swc") ||
-                            p.toString().endsWith(".ufo") ||
-                            p.toString().endsWith(".gd3"))
-                    .count();
-            assertEquals(0, intermediateCount, "No intermediate format files should remain");
-        }
-    }
-
-    @Test
-    void testShellSensitiveCharactersInFilename(@TempDir Path tempDir) throws Exception {
-        // Test file with shell-sensitive characters: &, $, !, and space
-        // These characters require escaping to prevent argument parser truncation
-        String problematicFilename = "Ren & Stimpy Show, The - Buckeroo$! (USA).sfc";
-        Path testRom = tempDir.resolve(problematicFilename);
-
-        // Use the actual problematic ROM file from workspace root
-        Path sourceRom = Path.of("/workspace", problematicFilename);
-        if (Files.exists(sourceRom)) {
-            Files.copy(sourceRom, testRom);
-        } else {
-            // Fallback to TestRomProvider (uses Super Mario World spec)
-            testRom = TestRomProvider.getRomOrSynthetic(SUPER_MARIO_WORLD_RESOURCE, tempDir);
-            // Rename to problematic filename for test
-            Path renamed = tempDir.resolve(problematicFilename);
-            Files.move(testRom, renamed);
-            testRom = renamed;
-        }
-
-        Path outputDir = tempDir.resolve("output");
-
-        // Invoke CLI - should handle shell-sensitive characters without truncation
-        int exitCode = new CommandLine(new FloppyConvert())
-                .setCaseInsensitiveEnumValuesAllowed(true)
-                .execute(
-                        testRom.toString(),
-                        "--output-dir", outputDir.toString(),
-                        "--format", "fig"
-                );
-
-        assertEquals(0, exitCode, "Conversion should succeed with shell-sensitive characters (&, $, !, space)");
-
-        // Verify output structure - single-file mode places output directly in outputDir
-        assertTrue(Files.exists(outputDir), "Output directory should exist");
-        assertTrue(Files.isDirectory(outputDir), "Output should be a directory");
-
-        // Verify .img files were created
-        try (var stream = Files.list(outputDir)) {
-            List<Path> imgFiles = stream
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".img"))
-                    .toList();
-            assertFalse(imgFiles.isEmpty(), "Should have generated at least one .img file");
-
-            // Verify .img files inside use SANITIZED name
-            for (Path imgFile : imgFiles) {
-                String imgName = imgFile.getFileName().toString();
-                assertTrue(imgName.startsWith("Ren___Stimpy_Show__The"),
-                        ".img file should use sanitized name prefix: " + imgName);
-            }
-        }
-
-        // Verify cleanup: no split parts should remain
-        // FIG format uses .1, .2, .3 extensions
-        try (var stream = Files.list(outputDir)) {
-            long partFileCount = stream
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().matches(".*\\.\\d+$"))
-                    .count();
-            assertEquals(0, partFileCount, "No split parts should remain after processing");
-        }
-
-        try (var files = Files.list(outputDir)) {
-            long intermediateCount = files
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".fig") ||
-                            p.toString().endsWith(".swc") ||
-                            p.toString().endsWith(".ufo") ||
-                            p.toString().endsWith(".gd3"))
-                    .count();
-            assertEquals(0, intermediateCount, "No intermediate format files should remain");
-        }
-    }
-
-    @Test
-    void testAlternativeExtension(@TempDir Path tempDir) throws Exception {
-        // Use real ROM if available, fallback to synthetic ROM
-        Path testRom = TestRomProvider.getRomOrSynthetic(CHRONO_TRIGGER_RESOURCE, tempDir);
-        // Rename to .fig extension for test
-        Path renamedRom = tempDir.resolve("ChronoTrigger.fig");
-        Files.move(testRom, renamedRom);
-        testRom = renamedRom;
-
-        Path outputDir = tempDir.resolve("output");
-
-        int exitCode = new CommandLine(new FloppyConvert())
-                .setCaseInsensitiveEnumValuesAllowed(true)
-                .execute(
-                        testRom.toString(),
-                        "--output-dir", outputDir.toString(),
-                        "--format", "fig"
-                );
-
-        assertEquals(0, exitCode, "Conversion should succeed with .fig extension");
-
-        try (var imgFiles = Files.list(outputDir)) {
-            var images = imgFiles
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".img"))
-                    .toList();
-
-            assertFalse(images.isEmpty(), "Should have generated at least one .img file");
-
-            for (Path img : images) {
-                long size = Files.size(img);
-                assertTrue(size > 0, "Empty floppy image: " + img.getFileName());
-            }
-        }
-    }
-
-    @Test
-    void testConvertSynthetic8MbitLoRomWithSwc(@TempDir Path tempDir) throws Exception {
-        Path syntheticRom = SyntheticRomFactory.generateLoRom(8, 0, DspChipset.ABSENT, "test_8mbit_lorom", tempDir);
-        Path outputDir = tempDir.resolve("output");
-
-        int exitCode = new CommandLine(new FloppyConvert())
-                .setCaseInsensitiveEnumValuesAllowed(true)
-                .execute(
-                        syntheticRom.toString(),
-                        "--output-dir", outputDir.toString(),
-                        "--format", "swc"
-                );
-
-        assertEquals(0, exitCode, "Conversion should succeed for 8 Mbit LoROM");
-
-        try (var imgFiles = Files.list(outputDir)) {
-            var images = imgFiles
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".img"))
-                    .toList();
-            assertFalse(images.isEmpty(), "Should generate at least one .img file");
-        }
-    }
-
-    @Test
-    void testConvertSynthetic16MbitHiRomWithGd3(@TempDir Path tempDir) throws Exception {
-        Path syntheticRom = SyntheticRomFactory.generateHiRom(16, 0, DspChipset.ABSENT, "test_16mbit_hirom", tempDir);
-        Path outputDir = tempDir.resolve("output");
-
-        int exitCode = new CommandLine(new FloppyConvert())
-                .setCaseInsensitiveEnumValuesAllowed(true)
-                .execute(
-                        syntheticRom.toString(),
-                        "--output-dir", outputDir.toString(),
-                        "--format", "gd3"
-                );
-
-        assertEquals(0, exitCode, "Conversion should succeed for 16 Mbit HiROM with GD3");
-
-        try (var imgFiles = Files.list(outputDir)) {
-            var images = imgFiles
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".img"))
-                    .toList();
-            assertFalse(images.isEmpty(), "Should generate .img files for 16 Mbit HiROM with GD3");
-            assertTrue(images.size() >= 2, "16 Mbit ROM should span multiple disks");
-
-            for (Path img : images) {
-                long size = Files.size(img);
-                assertTrue(size > 0, "Empty floppy image: " + img.getFileName());
-            }
-        }
-
-        try (var stream = Files.list(outputDir)) {
-            long partFileCount = stream
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().matches("SF\\d+[A-Z_]+\\.078$"))
-                    .count();
-            assertEquals(0, partFileCount, "GD3 split parts (SF*.078) should be cleaned up");
-        }
-    }
-
-    @Test
-    void testConvertSynthetic12MbitHiRomWithGd3Padding(@TempDir Path tempDir) throws Exception {
-        Path syntheticRom = SyntheticRomFactory.generateHiRom(12, 0, DspChipset.ABSENT, "test_12mbit_hirom", tempDir);
-        Path outputDir = tempDir.resolve("output");
-
-        int exitCode = new CommandLine(new FloppyConvert())
-                .setCaseInsensitiveEnumValuesAllowed(true)
-                .execute(
-                        syntheticRom.toString(),
-                        "--output-dir", outputDir.toString(),
-                        "--format", "gd3"
-                );
-
-        assertEquals(0, exitCode, "Conversion should succeed for 12 Mbit HiROM with GD3");
-
-        try (var imgFiles = Files.list(outputDir)) {
-            var images = imgFiles
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".img"))
-                    .toList();
-            assertFalse(images.isEmpty(), "Should generate .img files for 12 Mbit HiROM with GD3");
-
-            for (Path img : images) {
-                long size = Files.size(img);
-                assertTrue(size > 0, "Empty floppy image: " + img.getFileName());
-            }
-        }
-
-        try (var stream = Files.list(outputDir)) {
-            long partFileCount = stream
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().matches(".*\\.(078|\\d+)$"))
-                    .count();
-            assertEquals(0, partFileCount, "Split parts should be cleaned up after conversion");
-        }
-    }
-
-    @Test
-    void testConvertSynthetic8MbitHiRomWith64KbSram(@TempDir Path tempDir) throws Exception {
-        Path syntheticRom = SyntheticRomFactory.generateHiRom(8, 64, DspChipset.ABSENT, "test_8mbit_hirom_64kb_sram", tempDir);
-        Path outputDir = tempDir.resolve("output");
-
-        int exitCode = new CommandLine(new FloppyConvert())
-                .setCaseInsensitiveEnumValuesAllowed(true)
-                .execute(
-                        syntheticRom.toString(),
-                        "--output-dir", outputDir.toString(),
-                        "--format", "fig"
-                );
-
-        assertEquals(0, exitCode, "Conversion should succeed for 8 Mbit HiROM with 64KB SRAM");
-
-        try (var imgFiles = Files.list(outputDir)) {
-            var images = imgFiles
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".img"))
-                    .toList();
-            assertFalse(images.isEmpty(), "Should generate at least one .img file");
-        }
-    }
-
-    @Test
-    void testConvertSynthetic12MbitLoRomWithDsp(@TempDir Path tempDir) throws Exception {
-        Path syntheticRom = SyntheticRomFactory.generateLoRom(12, 0, DspChipset.PRESENT, "test_12mbit_lorom_dsp", tempDir);
-        Path outputDir = tempDir.resolve("output");
-
-        int exitCode = new CommandLine(new FloppyConvert())
-                .setCaseInsensitiveEnumValuesAllowed(true)
-                .execute(
-                        syntheticRom.toString(),
-                        "--output-dir", outputDir.toString(),
-                        "--format", "ufo"
-                );
-
-        assertEquals(0, exitCode, "Conversion should succeed for 12 Mbit LoROM with DSP");
-
-        try (var imgFiles = Files.list(outputDir)) {
-            var images = imgFiles
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".img"))
-                    .toList();
-            assertFalse(images.isEmpty(), "Should generate at least one .img file");
-        }
-    }
-
-
-    @Test
-    void testGd3_8MbitHiRom_ForceSplit_E2E() throws Exception {
-        Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.SUPER_BOMBERMAN_2, tempDir);
-
-        RomProcessor processor = createProcessor();
-        int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3, false);
-
-        assertEquals(1, diskCount, "8Mbit ROM should fit on 1 disk");
-
-        String baseName = romPath.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        List<Path> diskImages = listDiskImages(baseName);
-        assertEquals(1, diskImages.size(), "Should produce 1 disk image");
-
-        Path diskImage = diskImages.get(0);
-        assertTrue(Files.size(diskImage) > 700_000, "Disk image should be at least 720KB");
-    }
-
-    @Test
-    void testGd3_16MbitHiRom_BoundaryCase_E2E() throws Exception {
-        Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.ART_OF_FIGHTING, tempDir);
-
-        RomProcessor processor = createProcessor();
-        int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3, false);
-
-        assertTrue(diskCount >= 2, "16Mbit ROM should span multiple disks");
-
-        String baseName = romPath.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        List<Path> diskImages = listDiskImages(baseName);
-        assertTrue(diskImages.size() >= 2, "Should produce at least 2 disk images");
-    }
-
-    @Test
-    // A 20 Mbit HiROM is padded to 24 Mbit, so its part names carry 24.
-    void testGd3_20MbitHiRom_PadsTo24Mbit_E2E() throws Exception {
-        Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.STREET_FIGHTER_II, tempDir);
-
-        RomProcessor processor = createProcessor();
-        int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3, false);
-
-        assertTrue(diskCount >= 2, "20Mbit ROM should span multiple disks");
-
-        String baseName = romPath.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        List<Path> diskImages = listDiskImages(baseName);
-        assertTrue(diskImages.size() >= 2, "Should produce at least 2 disk images");
-    }
-
-    @Test
-    void testUfo_12MbitHiRom_IrregularChunks_E2E() throws Exception {
-        Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.ACTRAISER_2, tempDir);
-
-        RomProcessor processor = createProcessor();
-        int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.UFO, false);
-
-        assertTrue(diskCount >= 1, "12Mbit ROM should produce at least 1 disk");
-
-        String baseName = romPath.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        List<Path> diskImages = listDiskImages(baseName);
-        assertFalse(diskImages.isEmpty(), "Should produce disk images");
-
-        for (Path diskImage : diskImages) {
-            assertTrue(Files.size(diskImage) > 700_000, "Each disk should be at least 720KB");
-        }
-    }
-
-    @Test
-    void testUfo_12MbitLoRom_StandardChunks_E2E() throws Exception {
-        Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.BREATH_OF_FIRE, tempDir);
-
-        RomProcessor processor = createProcessor();
-        int diskCount = processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.UFO, false);
-
-        assertTrue(diskCount >= 1, "12Mbit ROM should produce at least 1 disk");
-
-        String baseName = romPath.getFileName().toString().replaceFirst("\\.[^.]+$", "");
-        List<Path> diskImages = listDiskImages(baseName);
-        assertFalse(diskImages.isEmpty(), "Should produce disk images");
-
-        for (Path diskImage : diskImages) {
-            assertTrue(Files.size(diskImage) > 700_000, "Each disk should be at least 720KB");
-        }
-    }
-
-    @Test
-    void testUfoRejectsLargeHiRom() throws Exception {
-        Path romFile = tempDir.resolve("large_hirom.sfc");
-        byte[] romData = new byte[48 * SnesConstants.MBIT];
-        romData[HIROM_HEADER_OFFSET + 0x15] = 0x21;
-        romData[HIROM_HEADER_OFFSET + 0x1C] = (byte) 0xFF;
-        romData[HIROM_HEADER_OFFSET + 0x1D] = (byte) 0xFF;
-        romData[HIROM_HEADER_OFFSET + 0x1E] = 0x00;
-        romData[HIROM_HEADER_OFFSET + 0x1F] = 0x00;
-        // Write valid checksum/complement at reader-expected offsets (base+0x2C/0x2E)
-        romData[HIROM_HEADER_OFFSET + 0x2C] = (byte) 0xFE; // complement low
-        romData[HIROM_HEADER_OFFSET + 0x2D] = (byte) 0xFF; // complement high -> 0xFFFE
-        romData[HIROM_HEADER_OFFSET + 0x2E] = (byte) 0x01; // checksum low
-        romData[HIROM_HEADER_OFFSET + 0x2F] = (byte) 0x00; // checksum high -> 0x0001
-        Files.write(romFile, romData);
-
-        RomProcessor processor = createProcessor();
-
-        assertThrows(UnsupportedHardwareException.class, () ->
-                processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.UFO, false)
-        );
-    }
-
-    @Test
-    void testGd3AcceptsExtendedHiRom() throws Exception {
-        Path romFile = tempDir.resolve("extended_hirom.sfc");
-        byte[] romData = new byte[48 * SnesConstants.MBIT];
-        int headerOffset = 0x40FFB0;
-        romData[headerOffset + 0x15] = 0x25;
-        romData[headerOffset + 0x1C] = (byte) 0xAA;
-        romData[headerOffset + 0x1D] = (byte) 0xBB;
-        romData[headerOffset + 0x1E] = (byte) 0x55;
-        romData[headerOffset + 0x1F] = (byte) 0x44;
-        // Write valid checksum/complement at reader-expected offsets (base+0x2C/0x2E)
-        romData[headerOffset + 0x2C] = (byte) 0xFE; // complement low
-        romData[headerOffset + 0x2D] = (byte) 0xFF; // complement high -> 0xFFFE
-        romData[headerOffset + 0x2E] = (byte) 0x01; // checksum low
-        romData[headerOffset + 0x2F] = (byte) 0x00; // checksum high -> 0x0001
-        Files.write(romFile, romData);
-
-        RomProcessor processor = createProcessor();
-        processor.processRom(romFile.toFile(), outputDir, "test", CopierFormat.GD3, false);
-    }
-
-    @Test
-    void testGd3_48MbitExtendedHiRom_E2E() throws Exception {
-        // Generate 48Mbit extended HiROM (headers at 0xFFB0 and 0x40FFB0) via TestRomProvider (synthetic-only, no real ROM)
-        Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.EXHIROM_48MBIT, tempDir);
-
-        RomProcessor processor = createProcessor();
-        processor.processRom(romPath.toFile(), outputDir, "test", CopierFormat.GD3, false);
-
-        List<Path> images = listDiskImages(romPath.getFileName().toString().replaceFirst("\\.[^.]+$", ""));
-
-        assertFalse(images.isEmpty(), "Should generate at least one disk image");
-        assertTrue(images.size() > 1, "48Mbit ROM should span multiple disks");
-
-        for (Path img : images) {
-            assertTrue(Files.size(img) > 0, "Disk image should not be empty: " + img.getFileName());
-        }
-    }
-
 }

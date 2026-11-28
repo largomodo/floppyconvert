@@ -242,4 +242,34 @@ class GreedyDiskPackerTest {
                 () -> packer.pack(parts, null),
                 "Should throw IllegalArgumentException for null minimum");
     }
+
+    // The largest disk takes 1,600,000 bytes of parts: exactly that much still fits, one byte more does not.
+    @Test
+    void partsFillingTheLargestDiskExactlyShareIt() {
+        List<DiskLayout> result = packer.pack(List.of(
+                new RomPartMetadata(Path.of("a.bin"), 1_000_000, "A.BIN"),
+                new RomPartMetadata(Path.of("b.bin"), 600_000, "B.BIN")), FloppyType.FLOPPY_720K);
+
+        assertEquals(1, result.size());
+        assertEquals(2, result.get(0).contents().size());
+        assertEquals(FloppyType.FLOPPY_160M, result.get(0).floppyType());
+    }
+
+    @Test
+    void oneByteOverTheLargestDiskStartsAnotherDisk() {
+        List<DiskLayout> result = packer.pack(List.of(
+                new RomPartMetadata(Path.of("a.bin"), 1_000_000, "A.BIN"),
+                new RomPartMetadata(Path.of("b.bin"), 600_001, "B.BIN")), FloppyType.FLOPPY_720K);
+
+        assertEquals(List.of(1, 1), result.stream().map(disk -> disk.contents().size()).toList());
+    }
+
+    @Test
+    void singlePartOfExactlyTheLargestDiskIsAccepted() {
+        List<DiskLayout> result = packer.pack(List.of(
+                new RomPartMetadata(Path.of("a.bin"), 1_600_000, "A.BIN")), FloppyType.FLOPPY_720K);
+
+        assertEquals(1, result.size());
+        assertEquals(FloppyType.FLOPPY_160M, result.get(0).floppyType());
+    }
 }

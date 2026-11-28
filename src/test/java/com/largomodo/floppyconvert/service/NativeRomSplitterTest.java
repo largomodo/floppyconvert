@@ -537,7 +537,6 @@ class NativeRomSplitterTest {
     void testGd3_8MbitHiRom_ForceSplitTo4Mbit() throws IOException {
         File inputRom = createRomFile("test.sfc");
         byte[] romData = createRomData(1024 * 1024);
-        byte[] interleavedData = new byte[romData.length];
         SnesRom rom = createHiRom(romData);
 
         when(mockReader.load(eq(inputRom.toPath()), any(CopierFormat.class))).thenReturn(rom);
@@ -701,5 +700,21 @@ class NativeRomSplitterTest {
         when(mockReader.load(eq(inputRom.toPath()), any(CopierFormat.class))).thenReturn(rom);
 
         assertThrows(UnsupportedHardwareException.class, () -> splitter.split(inputRom, tempDir, CopierFormat.UFO));
+    }
+
+    // Expected names follow ucon64 snes.c (name building 1553-1563, part letters 2408-2430) by hand:
+    // "sf" + Mbit + first 3 characters of the file name, cut to 6 below 10 Mbit, space and dot become '_'.
+    @org.junit.jupiter.params.ParameterizedTest(name = "{0} {1} Mbit hiRom={2} part {3}/{4} -> {5}")
+    @org.junit.jupiter.params.provider.CsvSource({
+            "'ab.sfc',     4, false, 0, 1, SF4AB_",   // the dot of a short name lands in the stem
+            "' ab.sfc',    4, false, 0, 1, SF4_AB",   // so does a leading space
+            "'sf4abc.sfc', 4, false, 0, 1, SF4ABC",   // a source already named sf<size> keeps its own name
+            "'ab.sfc',     8, true,  1, 2, SF8AB_XB", // HiROM below 10 Mbit: X pad, then the part letter
+            "'Game.sfc',  16, true,  0, 2, SF16GAMA", // from 10 Mbit on the stem is 7 characters and takes no pad
+    })
+    void gd3PartNameFollowsUcon64Rules(String fileName, int sizeMbit, boolean hiRom, int partIndex, int totalParts,
+                                       String expected) {
+        assertEquals(expected,
+                NativeRomSplitter.gd3PartName(fileName, sizeMbit * SnesConstants.MBIT, hiRom, partIndex, totalParts));
     }
 }

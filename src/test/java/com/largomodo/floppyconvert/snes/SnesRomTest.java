@@ -123,11 +123,12 @@ class SnesRomTest {
     }
 
     @Property
-    void invalidChecksumComplementPairThrowsIllegalArgumentException(
+    // The specific type matters: SnesFailureClassifier maps it to CHECKSUM, a plain IllegalArgumentException to OTHER.
+    void invalidChecksumComplementPairThrowsInvalidChecksumException(
             @ForAll("invalidPairs") int checksum) {
         int complement = 0;
         byte[] data = new byte[1024];
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(InvalidChecksumException.class,
                 () -> new SnesRom(data, RomType.LoROM, 0, "TITLE", false, 0, 0, 0, checksum, complement));
     }
 

@@ -51,7 +51,7 @@ class Gd3HeaderGeneratorTest {
         assertEquals("GAME DOCTOR SF 3", id, "Header should contain 'GAME DOCTOR SF 3' ID");
     }
 
-    @Property(tries = 100)
+    @Example
     void sramSizeCodeCorrectFor64KB() {
         SnesRom rom = createTestRom(RomType.LoROM, 4 * 1024 * 1024, 8192, false);
 
@@ -60,7 +60,7 @@ class Gd3HeaderGeneratorTest {
         assertEquals((byte) 0x81, header[16], "SRAM size code should be 0x81 for 64KB (8192 bytes)");
     }
 
-    @Property(tries = 100)
+    @Example
     void sramSizeCodeCorrectFor16KB() {
         SnesRom rom = createTestRom(RomType.LoROM, 4 * 1024 * 1024, 2048, false);
 
@@ -78,7 +78,7 @@ class Gd3HeaderGeneratorTest {
         assertEquals((byte) 0x80, header[16], "SRAM size code should be 0x80 for other sizes");
     }
 
-    @Property(tries = 100)
+    @Example
     void hiRom8MBUsesCorrectMemoryMap() {
         int size = 1024 * 1024;
         SnesRom rom = createTestRom(RomType.HiROM, size, 0, false);
@@ -94,7 +94,7 @@ class Gd3HeaderGeneratorTest {
         assertArrayEquals(expectedMap, actualMap, "HiROM 1MB (<=2 parts) should use MAP_HI_8MB");
     }
 
-    @Property(tries = 100)
+    @Example
     void hiRom16MBUsesCorrectMemoryMap() {
         int size = 2 * 1024 * 1024;
         SnesRom rom = createTestRom(RomType.HiROM, size, 0, false);
@@ -110,7 +110,7 @@ class Gd3HeaderGeneratorTest {
         assertArrayEquals(expectedMap, actualMap, "HiROM 2MB (>2, <=4 parts) should use MAP_HI_16MB");
     }
 
-    @Property(tries = 100)
+    @Example
     void hiRom24MBUsesCorrectMemoryMap() {
         int size = 3 * 1024 * 1024;
         SnesRom rom = createTestRom(RomType.HiROM, size, 0, false);
@@ -126,7 +126,7 @@ class Gd3HeaderGeneratorTest {
         assertArrayEquals(expectedMap, actualMap, "HiROM 3MB (>4, <=6 parts) should use MAP_HI_24MB");
     }
 
-    @Property(tries = 100)
+    @Example
     void hiRom32MBUsesCorrectMemoryMap() {
         // 32 Mbit = 4 MB
         int size = 4 * 1024 * 1024;
@@ -143,7 +143,7 @@ class Gd3HeaderGeneratorTest {
         assertArrayEquals(expectedMap, actualMap, "HiROM 32Mbit should use MAP_HI_32MB");
     }
 
-    @Property(tries = 100)
+    @Example
     void loRom4MBUsesCorrectMemoryMap() {
         int size = 512 * 1024;
         SnesRom rom = createTestRom(RomType.LoROM, size, 0, false);
@@ -159,7 +159,7 @@ class Gd3HeaderGeneratorTest {
         assertArrayEquals(expectedMap, actualMap, "LoROM 512KB (<=1 part) should use MAP_LO_4MB");
     }
 
-    @Property(tries = 100)
+    @Example
     void loRom8MBUsesCorrectMemoryMap() {
         int size = 1024 * 1024;
         SnesRom rom = createTestRom(RomType.LoROM, size, 0, false);
@@ -175,7 +175,7 @@ class Gd3HeaderGeneratorTest {
         assertArrayEquals(expectedMap, actualMap, "LoROM 1MB (>1, <=2 parts) should use MAP_LO_8MB");
     }
 
-    @Property(tries = 100)
+    @Example
     void loRom16MBUsesCorrectMemoryMap() {
         int size = 2 * 1024 * 1024;
         SnesRom rom = createTestRom(RomType.LoROM, size, 0, false);
@@ -191,7 +191,7 @@ class Gd3HeaderGeneratorTest {
         assertArrayEquals(expectedMap, actualMap, "LoROM 2MB (>2, <=4 parts) should use MAP_LO_16MB");
     }
 
-    @Property(tries = 100)
+    @Example
     void loRom32MBUsesCorrectMemoryMap() {
         // 32 Mbit = 4 MB
         int size = 4 * 1024 * 1024;
@@ -218,7 +218,7 @@ class Gd3HeaderGeneratorTest {
         assertEquals((byte) 0x0C, header[0x2A], "HiROM SRAM mapping should be 0x0C at offset 0x2A");
     }
 
-    @Property(tries = 100)
+    @Example
     void hiRomSramMappingNotSetWhenNoSram() {
         SnesRom rom = createTestRom(RomType.HiROM, 2 * 1024 * 1024, 0, false);
 
@@ -228,7 +228,7 @@ class Gd3HeaderGeneratorTest {
         assertEquals((byte) 0x00, header[0x2A], "HiROM SRAM mapping should be 0x00 at offset 0x2A when no SRAM");
     }
 
-    @Property(tries = 100)
+    @Example
     void loRomDspFlagSetWhenHasDsp() {
         SnesRom rom = createTestRom(RomType.LoROM, 1024 * 1024, 0, true);
 
@@ -238,7 +238,7 @@ class Gd3HeaderGeneratorTest {
         assertEquals((byte) 0x60, header[0x1C], "LoROM DSP flag should be 0x60 at offset 0x1C");
     }
 
-    @Property(tries = 100)
+    @Example
     void loRomDspFlagNotSetWhenNoDsp() {
         SnesRom rom = createTestRom(RomType.LoROM, 1024 * 1024, 0, false);
 
@@ -258,7 +258,7 @@ class Gd3HeaderGeneratorTest {
         assertEquals((byte) 0x40, header[0x28], "LoROM SRAM mapping should be 0x40 at offset 0x28");
     }
 
-    @Property(tries = 100)
+    @Example
     void loRomSramMappingNotSetWhenNoSram() {
         SnesRom rom = createTestRom(RomType.LoROM, 1024 * 1024, 0, false);
 
@@ -422,6 +422,22 @@ class Gd3HeaderGeneratorTest {
     @Provide
     Arbitrary<Integer> positiveSramSize() {
         return Arbitraries.integers().between(1, 32768);
+    }
+
+    @Test
+    // ucon64 snes.c LoROM map_64mb ("Thraki 776"): the only map for a LoROM above 32 Mbit that is not the 96 Mbit class.
+    void extendedLoRom48MbitUsesTheLoRom64Map() {
+        SnesRom rom = new SnesRom(new byte[48 * SnesConstants.MBIT], RomType.LoROM, 0, "TEST TITLE",
+                false, 0, 0, 0, 0x0001, 0xFFFE, SnesRom.EXTENDED_BASE, false, false);
+
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
+
+        byte[] expectedMap = new byte[]{
+                0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F,
+                0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
+                0x2C, 0x2D, 0x2E, 0x2F, 0x24, 0x25, 0x26, 0x27
+        };
+        assertArrayEquals(expectedMap, Arrays.copyOfRange(header, 0x11, 0x11 + expectedMap.length));
     }
 
     private SnesRom createTestRom(RomType type, int size, int sramSize, boolean hasDsp) {
