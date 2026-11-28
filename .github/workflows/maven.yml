@@ -32,7 +32,7 @@ jobs:
 
       - name: Upload Artifact
         if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: floppyconvert-jar
           path: target/*.jar
