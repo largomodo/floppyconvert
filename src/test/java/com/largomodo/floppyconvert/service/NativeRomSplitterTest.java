@@ -179,7 +179,7 @@ class NativeRomSplitterTest {
 
     @Test
     void testGd3NameSanitization() throws IOException {
-        // ucon64 takes the first 3 characters of the file name as they are; '-' survives, only ' ' and '.' become '_'
+        // Only letters and digits reach the name, so the X of a small HiROM stays at index 6 on the floppy too
         File inputRom = createRomFile("My-Game!.sfc");
         byte[] romData = createRomData(512 * 1024);
         SnesRom rom = createHiRom(romData);
@@ -191,13 +191,13 @@ class NativeRomSplitterTest {
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
         assertEquals(2, parts.size());
-        assertEquals("SF4MY-XA.078", parts.getFirst().getName());
-        assertEquals("SF4MY-XB.078", parts.get(1).getName());
+        assertEquals("SF4MYGXA.078", parts.getFirst().getName());
+        assertEquals("SF4MYGXB.078", parts.get(1).getName());
     }
 
     @Test
-    // Spaces and dots at index 3 or later would break the part file name, so they become underscores.
-    void testGd3SpacesAndDotsBecomeUnderscoresAfterTheSizeDigit() throws IOException {
+    // A space is skipped, and the character the name is then short of is an X.
+    void testGd3SpacesAreSkippedAndShortNamesPaddedWithX() throws IOException {
         File inputRom = createRomFile("a b.sfc");
         byte[] romData = createRomData(512 * 1024);
         SnesRom rom = createLoRom(romData);
@@ -209,7 +209,7 @@ class NativeRomSplitterTest {
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
         assertEquals(1, parts.size());
-        assertEquals("SF4A_B.078", parts.getFirst().getName());
+        assertEquals("SF4ABX.078", parts.getFirst().getName());
     }
 
     @Test
@@ -250,7 +250,7 @@ class NativeRomSplitterTest {
     @Test
     void testGd3NineMbitLoRomKeepsDistinctPartNames() throws IOException {
         // ucon64 writes the part letter past the end of the 6-character name, so both parts get one name and the
-        // second overwrites the first. A '_' at index 6 keeps the set usable. (ref: DL-021)
+        // second overwrites the first. The letter right after the stem keeps the set usable. (ref: DL-021)
         File inputRom = createRomFile("test.sfc");
         byte[] romData = createRomData(9 * SnesConstants.MBIT);
         SnesRom rom = createLoRom(romData);
@@ -262,8 +262,8 @@ class NativeRomSplitterTest {
         List<File> parts = splitter.split(inputRom, tempDir, CopierFormat.GD3);
 
         assertEquals(2, parts.size());
-        assertEquals("SF9TES_A.078", parts.getFirst().getName());
-        assertEquals("SF9TES_B.078", parts.get(1).getName());
+        assertEquals("SF9TESA.078", parts.getFirst().getName());
+        assertEquals("SF9TESB.078", parts.get(1).getName());
     }
 
     @Test
@@ -702,19 +702,47 @@ class NativeRomSplitterTest {
         assertThrows(UnsupportedHardwareException.class, () -> splitter.split(inputRom, tempDir, CopierFormat.UFO));
     }
 
-    // Expected names follow ucon64 snes.c (name building 1553-1563, part letters 2408-2430) by hand:
-    // "sf" + Mbit + first 3 characters of the file name, cut to 6 below 10 Mbit, space and dot become '_'.
+    // "SF" + Mbit + 3 characters + part letter, after ucon64 snes.c (name building 1553-1563, part letters
+    // 2408-2430). Where ucon64 would write '_' or keep a '-', the name skips the character or pads with X.
     @org.junit.jupiter.params.ParameterizedTest(name = "{0} {1} Mbit hiRom={2} part {3}/{4} -> {5}")
     @org.junit.jupiter.params.provider.CsvSource({
-            "'ab.sfc',     4, false, 0, 1, SF4AB_",   // the dot of a short name lands in the stem
-            "' ab.sfc',    4, false, 0, 1, SF4_AB",   // so does a leading space
-            "'sf4abc.sfc', 4, false, 0, 1, SF4ABC",   // a source already named sf<size> keeps its own name
-            "'ab.sfc',     8, true,  1, 2, SF8AB_XB", // HiROM below 10 Mbit: X pad, then the part letter
-            "'Game.sfc',  16, true,  0, 2, SF16GAMA", // from 10 Mbit on the stem is 7 characters and takes no pad
+            "'Game.sfc',    16, true,  0, 2, SF16GAMA", // from 10 Mbit on the stem is 7 characters and takes no pad
+            "'Game.sfc',     8, true,  1, 2, SF8GAMXB", // HiROM below 10 Mbit: X at index 6, then the part letter
+            "'Game.sfc',     4, false, 0, 1, SF4GAM",   // a single part has no letter
+            "'Game.sfc',     9, false, 1, 2, SF9GAMB",  // LoROM below 10 Mbit in parts: letter right after the stem
+            "'ab.sfc',       4, false, 0, 1, SF4ABX",   // a short name is padded with X; the extension is not part of it
+            "'ab.sfc',       8, true,  1, 2, SF8ABXXB",
+            "' a-b_c.sfc',   4, false, 0, 1, SF4ABC",   // space, dash and underscore are skipped
+            "'a.b.sfc',      8, true,  0, 2, SF8ABXXA", // so is a dot inside the name
+            "'Dr. Mario.sfc', 8, true, 0, 2, SF8DRMXA",
+            "'!!!.sfc',      4, false, 0, 1, SF4XXX",   // nothing usable in the name
+            "'sf4abc.sfc',   4, false, 0, 1, SF4ABC",   // a source already named sf<size> keeps its own name
+            "'sf4.sfc',      4, false, 0, 1, SF4XXX",
+            "'SF96SFA2',    96, false, 2, 12, SF96SFAC", // an existing Game Doctor file has no extension
     })
-    void gd3PartNameFollowsUcon64Rules(String fileName, int sizeMbit, boolean hiRom, int partIndex, int totalParts,
-                                       String expected) {
+    void gd3PartNameFollowsTheNamingRules(String fileName, int sizeMbit, boolean hiRom, int partIndex, int totalParts,
+                                          String expected) {
         assertEquals(expected,
                 NativeRomSplitter.gd3PartName(fileName, sizeMbit * SnesConstants.MBIT, hiRom, partIndex, totalParts));
+    }
+
+    // Whatever the file is called, the name is what the floppy's 8.3 directory entry will hold: letters and
+    // digits only, at most 8 of them, with the X of a small HiROM at index 6.
+    @net.jqwik.api.Property
+    void gd3PartNameIsAlwaysAPlainDosName(
+            @net.jqwik.api.ForAll @net.jqwik.api.constraints.StringLength(min = 1, max = 40) String fileName,
+            @net.jqwik.api.ForAll @net.jqwik.api.constraints.IntRange(min = 1, max = 96) int sizeMbit,
+            @net.jqwik.api.ForAll boolean hiRom,
+            @net.jqwik.api.ForAll @net.jqwik.api.constraints.IntRange(min = 0, max = 11) int partIndex) {
+        String name = NativeRomSplitter.gd3PartName(fileName, sizeMbit * SnesConstants.MBIT, hiRom, partIndex, 12);
+
+        assertTrue(name.matches("SF" + sizeMbit + "[A-Z0-9]{3,5}"), name);
+        assertTrue(name.length() <= 8, name);
+        assertEquals(name + ".078", com.largomodo.floppyconvert.util.DosName.of(name + ".078").value());
+        assertEquals((char) ('A' + partIndex), name.charAt(name.length() - 1));
+        if (hiRom && sizeMbit < 10) {
+            assertEquals(8, name.length(), name);
+            assertEquals('X', name.charAt(6), name);
+        }
     }
 }

@@ -31,7 +31,7 @@ Automates the conversion of SNES ROM files (.sfc, .fig, .swc, .ufo) into FAT12 f
 This tool uses a native ROM splitting engine and FAT12 writer to create .img files.
 It supports recursive directory processing and batch conversion.
 
-GD3 (Game Doctor) output is byte-identical to uCON64 2.2.3 for every ROM uCON64 converts: part names are SF<Mbit><name>.078 with a part letter (after an X or '_' below 10 Mbit), a HiROM up to 16 Mbit is split in two halves and every other ROM in 8 Mbit parts. A file that already is a Game Doctor file is split as it is.
+GD3 (Game Doctor) output is byte-identical to uCON64 2.2.3 for every ROM uCON64 converts: part names are SF<Mbit><name>.078 with a part letter (after an X for a HiROM below 10 Mbit), a HiROM up to 16 Mbit is split in two halves and every other ROM in 8 Mbit parts. Part names hold letters and digits only: other characters of the file name are skipped and a name shorter than 3 characters is padded with X, so for such a file name the part names differ from uCON64's, which writes '_' there. A file that already is a Game Doctor file is split as it is.
 
 In batch mode a ROM that fails is logged to failures.log as 'FAILED: <path> - <CATEGORY> - <message>', CATEGORY being CHECKSUM, SIZE, HEADER or OTHER.
 

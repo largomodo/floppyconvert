@@ -52,10 +52,9 @@ public enum CopierFormat {
                 return name.matches(".*\\.[0-9]+gm$");
             };
             // SF + size digits (1 below 10 Mbit, 2 from 10 to 96) + at most 6 characters: the name is cut to 6
-            // (below 10 Mbit) or 7 characters, plus a part letter after an X or '_' at index 6. Zero characters
-            // are allowed because a source named "sf4" keeps its own name. The SF + digit prefix still rejects
-            // unrelated .078 files. Split output is collected by name, so the filter must accept every name that
-            // ucon64's gd_make_name produces.
+            // (below 10 Mbit) or 7 characters, plus a part letter, which follows an X at index 6 for a HiROM below
+            // 10 Mbit. The SF + digit prefix still rejects unrelated .078 files. Split output is collected by name,
+            // so the filter must accept every name NativeRomSplitter.gd3PartName produces.
             case GD3 -> file -> file.getName().matches("(?i)SF\\d{1,2}[^.]{0,6}\\.078");
         };
     }

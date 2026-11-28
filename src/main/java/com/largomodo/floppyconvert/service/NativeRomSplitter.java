@@ -179,8 +179,14 @@ public class NativeRomSplitter implements RomSplitter {
     }
 
     /**
-     * Part names for GD3: a literal port of ucon64 {@code gd_make_name} (snes.c 1471) and the naming half of
-     * {@code snes_gd_make_names} (snes.c 2401), so a set built here has the names ucon64 gives it.
+     * Part names for GD3, after ucon64 {@code gd_make_name} (snes.c 1471) and the naming half of
+     * {@code snes_gd_make_names} (snes.c 2401): "SF" + size in Mbit + 3 characters of the file name + part letter.
+     * <p>
+     * A name holds letters and digits only. ucon64 lets '-' through and writes '_' for a space, a dot and a
+     * missing character, but the 8.3 name on the floppy keeps letters and digits only, so such a part would
+     * get another name on the disk than in the split, and the X of a small HiROM would leave index 6.
+     * Characters that are not letters or digits are therefore skipped, and a missing character is an X.
+     * For a file name that starts with 3 letters or digits the names are ucon64's.
      *
      * @param sourceFileName full input file name including its extension
      * @param sizeBytes      size of the image being split; its Mbit count is the size digits of the name
@@ -193,33 +199,29 @@ public class NativeRomSplitter implements RomSplitter {
     // Package-private so the naming rules are testable without a split.
     static String gd3PartName(String sourceFileName, int sizeBytes, boolean hiRom, int partIndex, int totalParts) {
         boolean below10Mbit = sizeBytes < 10 * SnesConstants.MBIT;
+        int stemLength = below10Mbit ? 6 : 7;
 
-        // "sf" + size digits + first 3 characters of the file name, cut to 7 characters
-        String head = sourceFileName.length() > 3 ? sourceFileName.substring(0, 3) : sourceFileName;
-        String name = cut("sf" + (sizeBytes / SnesConstants.MBIT) + head + "__", 7);
+        // The letters and digits of the file name without its extension
+        int lastDot = sourceFileName.lastIndexOf('.');
+        String source = (lastDot > 0 ? sourceFileName.substring(0, lastDot) : sourceFileName)
+                .replaceAll("[^A-Za-z0-9]", "");
+
+        // "sf" + size digits + first 3 characters of the source, X where the source has none
+        String name = cut("sf" + (sizeBytes / SnesConstants.MBIT) + cut(source, 3) + "XXX", stemLength);
         // A source already named sf<size>... keeps its own name (this is how ucon64 re-splits its own output)
-        if (startsWithIgnoreCase(name, sourceFileName, below10Mbit ? 3 : 4)) {
-            name = cut(sourceFileName + "___", 7);
+        if (startsWithIgnoreCase(name, source, below10Mbit ? 3 : 4)) {
+            name = cut(source + "XXX", stemLength);
         }
-        name = cut(name, below10Mbit ? 6 : 7);
 
-        // Spaces and dots after "sf" and the first size digit would break the 8.3 name
-        StringBuilder stem = new StringBuilder(name);
-        for (int i = stem.length() - 1; i >= 3; i--) {
-            if (stem.charAt(i) == ' ' || stem.charAt(i) == '.') {
-                stem.setCharAt(i, '_');
-            }
-        }
-        String upper = stem.toString().toUpperCase(Locale.ROOT);
+        String upper = name.toUpperCase(Locale.ROOT);
         if (totalParts == 1) {
             return upper;
         }
 
         // HiROM below 10 Mbit pads the 6-character stem with X before the part letter (the firmware checks for it).
-        // LoROM below 10 Mbit with several parts (9 Mbit only) gets '_' instead: ucon64 writes the letter after
-        // the end of the string, so both parts would collide and the second would overwrite the first. The '_' at
-        // index 6 is the one name that differs from ucon64's output; it keeps the part set usable.
-        String separator = below10Mbit ? (hiRom ? "X" : "_") : "";
+        // LoROM below 10 Mbit with several parts (9 Mbit only) takes the letter right after the stem: ucon64 writes
+        // it past the end of the string, so both parts would get one name and the second would overwrite the first.
+        String separator = below10Mbit && hiRom ? "X" : "";
         return upper + separator + (char) ('A' + partIndex);
     }
 

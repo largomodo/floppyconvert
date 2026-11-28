@@ -110,6 +110,18 @@ class FloppyConvertE2ETest {
                 describe(out));
     }
 
+    @Test
+    // A dot, dash or space in the file name must not move the X a small HiROM needs at index 6 of the name on the disk.
+    void gd3NamesOnTheDiskKeepTheXOfASmallHiRomAtIndexSix() throws IOException {
+        Path rom = Files.move(generate(Kind.HIROM, 8), tempDir.resolve("a.b - c.sfc"));
+        Path out = tempDir.resolve("out");
+
+        assertEquals(0, run(rom.toString(), "--output-dir", out.toString(), "--format", "gd3"));
+
+        assertEquals(List.of(image("a.b_-_c.img", DISK_144M, "SF8ABCXA078", PART_4M, "SF8ABCXB078", 524_288)),
+                describe(out));
+    }
+
     private Path generate(Kind kind, int sizeMbit) throws IOException {
         Path dir = Files.createDirectories(tempDir.resolve("gen"));
         return switch (kind) {

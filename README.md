@@ -96,12 +96,3 @@ GD3 parity tests (`Gd3ParityTest`) also use these local-only inputs, resolved fr
 | Wizardry VI - Kindan no Mahitsu (J) T-Eng v0.99a TiCo.sfc | `eb865c530fb7e045ac6f26463b370548491548d0` |
 | Daikaijuu Monogatari II (J) T+Eng v0.90 Dynamic-Designs.sfc | `bc7517b56630c66d4c9bbc3e5125534041956f4b` |
 | Fire Emblem - Thracia 776 (J) T+Eng v1.07 Lil' Manster.sfc | SHA1 not recorded (file not available when this table was written) |
-
-### GD3 parity testing
-
-`Gd3ParityTest` compares, per part, the name and SHA1 of floppyconvert's GD3 output with the SHA1 table in `Gd3ParityExpectations`, which was generated from uCON64 2.2.3. Rows uCON64 cannot produce are the exception: they hold the digests of a hardware-verified part set or, for the synthetic 96 Mbit LoROM that uCON64 rejects, of floppyconvert's own output. Parts are compared one by one because comparing reassembled bytes would hide split and naming errors. CI runs the synthetic fixtures only, so the table is the oracle there; rows built from real ROMs are skipped when the ROM is absent. When a uCON64 2.2.3 binary is present at `src/test/resources/ucon64` (Linux x86-64, ignored by `src/test/resources/.gitignore` and never committed) the same test also compares the table with live uCON64 output; the live layer is skipped unless `ucon64 --version` reports `uCON64 2.2.3`. The binary used for the committed table has SHA1 `403b8868a51565ed23c6c304d859cbc9a50c7dc4` and reports `uCON64 2.2.3 WIP UNIX (Linux)`; to rebuild it run `cd ucon64-svn/src && ./configure && make` and copy `src/ucon64` to `src/test/resources/ucon64`.
-
-- `-Dgd3.parity.regenerate=true` prints the table source from live uCON64 (`Gd3ParityTest#regenerate`) or from the code under test (`CrossFormatStabilityTest#regenerate`) instead of asserting.
-- `-Dgd3.parity.sweepDir=<dir>` converts every ROM under `<dir>` with both tools and reports mismatches as DETECTION, LAYOUT, HEADER, NAME or REJECT.
-
-`CrossFormatStabilityTest` pins FIG, SWC and UFO output for the same fixtures, so changes to shared code cannot alter those formats.
