@@ -19,7 +19,7 @@ floppyconvert - Converts SNES ROM files to floppy disk images.
 // tag::picocli-generated-man-section-synopsis[]
 == Synopsis
 
-*floppyconvert* [*-hvV*] [*--format*=_<format>_] [*-o*=_<outputDir>_] _INPUT_
+*floppyconvert* [*-hvV*] [*--format*=_<format>_] [*--gd3-dram*=_<gd3Dram>_] [*-o*=_<outputDir>_] _INPUT_
 
 // end::picocli-generated-man-section-synopsis[]
 
@@ -30,6 +30,10 @@ Automates the conversion of SNES ROM files (.sfc, .fig, .swc, .ufo) into FAT12 f
 
 This tool uses a native ROM splitting engine and FAT12 writer to create .img files.
 It supports recursive directory processing and batch conversion.
+
+GD3 (Game Doctor) output is byte-identical to uCON64 2.2.3 for every ROM uCON64 converts: part names are SF<Mbit><name>.078 with a part letter (after an X or '_' below 10 Mbit), a HiROM up to 16 Mbit is split in two halves and every other ROM in 8 Mbit parts. A file that already is a Game Doctor file is split as it is.
+
+In batch mode a ROM that fails is logged to failures.log as 'FAILED: <path> - <CATEGORY> - <message>', CATEGORY being CHECKSUM, SIZE, HARDWARE (needs a larger --gd3-dram), HEADER or OTHER.
 
 // end::picocli-generated-man-section-description[]
 
@@ -42,6 +46,16 @@ It supports recursive directory processing and batch conversion.
 Valid values: FIG, SWC, UFO, GD3
 +
 Default: FIG
+
+*--gd3-dram*=_<gd3Dram>_::
+  DRAM of the target Game Doctor in Mbit, for --format GD3: 32, 64 or 128. Any other value is a usage error
+  (exit code 2).
++
+A 96 Mbit game needs 128 (Game Doctor SF7).
++
+The output layout does not depend on this value; it only decides whether a ROM is accepted.
++
+Default: 64
 
 *-h*, *--help*::
   Show this help message and exit.

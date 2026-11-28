@@ -127,6 +127,43 @@ class FloppyConvertTest {
     }
 
     @Test
+    void testGd3DramDefaultsTo64() throws IOException {
+        Path testFile = tempDir.resolve("test.sfc");
+        Files.createFile(testFile);
+
+        FloppyConvert floppyConvert = new FloppyConvert();
+        new CommandLine(floppyConvert).parseArgs(testFile.toAbsolutePath().toString());
+
+        assertEquals(64, floppyConvert.gd3Dram);
+    }
+
+    @Test
+    void testGd3Dram128IsAccepted() throws Exception {
+        Path romSource = SyntheticRomFactory.generateLoRom(4, 0, DspChipset.ABSENT, "DRAM128", tempDir);
+        Path testFile = tempDir.resolve("game.sfc");
+        Files.copy(romSource, testFile);
+
+        FloppyConvert floppyConvert = new FloppyConvert();
+        new CommandLine(floppyConvert).setCaseInsensitiveEnumValuesAllowed(true).parseArgs(
+                testFile.toAbsolutePath().toString(), "--format", "gd3", "--gd3-dram", "128", "-o", tempDir.toString());
+
+        assertDoesNotThrow(floppyConvert::call);
+    }
+
+    @Test
+    // picocli binds --gd3-dram as an int, so the supported values are validated explicitly; a bad value is a
+    // usage error like any other.
+    void testGd3DramOutsideSupportedValuesIsAParameterError() throws IOException {
+        Path testFile = tempDir.resolve("test.sfc");
+        Files.createFile(testFile);
+
+        int exitCode = new CommandLine(new FloppyConvert()).execute(
+                testFile.toAbsolutePath().toString(), "--gd3-dram", "48");
+
+        assertEquals(2, exitCode, "An unsupported DRAM size is a command line error");
+    }
+
+    @Test
     void testNonExistentInputPathThrowsException() {
         File nonExistentFile = tempDir.resolve("nonexistent.sfc").toFile();
 

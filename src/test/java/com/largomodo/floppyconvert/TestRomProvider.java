@@ -67,11 +67,15 @@ public class TestRomProvider {
      */
     private static Path createSyntheticRom(RomSpec spec, Path outputDir) throws IOException {
         return switch (spec.type()) {
-            case LoROM -> SyntheticRomFactory.generateLoRom(
+            case LoROM -> spec.extended()
+                    ? SyntheticRomFactory.generateExLoRom(
+                    spec.sizeMbit(), spec.sramSizeKb(), spec.hasDsp(), spec.title(), outputDir)
+                    : SyntheticRomFactory.generateLoRom(
                     spec.sizeMbit(), spec.sramSizeKb(), spec.hasDsp(), spec.title(), outputDir);
-            case HiROM -> SyntheticRomFactory.generateHiRom(
-                    spec.sizeMbit(), spec.sramSizeKb(), spec.hasDsp(), spec.title(), outputDir);
-            case ExHiROM -> SyntheticRomFactory.generateExHiRom(
+            case HiROM -> spec.extended()
+                    ? SyntheticRomFactory.generateExHiRom(
+                    spec.sizeMbit(), spec.sramSizeKb(), spec.hasDsp(), spec.title(), outputDir)
+                    : SyntheticRomFactory.generateHiRom(
                     spec.sizeMbit(), spec.sramSizeKb(), spec.hasDsp(), spec.title(), outputDir);
         };
     }

@@ -39,9 +39,17 @@ public class BatchRunner {
     private static final Logger log = LoggerFactory.getLogger(BatchRunner.class);
 
     private final RomProcessor processor;
+    private final FailureClassifier classifier;
 
     public BatchRunner(RomProcessor processor) {
+        this(processor, FailureClassifier.ALWAYS_OTHER);
+    }
+
+    // Injected because core cannot import snes exception types; the single-argument constructor above keeps
+    // callers without domain knowledge on OTHER.
+    public BatchRunner(RomProcessor processor, FailureClassifier classifier) {
         this.processor = processor;
+        this.classifier = classifier;
     }
 
     /**
@@ -151,8 +159,8 @@ public class BatchRunner {
                 .collect(Collectors.toList());
     }
 
-    private static ConversionObserver createObserver(Path inputRoot, AtomicInteger successCount,
-                                                     AtomicInteger failCount) {
+    private ConversionObserver createObserver(Path inputRoot, AtomicInteger successCount,
+                                              AtomicInteger failCount) {
         return new ConversionObserver() {
             @Override
             public void onSuccess(Path rom, int diskCount) {
@@ -162,7 +170,8 @@ public class BatchRunner {
             @Override
             public void onFailure(Path rom, Exception e) {
                 failCount.incrementAndGet();
-                log.error("FAILED: {} - {}", inputRoot.relativize(rom), e.getMessage());
+                // The category token sits between path and message so failures.log can be grouped with grep or cut
+                log.error("FAILED: {} - {} - {}", inputRoot.relativize(rom), classifier.classify(e), e.getMessage());
             }
         };
     }

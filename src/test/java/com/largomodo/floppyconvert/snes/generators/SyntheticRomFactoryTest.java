@@ -1,5 +1,6 @@
 package com.largomodo.floppyconvert.snes.generators;
 
+import com.largomodo.floppyconvert.format.CopierFormat;
 import com.largomodo.floppyconvert.snes.RomType;
 import com.largomodo.floppyconvert.snes.SnesRom;
 import com.largomodo.floppyconvert.snes.SnesRomReader;
@@ -9,10 +10,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -23,8 +28,35 @@ class SyntheticRomFactoryTest {
     private static final int EXHIROM_HEADER_OFFSET = 0x40FFB0;
     private static final int TITLE_OFFSET = 0x10;
     private static final int TITLE_LENGTH = 21;
+    private static final int BLOCK_BYTES = 0x8000;
 
     private final SnesRomReader reader = new SnesRomReader();
+
+    @Property(tries = 30)
+    void bodyBlocksAreDistinctAndHeaderRoundTrips(@ForAll("blockUniquenessSizes") int sizeMbit,
+                                                  @ForAll boolean hiRom) throws IOException {
+        Path tempDir = Files.createTempDirectory("block-uniqueness-test-");
+        try {
+            Path romPath = hiRom
+                    ? SyntheticRomFactory.generateHiRom(sizeMbit, SyntheticRomFactory.SRAM_0KB, DspChipset.ABSENT, tempDir)
+                    : SyntheticRomFactory.generateLoRom(sizeMbit, SyntheticRomFactory.SRAM_0KB, DspChipset.ABSENT, tempDir);
+
+            byte[] data = Files.readAllBytes(romPath);
+            Set<ByteBuffer> blocks = new HashSet<>();
+            for (int offset = 0; offset < data.length; offset += BLOCK_BYTES) {
+                byte[] block = Arrays.copyOfRange(data, offset, offset + BLOCK_BYTES);
+                assertTrue(blocks.add(ByteBuffer.wrap(block)),
+                        "32 KB block at offset " + offset + " repeats an earlier block");
+            }
+
+            SnesRom rom = reader.load(romPath);
+            assertEquals(hiRom ? RomType.HiROM : RomType.LoROM, rom.type(), "Detected type must match the requested type");
+            assertEquals((hiRom ? "SYNHI" : "SYNLO") + sizeMbit + "T0", rom.title());
+            assertEquals(0, rom.sramSize());
+        } finally {
+            deleteDirectory(tempDir);
+        }
+    }
 
     @Property
     void customTitleAppearsAtCorrectHeaderOffsetForLoRom(@ForAll("validSizes") int sizeMbit,
@@ -76,7 +108,7 @@ class SyntheticRomFactoryTest {
             String actualTitle = extractTitle(data, EXHIROM_HEADER_OFFSET + TITLE_OFFSET);
 
             assertEquals(customTitle, actualTitle.trim(),
-                    "ExHiROM custom title should appear at offset 0x40FFB0 + 0x10 = 0x40FFC0");
+                    "extended HiROM custom title should appear at offset 0x40FFB0 + 0x10 = 0x40FFC0");
         } finally {
             deleteDirectory(tempDir);
         }
@@ -138,7 +170,7 @@ class SyntheticRomFactoryTest {
             String actualTitle = extractTitle(data, EXHIROM_HEADER_OFFSET + TITLE_OFFSET);
 
             assertEquals(title, actualTitle.trim(),
-                    "ExHiROM auto-generated title should follow pattern SYNEX{size}T{sram}{dsp}");
+                    "extended HiROM auto-generated title should follow pattern SYNEX{size}T{sram}{dsp}");
         } finally {
             deleteDirectory(tempDir);
         }
@@ -148,22 +180,25 @@ class SyntheticRomFactoryTest {
     void exHiRomHeaderAt0x40FFB0DetectedBySnesRomReader(@TempDir Path tempDir) throws IOException {
         Path romPath = SyntheticRomFactory.generateExHiRom(48, 0, DspChipset.ABSENT, "SYNEX48T0", tempDir);
 
-        SnesRom rom = reader.load(romPath);
+        SnesRom rom = reader.load(romPath, CopierFormat.GD3);
 
-        assertEquals(RomType.ExHiROM, rom.type(),
-                "SnesRomReader should detect ExHiROM by header location at 0x40FFB0");
+        assertEquals(RomType.HiROM, rom.type(),
+                "SnesRomReader should detect HiROM for the extended header at 0x40FFB0");
+        assertEquals(SnesRom.EXTENDED_BASE, rom.headerBase(),
+                "The 0x40FFB0 checksum pair should set the extended header base");
         assertEquals("SYNEX48T0", rom.title().trim(),
-                "ExHiROM title should be correctly parsed");
+                "extended HiROM title should be correctly parsed");
     }
 
     @Test
     void exHiRom64MbitMaximumSizeGeneratesValidRom(@TempDir Path tempDir) throws IOException {
         Path romPath = SyntheticRomFactory.generateExHiRom(64, 0, DspChipset.ABSENT, "SYNEX64T0", tempDir);
 
-        assertTrue(Files.exists(romPath), "ExHiROM file should be created");
+        assertTrue(Files.exists(romPath), "extended HiROM file should be created");
 
-        SnesRom rom = reader.load(romPath);
-        assertEquals(RomType.ExHiROM, rom.type(), "64Mbit ExHiROM should be valid");
+        SnesRom rom = reader.load(romPath, CopierFormat.GD3);
+        assertEquals(RomType.HiROM, rom.type(), "64Mbit extended HiROM should be valid");
+        assertEquals(SnesRom.EXTENDED_BASE, rom.headerBase());
 
         int expectedSize = 64 * 1024 * 1024 / 8;
         assertEquals(expectedSize, Files.size(romPath),
@@ -172,38 +207,61 @@ class SyntheticRomFactoryTest {
 
     @Test
     void exHiRomBelowMinimumSizeThrowsIllegalArgumentException(@TempDir Path tempDir) {
-        assertThrows(IllegalArgumentException.class, () ->
+        assertDoesNotThrow(() ->
                         SyntheticRomFactory.generateExHiRom(40, 0, DspChipset.ABSENT, "TEST", tempDir),
-                "ExHiROM below 48Mbit should throw IllegalArgumentException");
+                "extended HiROM at 40Mbit is the smallest valid size");
+
+        assertThrows(IllegalArgumentException.class, () ->
+                        SyntheticRomFactory.generateExHiRom(39, 0, DspChipset.ABSENT, "TEST", tempDir),
+                "extended HiROM below 40Mbit should throw IllegalArgumentException");
 
         assertThrows(IllegalArgumentException.class, () ->
                         SyntheticRomFactory.generateExHiRom(32, 0, DspChipset.ABSENT, "TEST", tempDir),
-                "ExHiROM at 32Mbit should throw IllegalArgumentException");
+                "extended HiROM at 32Mbit should throw IllegalArgumentException");
+    }
+
+    @Test
+    void exLoRomHeaderAt0x407FB0DetectedBySnesRomReader(@TempDir Path tempDir) throws IOException {
+        Path romPath = SyntheticRomFactory.generateExLoRom(48, 0, DspChipset.ABSENT, "SYNEXLO48", tempDir);
+
+        SnesRom rom = reader.load(romPath, CopierFormat.GD3);
+
+        assertEquals(RomType.LoROM, rom.type());
+        assertEquals(SnesRom.EXTENDED_BASE, rom.headerBase());
+        assertEquals("SYNEXLO48", rom.title());
+    }
+
+    @Test
+    void exLoRomOutsideSizeRangeThrowsIllegalArgumentException(@TempDir Path tempDir) {
+        assertThrows(IllegalArgumentException.class, () ->
+                SyntheticRomFactory.generateExLoRom(39, 0, DspChipset.ABSENT, "TEST", tempDir));
+        assertThrows(IllegalArgumentException.class, () ->
+                SyntheticRomFactory.generateExLoRom(65, 0, DspChipset.ABSENT, "TEST", tempDir));
     }
 
     @Test
     void exHiRomAboveMaximumSizeThrowsIllegalArgumentException(@TempDir Path tempDir) {
         assertThrows(IllegalArgumentException.class, () ->
                         SyntheticRomFactory.generateExHiRom(72, 0, DspChipset.ABSENT, "TEST", tempDir),
-                "ExHiROM above 64Mbit should throw IllegalArgumentException");
+                "extended HiROM above 64Mbit should throw IllegalArgumentException");
 
         assertThrows(IllegalArgumentException.class, () ->
                         SyntheticRomFactory.generateExHiRom(96, 0, DspChipset.ABSENT, "TEST", tempDir),
-                "ExHiROM at 96Mbit should throw IllegalArgumentException");
+                "extended HiROM at 96Mbit should throw IllegalArgumentException");
     }
 
     @Test
     void exHiRomZeroSizeThrowsIllegalArgumentException(@TempDir Path tempDir) {
         assertThrows(IllegalArgumentException.class, () ->
                         SyntheticRomFactory.generateExHiRom(0, 0, DspChipset.ABSENT, "TEST", tempDir),
-                "ExHiROM with 0 size should throw IllegalArgumentException");
+                "extended HiROM with 0 size should throw IllegalArgumentException");
     }
 
     @Test
     void exHiRomNegativeSizeThrowsIllegalArgumentException(@TempDir Path tempDir) {
         assertThrows(IllegalArgumentException.class, () ->
                         SyntheticRomFactory.generateExHiRom(-8, 0, DspChipset.ABSENT, "TEST", tempDir),
-                "ExHiROM with negative size should throw IllegalArgumentException");
+                "extended HiROM with negative size should throw IllegalArgumentException");
     }
 
     @Property
@@ -257,7 +315,12 @@ class SyntheticRomFactoryTest {
 
     @Provide
     Arbitrary<Integer> exHiRomValidSizes() {
-        return Arbitraries.integers().between(48, 64);
+        return Arbitraries.integers().between(40, 64);
+    }
+
+    @Provide
+    Arbitrary<Integer> blockUniquenessSizes() {
+        return Arbitraries.integers().between(2, 32);
     }
 
     @Provide

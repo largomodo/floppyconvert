@@ -51,10 +51,12 @@ public enum CopierFormat {
                 String name = file.getName();
                 return name.matches(".*\\.[0-9]+gm$");
             };
-            case GD3 -> file -> {
-                String name = file.getName();
-                return name.matches(".*[A-Z]\\.078$");
-            };
+            // SF + size digits (1 below 10 Mbit, 2 from 10 to 96) + at most 6 characters: the name is cut to 6
+            // (below 10 Mbit) or 7 characters, plus a part letter after an X or '_' at index 6. Zero characters
+            // are allowed because a source named "sf4" keeps its own name. The SF + digit prefix still rejects
+            // unrelated .078 files. Split output is collected by name, so the filter must accept every name that
+            // ucon64's gd_make_name produces.
+            case GD3 -> file -> file.getName().matches("(?i)SF\\d{1,2}[^.]{0,6}\\.078");
         };
     }
 }

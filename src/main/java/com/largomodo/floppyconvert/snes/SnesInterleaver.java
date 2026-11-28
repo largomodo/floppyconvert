@@ -1,185 +1,198 @@
 package com.largomodo.floppyconvert.snes;
 
-import com.largomodo.floppyconvert.snes.SnesConstants;
+import com.largomodo.floppyconvert.snes.Gd3Layout.PadStrategy;
+
+import java.util.Arrays;
 
 /**
  * Handles SNES ROM interleaving for Game Doctor (GD3) format.
  * <p>
- * The Game Doctor copier requires HiROM games to be interleaved when split into 8Mbit chunks.
- * The interleaving algorithm swaps 32KB blocks within each 64KB segment.
+ * The image the Game Doctor receives is described by a {@link Gd3Layout}: the layout names the padded size,
+ * the pad strategy and the interleave scheme, and this class only moves bytes accordingly. Padding follows
+ * ucon64's per-size rules (zero fill, or mirrored halves for 3, 6 and 12 parts) so the SNES memory map stays
+ * valid where the console shadows addresses.
  * <p>
- * <b>Mirroring:</b>
- * If the ROM size is not aligned to 8Mbit, the data is extended using mirroring (replication)
- * rather than zero-filling. This ensures that the SNES memory map remains valid when the
- * console attempts to access addresses in the extended range (shadowing).
- * <p>
- * Logic ported from uCON64's {@code snes_int_blocks} and {@code snes_mirror} functions.
+ * Logic ported from uCON64's {@code snes_int_blocks} (snes.c 1429) and {@code snes_mirror} (snes.c 1447).
  */
 public class SnesInterleaver {
 
     private static final int BLOCK_64KB = 0x10000;
     private static final int BLOCK_32KB = 0x8000;
-    private static final int CHUNK_8MBIT = 0x100000; // 1MB
+    private static final int MAX_DEINTERLEAVE_BLOCKS = 512; // ucon64 snes_deinterleave block table: 512 x 32 KB = 16 MB
 
     /**
-     * Interleaves a ROM byte array according to GD3 HiROM specifications.
+     * Pads and interleaves a linear ROM into the Game Doctor image described by layout.
      * <p>
-     * Transformation:
-     * 1. Align data to 8Mbit boundary using mirroring (e.g., 12Mbit -> 16Mbit by repeating last 4Mbit).
-     * 2. For every 8Mbit chunk:
-     * The first 4Mbit (512KB) of destination receives the UPPER 32KB of each 64KB source block.
-     * The second 4Mbit (512KB) of destination receives the LOWER 32KB of each 64KB source block.
+     * Per scheme (ucon64 snes_convert_to_gd, snes.c 1818-1855):
+     * <ul>
+     *   <li>GLOBAL: one pass, lower 32 KB of every 64 KB block to the second half; with mirror padding the
+     *       last partial 4 Mbit of each half is repeated up to the next 1 Mbit boundary.</li>
+     *   <li>TWO_REGION_24: a 16 Mbit region then an 8 Mbit region, each interleaved on its own; mirror padding
+     *       fills 10 to 12 Mbit and 14 to 16 Mbit.</li>
+     *   <li>EXTENDED: the expansion past 32 Mbit goes first, the 32 Mbit base after it.</li>
+     *   <li>NONE: the input is returned untouched.</li>
+     * </ul>
      *
-     * @param input Raw linear ROM data
-     * @param type ROM memory map type (LoROM/HiROM/ExHiROM)
-     * @return Interleaved and mirrored data
+     * @param linear Raw linear ROM data
+     * @param layout layout computed by {@link Gd3Layout#of(SnesRom)} for this ROM
+     * @return image of {@code layout.paddedSize()} bytes
      */
-    public byte[] interleave(byte[] input, RomType type) {
-        // LoROM requires no interleaving (GD3 copier specification applies only to HiROM/ExHiROM per ucon64 snes.c:1148-1160)
-        if (type == RomType.LoROM) {
-            return input;
+    public byte[] interleave(byte[] linear, Gd3Layout layout) {
+        if (layout.interleave() == Gd3Interleave.NONE) {
+            return linear;
         }
 
-        // ExHiROM base ROM (32Mbit @banks C0-FF) and expansion (@banks 40-7D) require separate interleaving to preserve bank boundaries per ucon64 snes.c:1148-1160
-        if (type == RomType.ExHiROM) {
-            return splitInterleave(input);
-        }
-
-        // 1. Extend input to nearest 8Mbit boundary using mirroring (Hardware requirement)
-        byte[] source = mirrorTo8Mbit(input);
-        byte[] dest = new byte[source.length];
-
-        // Global interleaving: process all 64KB blocks in single pass
-        // GD3 copier expects symmetric block swap across entire ROM address space
-        int halfSize = source.length / 2;
-        int numBlocks = source.length / BLOCK_64KB;
-
-        for (int i = 0; i < numBlocks; i++) {
-            int srcBlockOffset = i * BLOCK_64KB;
-
-            // Mapping logic matches uCON64 snes_int_blocks global offset (n = size/2):
-            // Src[0..32k] (Lower) -> Dst[n + i*32k]
-            // Src[32k..64k] (Upper) -> Dst[i*32k]
-
-            int destLowerOffset = i * BLOCK_32KB;
-            int destUpperOffset = halfSize + (i * BLOCK_32KB);
-
-            // Copy Src Lower 32K to Dest Upper Half
-            System.arraycopy(source, srcBlockOffset, dest, destUpperOffset, BLOCK_32KB);
-
-            // Copy Src Upper 32K to Dest Lower Half
-            System.arraycopy(source, srcBlockOffset + BLOCK_32KB, dest, destLowerOffset, BLOCK_32KB);
-        }
-
-        return dest;
-    }
-
-    /**
-     * Split-interleaves ExHiROM data (base 32Mbit + expansion separately).
-     * <p>
-     * <b>Algorithm Strategy:</b>
-     * ExHiROM layout: First 32Mbit (base ROM) mapped to $C0-$FF banks.
-     * Remaining data (expansion) mapped to $40-$7D banks.
-     * Single-pass interleaving would corrupt bank boundaries; hardware requires
-     * separate interleaving per section to maintain bank integrity.
-     * <p>
-     * <b>Steps:</b>
-     * 1. Split input at 32Mbit boundary (base vs expansion)
-     * 2. Interleave base independently
-     * 3. Interleave expansion independently
-     * 4. Concatenate interleaved sections
-     * <p>
-     * <b>Invariants:</b>
-     * - Split boundary at exactly 32Mbit (4,194,304 bytes) per SNES memory map
-     * - Each section interleaved separately (no cross-section block mapping)
-     * - Output size equals input size (data preservation)
-     * <p>
-     * Ported from ucon64 snes.c snes_int_blocks ExHiROM branch (lines 1148-1160).
-     */
-    private byte[] splitInterleave(byte[] input) {
-        // 32Mbit boundary separates base ROM (banks $C0-$FF) from expansion (banks $40-$7D)
-        // Bank boundary integrity required for ExHiROM hardware mapping
-        int splitBoundary = 32 * SnesConstants.MBIT; // 32Mbit = 4,194,304 bytes
-        byte[] base = new byte[Math.min(input.length, splitBoundary)];
-        System.arraycopy(input, 0, base, 0, base.length);
-
-        byte[] interleavedBase = interleaveBlock(base);
-
-        if (input.length <= splitBoundary) {
-            return interleavedBase;
-        }
-
-        byte[] expansion = new byte[input.length - splitBoundary];
-        System.arraycopy(input, splitBoundary, expansion, 0, expansion.length);
-        byte[] interleavedExpansion = interleaveBlock(expansion);
-
-        byte[] result = new byte[interleavedBase.length + interleavedExpansion.length];
-        System.arraycopy(interleavedBase, 0, result, 0, interleavedBase.length);
-        System.arraycopy(interleavedExpansion, 0, result, interleavedBase.length, interleavedExpansion.length);
-        return result;
-    }
-
-    /**
-     * Interleaves a single ROM block (base or expansion).
-     * Reusable for both single-block and split-interleave operations.
-     */
-    private byte[] interleaveBlock(byte[] input) {
-        byte[] source = mirrorTo8Mbit(input);
-        byte[] dest = new byte[source.length];
-
-        int halfSize = source.length / 2;
-        int numBlocks = source.length / BLOCK_64KB;
-
-        for (int i = 0; i < numBlocks; i++) {
-            int srcBlockOffset = i * BLOCK_64KB;
-            int destLowerOffset = i * BLOCK_32KB;
-            int destUpperOffset = halfSize + (i * BLOCK_32KB);
-
-            System.arraycopy(source, srcBlockOffset, dest, destUpperOffset, BLOCK_32KB);
-            System.arraycopy(source, srcBlockOffset + BLOCK_32KB, dest, destLowerOffset, BLOCK_32KB);
-        }
-
-        return dest;
-    }
-
-    /**
-     * Aligns data to the next 8Mbit boundary by mirroring the tail of the data.
-     * <p>
-     * Example: A 12Mbit ROM is extended to 16Mbit. The 4Mbit gap is filled by
-     * copying the *last* 4Mbit of the original data into the new space.
-     * This simulates hardware address mirroring.
-     */
-    private byte[] mirrorTo8Mbit(byte[] input) {
-        if (input.length % CHUNK_8MBIT == 0) {
-            return input;
-        }
-
-        int newSize = ((input.length / CHUNK_8MBIT) + 1) * CHUNK_8MBIT;
-        int gap = newSize - input.length;
+        int size = linear.length;
+        int newSize = layout.paddedSize();
+        // Zero fill beyond the source: both unmirrored padding and the holes mirroring later overwrites
+        byte[] source = Arrays.copyOf(linear, newSize);
         byte[] dest = new byte[newSize];
+        boolean mirror = layout.padStrategy() == PadStrategy.MIRROR_HALVES;
 
-        // Copy original data
-        System.arraycopy(input, 0, dest, 0, input.length);
+        switch (layout.interleave()) {
+            case GLOBAL -> interleaveGlobal(source, dest, size, mirror);
+            case TWO_REGION_24 -> interleaveTwoRegion(source, dest, size, mirror);
+            case EXTENDED -> interleaveExtended(source, dest, mirror);
+            default -> throw new IllegalArgumentException("Unsupported interleave scheme: " + layout.interleave());
+        }
+        return dest;
+    }
 
-        // Perform Mirroring: Copy the last 'gap' bytes of the input to the end
-        // If input is smaller than gap (e.g. 1 byte input, 1MB target), we repeat
-        // the available data until filled.
-        int bytesWritten = 0;
-        while (bytesWritten < gap) {
-            int sourceOffset = Math.max(0, input.length - (gap - bytesWritten));
-            int copyLength = Math.min(input.length, gap - bytesWritten);
+    // Whole-image pass; mirror padding repeats the tail of each half up to the next 1 Mbit boundary.
+    private static void interleaveGlobal(byte[] source, byte[] dest, int size, boolean mirror) {
+        int newSize = dest.length;
+        int half = newSize / 2;
+        intBlocks(source, 0, dest, half, 0, newSize / BLOCK_64KB);
+        if (mirror) {
+            int halfSize4Mbit = (size / 2) & ~(4 * SnesConstants.MBIT - 1);
+            int halfSize1Mbit = (size / 2 + SnesConstants.MBIT - 1) & ~(SnesConstants.MBIT - 1);
+            mirror(dest, halfSize4Mbit, halfSize1Mbit, half);
+            mirror(dest, half + halfSize4Mbit, half + halfSize1Mbit, newSize);
+        }
+    }
 
-            // If the gap is larger than the entire file, we mirror the whole file repeatedly
-            if (copyLength == 0 && input.length > 0) {
-                // Fallback for very small files being aligned up
-                sourceOffset = 0;
-                copyLength = input.length;
-            }
+    // The second region uses the unpadded size, as ucon64 does: padding blocks come from the mirror, not from the source
+    private static void interleaveTwoRegion(byte[] source, byte[] dest, int size, boolean mirror) {
+        int mbit = SnesConstants.MBIT;
+        intBlocks(source, 0, dest, 16 * mbit, 0, 16 * mbit / BLOCK_64KB);
+        intBlocks(source, 16 * mbit, dest, 12 * mbit, 8 * mbit, (size - 16 * mbit) / BLOCK_64KB);
+        if (mirror) {
+            mirror(dest, 8 * mbit, 10 * mbit, 12 * mbit);
+            mirror(dest, 12 * mbit, 14 * mbit, 16 * mbit);
+        }
+    }
 
-            System.arraycopy(input, sourceOffset, dest, input.length + bytesWritten, copyLength);
-            bytesWritten += copyLength;
+    // Expansion first (banks $40-$7D), 32 Mbit base after it (banks $C0-$FF): the order the Game Doctor expects
+    private static void interleaveExtended(byte[] source, byte[] dest, boolean mirror) {
+        int mbit = SnesConstants.MBIT;
+        int size2 = dest.length - 32 * mbit;
+        intBlocks(source, 0, dest, size2 + 16 * mbit, size2, 32 * mbit / BLOCK_64KB);
+        intBlocks(source, 32 * mbit, dest, size2 / 2, 0, size2 / BLOCK_64KB);
+        if (mirror) {
+            mirror(dest, 0, 4 * mbit, 8 * mbit);
+            mirror(dest, 8 * mbit, 12 * mbit, 16 * mbit);
+        }
+    }
+
+    /**
+     * Port of snes_int_blocks: the lower 32 KB of each 64 KB source block goes to the lower-offset stream, the
+     * upper 32 KB to the upper-offset stream.
+     */
+    private static void intBlocks(byte[] source, int sourceOffset, byte[] dest, int lowerOffset, int upperOffset,
+                                  int blocks) {
+        for (int i = 0; i < blocks; i++) {
+            System.arraycopy(source, sourceOffset, dest, lowerOffset, BLOCK_32KB);
+            System.arraycopy(source, sourceOffset + BLOCK_32KB, dest, upperOffset, BLOCK_32KB);
+            sourceOffset += BLOCK_64KB;
+            lowerOffset += BLOCK_32KB;
+            upperOffset += BLOCK_32KB;
+        }
+    }
+
+    /**
+     * Port of snes_mirror: repeats dest[start, dataEnd) until dest reaches mirrorEnd.
+     */
+    private static void mirror(byte[] dest, int start, int dataEnd, int mirrorEnd) {
+        int dataSize = dataEnd - start;
+        int totalSize = mirrorEnd - start;
+        if (dataSize <= 0 || dataSize >= totalSize) {
+            return;
+        }
+        int repeats = totalSize / dataSize - 1;
+        int surplus = totalSize % dataSize;
+        while (repeats-- > 0) {
+            System.arraycopy(dest, start, dest, dataEnd, dataSize);
+            dataEnd += dataSize;
+        }
+        if (surplus > 0) {
+            System.arraycopy(dest, start, dest, dataEnd, mirrorEnd - dataEnd);
+        }
+    }
+
+    /**
+     * Restores linear ROM order from a Game Doctor interleaved image. Literal port of ucon64
+     * {@code snes_deinterleave} (snes.c 3859): the scheme selects a table that maps each 32 KB output block to
+     * the interleaved block it came from. An image over 16 MB (more than 512 blocks of 32 KB) is returned as is,
+     * the same limit ucon64's fixed block table imposes.
+     *
+     * @param interleaved image in interleaved order
+     * @param scheme      how it was interleaved; {@link Gd3Interleave#NONE} returns the input
+     * @return linear image of the same length
+     */
+    public byte[] deinterleave(byte[] interleaved, Gd3Interleave scheme) {
+        int nblocks = interleaved.length >>> 16;
+        if (scheme == Gd3Interleave.NONE || nblocks * 2 > MAX_DEINTERLEAVE_BLOCKS) {
+            return interleaved;
         }
 
-        return dest;
+        int[] blocks = new int[nblocks * 2];
+        switch (scheme) {
+            case GLOBAL -> fillGlobalBlocks(blocks, nblocks);
+            case TWO_REGION_24 -> fillTwoRegionBlocks(blocks, nblocks);
+            case EXTENDED -> fillExtendedBlocks(blocks, interleaved.length);
+            default -> throw new IllegalArgumentException("Unsupported interleave scheme: " + scheme);
+        }
+
+        byte[] linear = interleaved.clone();
+        for (int i = 0; i < blocks.length; i++) {
+            int source = blocks[i] * BLOCK_32KB;
+            if (source + BLOCK_32KB > interleaved.length) {
+                throw new IllegalArgumentException(
+                        scheme + " table points past the end of a " + interleaved.length + "-byte image");
+            }
+            System.arraycopy(interleaved, source, linear, i * BLOCK_32KB, BLOCK_32KB);
+        }
+        return linear;
+    }
+
+    private static void fillGlobalBlocks(int[] blocks, int nblocks) {
+        for (int i = 0; i < nblocks; i++) {
+            blocks[i * 2] = i + nblocks;
+            blocks[i * 2 + 1] = i;
+        }
+    }
+
+    private static void fillTwoRegionBlocks(int[] blocks, int nblocks) {
+        int firstRegionBlocks = (16 * SnesConstants.MBIT) >> 16;
+        int blocksPerMbit = SnesConstants.MBIT >> 15;
+        for (int i = 0; i < nblocks; i++) {
+            blocks[i * 2] = i + (i < firstRegionBlocks ? 16 : 4) * blocksPerMbit;
+            blocks[i * 2 + 1] = i;
+        }
+    }
+
+    private static void fillExtendedBlocks(int[] blocks, int length) {
+        int size2 = length - 32 * SnesConstants.MBIT;
+        int baseBlocks = (32 * SnesConstants.MBIT) >> 16;
+        int i = 0;
+        for (; i < baseBlocks; i++) {
+            blocks[i * 2] = i + baseBlocks + (size2 >> 15);
+            blocks[i * 2 + 1] = i + (size2 >> 15);
+        }
+        int expansionBlocks = size2 >> 16;
+        for (; i < expansionBlocks + baseBlocks; i++) {
+            blocks[i * 2] = i + expansionBlocks - baseBlocks;
+            blocks[i * 2 + 1] = i - baseBlocks;
+        }
     }
 }

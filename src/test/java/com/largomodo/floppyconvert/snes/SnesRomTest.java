@@ -52,10 +52,47 @@ class SnesRomTest {
     }
 
     @Test
-    void testIsHiRomReturnsTrueForExHiROM() {
+    void testExtendedHiRomIsHiRomWithExtendedHeader() {
         byte[] data = new byte[1024];
-        SnesRom rom = new SnesRom(data, RomType.ExHiROM, 0, "TITLE", false, (byte) 0, (byte) 0, (byte) 0, 0x0001, 0xFFFE);
+        SnesRom rom = new SnesRom(data, RomType.HiROM, 0, "TITLE", false, 0, 0, 0, 0x0001, 0xFFFE,
+                SnesRom.EXTENDED_BASE, false, false);
         assertTrue(rom.isHiRom());
+        assertTrue(rom.isExtended());
+        assertEquals(SnesRom.EXTENDED_BASE + 0xFFB0, rom.headerOffset());
+    }
+
+    @Test
+    void testExtendedLoRomHeaderOffset() {
+        byte[] data = new byte[1024];
+        SnesRom rom = new SnesRom(data, RomType.LoROM, 0, "TITLE", false, 0, 0, 0, 0x0001, 0xFFFE,
+                SnesRom.EXTENDED_BASE, false, false);
+        assertFalse(rom.isHiRom());
+        assertEquals(SnesRom.EXTENDED_BASE + 0x7FB0, rom.headerOffset());
+    }
+
+    @Test
+    void testInvalidHeaderBaseThrowsIllegalArgumentException() {
+        byte[] data = new byte[1024];
+        assertThrows(IllegalArgumentException.class, () ->
+                new SnesRom(data, RomType.HiROM, 0, "TITLE", false, 0, 0, 0, 0x0001, 0xFFFE, 0x1000, false, false));
+    }
+
+    @Test
+    void testHeaderBytesAreReadRelativeToTheHeaderOffset() {
+        byte[] data = new byte[0x10000];
+        data[0xFFB0 + 0x26] = 0x05;
+        SnesRom rom = new SnesRom(data, RomType.HiROM, 0, "TITLE", false, 0, 0, 0, 0x0001, 0xFFFE);
+        assertEquals(0x05, rom.headerByte(0x26));
+        assertThrows(IllegalStateException.class, () -> rom.headerBytes(0x60, 1));
+    }
+
+    @Test
+    void testEqualsDistinguishesHeaderBase() {
+        byte[] data = new byte[]{1, 2, 3};
+        SnesRom base = new SnesRom(data, RomType.HiROM, 0, "TITLE", false, 0, 0, 0, 0x0001, 0xFFFE);
+        SnesRom extended = new SnesRom(data, RomType.HiROM, 0, "TITLE", false, 0, 0, 0, 0x0001, 0xFFFE,
+                SnesRom.EXTENDED_BASE, false, false);
+        assertNotEquals(base, extended);
     }
 
     @Test

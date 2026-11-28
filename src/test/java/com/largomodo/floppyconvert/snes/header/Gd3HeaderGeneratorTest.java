@@ -294,9 +294,113 @@ class Gd3HeaderGeneratorTest {
         assertEquals((byte) 0x0C, header[0x2A], "HiROM SRAM mapping at 0x2A");
     }
 
+    private SnesRom loRomWithChipset(int chipset) {
+        byte[] rawData = new byte[1024 * 1024];
+        rawData[0x7FB0 + 0x26] = (byte) chipset;
+        return new SnesRom(rawData, RomType.LoROM, 0, "TEST TITLE", chipset == 0x14, 0, 0, 0, 0x0001, 0xFFFE);
+    }
+
+    private SnesRom loRom96(int sramSize, String id) {
+        byte[] data = new byte[96 * SnesConstants.MBIT];
+        System.arraycopy(id.getBytes(StandardCharsets.US_ASCII), 0, data, 0x7FB0, id.length());
+        return new SnesRom(data, RomType.LoROM, sramSize, "TEST 96", false, 0, 0, 0, 0x0001, 0xFFFE);
+    }
+
+    @Test
+    // A 96 Mbit LoROM fills 24 units, so its memory map is sequential from 0x20 and the LoROM SRAM bytes do not apply.
+    void loRom96MbitUsesSequentialMap() {
+        byte[] header = generator.generateHeader(loRom96(0, "XXXXX"), 8 * SnesConstants.MBIT, 0, false, (byte) 0x00);
+
+        for (int i = 0; i < 24; i++) {
+            assertEquals(0x20 + i, header[0x11 + i] & 0xFF, "map entry " + i);
+        }
+        assertEquals((byte) 0x80, header[0x10]);
+        assertNotEquals(0x40, header[0x24] & 0xFF, "LoROM SRAM bytes do not apply to the 96 Mbit class");
+    }
+
+    @Test
+    void starOcean96SetsItsSramBytes() {
+        byte[] header = generator.generateHeader(loRom96(8192, "B4ARF"), 8 * SnesConstants.MBIT, 0, false, (byte) 0x00);
+
+        assertEquals(0x81, header[0x10] & 0xFF);
+        assertEquals(0x00, header[0x24] & 0xFF, "map entry 19");
+        assertEquals(0x08, header[0x29] & 0xFF);
+    }
+
+    private static byte[] realHeader(String resource) throws java.io.IOException {
+        try (java.io.InputStream in = Gd3HeaderGeneratorTest.class.getResourceAsStream(resource)) {
+            org.junit.jupiter.api.Assumptions.assumeTrue(in != null, "real fixture absent: " + resource);
+            return in.readNBytes(512);
+        }
+    }
+
+    @Test
+    void headerForTheStarOceanSfcEqualsTheHardwareVerifiedGd3Header(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir)
+            throws java.io.IOException {
+        byte[] expected = realHeader("/snes/SF96soe");
+        try (java.io.InputStream in = Gd3HeaderGeneratorTest.class.getResourceAsStream(
+                "/snes/Star Ocean (J) T+Eng, SDD1 Patched v1 DeJap, SDD1 v1 Neviksti.sfc")) {
+            org.junit.jupiter.api.Assumptions.assumeTrue(in != null, "Star Ocean .sfc absent");
+            java.nio.file.Path sfc = tempDir.resolve("star-ocean.sfc");
+            java.nio.file.Files.copy(in, sfc);
+            SnesRom rom = new com.largomodo.floppyconvert.snes.SnesRomReader()
+                    .load(sfc, com.largomodo.floppyconvert.format.CopierFormat.GD3);
+
+            assertArrayEquals(expected, generator.generateHeader(rom, 8 * SnesConstants.MBIT, 0, false, (byte) 0x40));
+        }
+    }
+
+    @Test
+    // The DSP bytes follow the raw chipset byte, so SuperFX gets none and the Seta DSP (0xF6) does.
+    void superFxLoRomGetsNoDspBytes() {
+        byte[] header = generator.generateHeader(loRomWithChipset(0x14), 1024 * 1024, 0, false, (byte) 0x00);
+
+        assertNotEquals((byte) 0x60, header[0x14]);
+        assertNotEquals((byte) 0x60, header[0x1C]);
+    }
+
+    @Test
+    void setaDspLoRomGetsDspBytes() {
+        byte[] header = generator.generateHeader(loRomWithChipset(0xF6), 1024 * 1024, 0, false, (byte) 0x00);
+
+        assertEquals((byte) 0x60, header[0x14]);
+        assertEquals((byte) 0x60, header[0x1C]);
+    }
+
+    @Test
+    void twentyMbitHiRomUsesThe24MbitMap() {
+        SnesRom rom = createTestRom(RomType.HiROM, 20 * SnesConstants.MBIT, 0, false);
+
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
+
+        byte[] expectedMap = new byte[]{
+                0x20, 0x21, 0x22, 0x00, 0x20, 0x21, 0x22, 0x00,
+                0x20, 0x21, 0x22, 0x00, 0x20, 0x21, 0x22, 0x00,
+                0x24, 0x25, 0x23, 0x00, 0x24, 0x25, 0x23, 0x00
+        };
+        assertArrayEquals(expectedMap, Arrays.copyOfRange(header, 0x11, 0x11 + expectedMap.length),
+                "A 20 Mbit HiROM is padded to 24 Mbit and selects MAP_HI_24MB");
+    }
+
+    @Test
+    void extendedHiRom48MbitUsesMap48() {
+        SnesRom rom = new SnesRom(new byte[48 * SnesConstants.MBIT], RomType.HiROM, 0, "TEST TITLE", false,
+                0, 0, 0, 0x0001, 0xFFFE, SnesRom.EXTENDED_BASE, false, false);
+
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
+
+        byte[] expectedMap = new byte[]{
+                0x20, 0x21, 0x20, 0x21, 0x20, 0x21, 0x20, 0x21,
+                0x24, 0x25, 0x26, 0x27, 0x24, 0x25, 0x26, 0x27,
+                0x22, 0x23, 0x22, 0x23, 0x28, 0x29, 0x2A, 0x2B
+        };
+        assertArrayEquals(expectedMap, Arrays.copyOfRange(header, 0x11, 0x11 + expectedMap.length),
+                "Extended HiROM 48 Mbit should use MAP_HI_48MB");
+    }
+
     @Provide
     Arbitrary<RomType> romTypes() {
-        return Arbitraries.of(RomType.LoROM, RomType.HiROM, RomType.ExHiROM);
+        return Arbitraries.of(RomType.LoROM, RomType.HiROM);
     }
 
     @Provide
@@ -306,7 +410,8 @@ class Gd3HeaderGeneratorTest {
 
     @Provide
     Arbitrary<Integer> megabytes() {
-        return Arbitraries.integers().between(1, 8);
+        // 4 MB = 32 Mbit: the largest size both HiROM and LoROM convert without an extended header
+        return Arbitraries.integers().between(1, 4);
     }
 
     @Provide
@@ -321,6 +426,10 @@ class Gd3HeaderGeneratorTest {
 
     private SnesRom createTestRom(RomType type, int size, int sramSize, boolean hasDsp) {
         byte[] rawData = new byte[size];
+        if (hasDsp) {
+            // The generator reads the raw chipset byte (internal header offset 0x26), not hasDsp()
+            rawData[(type == RomType.HiROM ? 0xFFB0 : 0x7FB0) + 0x26] = 0x03;
+        }
         return new SnesRom(
                 rawData,
                 type,
@@ -335,37 +444,62 @@ class Gd3HeaderGeneratorTest {
         );
     }
 
+    private SnesRom extendedRom(int sizeMbit, int sramSize, int maker, String id) {
+        byte[] data = new byte[sizeMbit * SnesConstants.MBIT];
+        byte[] idBytes = id.getBytes(StandardCharsets.US_ASCII);
+        System.arraycopy(idBytes, 0, data, SnesRom.EXTENDED_BASE + 0xFFB0, idBytes.length);
+        return new SnesRom(data, RomType.HiROM, sramSize, "EXTENDED TITLE", false, 0, maker, 0, 0x0001, 0xFFFE,
+                SnesRom.EXTENDED_BASE, false, false);
+    }
+
     @Test
-    void testTalesOfPhantasiaHeaderOverrides() {
-        SnesRom genericRom = new SnesRom(
-                new byte[8 * SnesConstants.MBIT],
-                RomType.HiROM,
-                64 * 1024,
-                "GENERIC GAME TITLE",
-                false,
-                (byte) 0x00,
-                (byte) 0x01,
-                (byte) 0x00,
-                0x0000,
-                0xFFFF
-        );
-        byte[] genericHeader = generator.generateHeader(genericRom, 8 * SnesConstants.MBIT, 0, true, (byte) 0x00);
-        assertNotEquals(0x40, genericHeader[0x17] & 0xFF);
+    // The special SRAM bytes apply only when the extended header, maker and ID bytes all match.
+    void talesOfPhantasiaSramBytesNeedExtendedHeaderMakerAndId() {
+        byte[] header = generator.generateHeader(extendedRom(48, 8192, 0x33, "AFATV"), 1024 * 1024, 0, false, (byte) 0x00);
 
-        SnesRom rom = new SnesRom(
-                new byte[8 * SnesConstants.MBIT],
-                RomType.HiROM,
-                64 * 1024,
-                "TALES OF PHANTASIA",
-                false,
-                (byte) 0x00,
-                (byte) 0x36,
-                (byte) 0x00,
-                0x0000,
-                0xFFFF
-        );
-
-        byte[] header = generator.generateHeader(rom, 8 * SnesConstants.MBIT, 0, true, (byte) 0x00);
         assertEquals(0x40, header[0x17] & 0xFF);
+        assertEquals(0x40, header[0x18] & 0xFF);
+        assertEquals(0x40, header[0x23] & 0xFF);
+        assertEquals(0x40, header[0x24] & 0xFF);
+        assertEquals(0x00, header[0x29] & 0xFF);
+        assertEquals(0x0F, header[0x2A] & 0xFF);
+    }
+
+    @Test
+    void daiKaijuMonogatari2SetsOnlyTheSramMap() {
+        byte[] header = generator.generateHeader(extendedRom(40, 8192, 0x33, "18AE6"), 1024 * 1024, 0, false, (byte) 0x00);
+
+        assertNotEquals(0x40, header[0x17] & 0xFF);
+        assertEquals(0x00, header[0x29] & 0xFF);
+        assertEquals(0x0F, header[0x2A] & 0xFF);
+    }
+
+    @Test
+    void trialsOfManaGetsTheOrdinaryHiRomSramBytes() {
+        byte[] header = generator.generateHeader(extendedRom(48, 8192, 0x33, "AFZJ6"), 1024 * 1024, 0, false, (byte) 0x00);
+
+        assertEquals(0x0C, header[0x29] & 0xFF);
+        assertEquals(0x0C, header[0x2A] & 0xFF);
+        assertNotEquals(0x40, header[0x17] & 0xFF);
+    }
+
+    @Test
+    void talesOfPhantasiaIdWithoutExtendedHeaderGetsTheOrdinaryBytes() {
+        byte[] data = new byte[8 * SnesConstants.MBIT];
+        System.arraycopy("AFATV".getBytes(StandardCharsets.US_ASCII), 0, data, 0xFFB0, 5);
+        SnesRom rom = new SnesRom(data, RomType.HiROM, 8192, "TITLE", false, 0, 0x33, 0, 0x0001, 0xFFFE);
+
+        byte[] header = generator.generateHeader(rom, 1024 * 1024, 0, false, (byte) 0x00);
+
+        assertEquals(0x0C, header[0x29] & 0xFF);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"40,0x22", "48,0x24", "64,0x28"})
+    void extendedMapsAreSelectedBySize(int sizeMbit, String markerHex) {
+        byte[] header = generator.generateHeader(extendedRom(sizeMbit, 0, 0x00, "XXXXX"), 1024 * 1024, 0, false, (byte) 0x00);
+
+        // 9th map byte (offset 0x11 + 8) differs between MAP_HI_40MB (0x22), MAP_HI_48MB (0x24) and MAP_HI_64MB (0x28)
+        assertEquals(Integer.decode(markerHex), header[0x11 + 8] & 0xFF);
     }
 }

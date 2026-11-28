@@ -1,19 +1,38 @@
 package com.largomodo.floppyconvert.snes;
 
 import com.largomodo.floppyconvert.format.CopierFormat;
+import com.largomodo.floppyconvert.snes.UnsupportedHardwareException.Reason;
+
+import java.util.Locale;
 
 /**
  * Hardware validator for Game Doctor (GD3/SF3/SF7) backup unit format.
  * <p>
- * GD3 hardware constraints from ucon64 snes.c:
- * - Standard HiROM maximum: 32Mbit (memory map tables extend only to 32Mbit)
- * - ExHiROM allowed: Up to 64Mbit (extended memory maps present in Gd3HeaderGenerator)
- * - LoROM maximum: 32Mbit (ucon64 snes.c:1863 "ERROR: LoROM > 32 Mbit -- cannot convert")
+ * Rules in order (ref: DL-010):
+ * <ol>
+ *   <li>Gd3Layout.of rejects what ucon64 snes_convert_to_gd rejects, with ucon64's wording (SIZE).</li>
+ *   <li>At most 16 parts of 4 Mbit (ucon64 GD3_MAX_UNITS, gd.h:32) except the 96 Mbit LoROM class (SIZE).</li>
+ *   <li>The 96 Mbit LoROM class carries no SRAM, or is the named Star Ocean case (SIZE): any other SRAM map
+ *       would be unverified.</li>
+ *   <li>The padded image fits the configured DRAM (HARDWARE): a larger configuration would convert it.</li>
+ * </ol>
  */
 public class Gd3HardwareValidator implements HardwareValidator {
 
-    private static final int MAX_STANDARD_SIZE = 32 * SnesConstants.MBIT;
-    private static final int MAX_EXHIROM_SIZE = 64 * SnesConstants.MBIT;
+    // ucon64 GD3_MAX_UNITS: the most 4 Mbit parts a Game Doctor holds.
+    private static final int GD3_MAX_UNITS = 16;
+    // Game Doctor DRAM sizes in ascending order, used to name the smallest option that fits.
+    private static final int[] DRAM_SIZES_MBIT = {32, 64, 128};
+
+    private final Gd3Memory memory;
+
+    public Gd3HardwareValidator() {
+        this(Gd3Memory.DEFAULT);
+    }
+
+    public Gd3HardwareValidator(Gd3Memory memory) {
+        this.memory = memory;
+    }
 
     @Override
     public void validate(SnesRom rom, CopierFormat format) throws UnsupportedHardwareException {
@@ -21,22 +40,32 @@ public class Gd3HardwareValidator implements HardwareValidator {
             return;
         }
 
-        int sizeMbit = rom.rawData().length / SnesConstants.MBIT;
+        Gd3Layout layout = Gd3Layout.of(rom);
+        boolean loRom96 = layout.isLoRom96();
 
-        if (rom.type() == RomType.ExHiROM) {
-            if (rom.rawData().length > MAX_EXHIROM_SIZE) {
-                throw new UnsupportedHardwareException(
-                        String.format("GD3 hardware does not support ExHiROM > 64Mbit: ROM is %d Mbit", sizeMbit)
-                );
+        if (!loRom96 && layout.totalParts4Mbit() > GD3_MAX_UNITS) {
+            throw new UnsupportedHardwareException(Reason.SIZE, String.format(Locale.ROOT,
+                    "ROM needs %d parts of 4 Mbit; GD3 hardware supports at most %d",
+                    layout.totalParts4Mbit(), GD3_MAX_UNITS));
+        }
+        if (loRom96 && rom.sramSize() > 0 && !SpecialCaseRegistry.isStarOcean96(rom, layout)) {
+            throw new UnsupportedHardwareException(Reason.SIZE,
+                    "96 Mbit LoROM with SRAM is only converted for Star Ocean: no verified SRAM map for this ROM");
+        }
+        if (layout.paddedSize() > memory.dramBytes()) {
+            int neededMbit = layout.paddedSize() / SnesConstants.MBIT;
+            throw new UnsupportedHardwareException(Reason.HARDWARE, String.format(Locale.ROOT,
+                    "ROM needs %d Mbit of Game Doctor DRAM but %d Mbit is configured; rerun with --gd3-dram %d",
+                    neededMbit, memory.dramMbit(), smallestDramFor(neededMbit)));
+        }
+    }
+
+    private static int smallestDramFor(int neededMbit) {
+        for (int dram : DRAM_SIZES_MBIT) {
+            if (dram >= neededMbit) {
+                return dram;
             }
-            return;
         }
-
-        if (rom.rawData().length > MAX_STANDARD_SIZE) {
-            String romTypeStr = rom.type() == RomType.ExHiROM ? "ExHiROM" : (rom.isHiRom() ? "HiROM" : "LoROM");
-            throw new UnsupportedHardwareException(
-                    String.format("GD3 hardware does not support %s > 32Mbit: ROM is %d Mbit", romTypeStr, sizeMbit)
-            );
-        }
+        return DRAM_SIZES_MBIT[DRAM_SIZES_MBIT.length - 1];
     }
 }

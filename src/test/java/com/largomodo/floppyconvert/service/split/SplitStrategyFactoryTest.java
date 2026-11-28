@@ -3,7 +3,6 @@ package com.largomodo.floppyconvert.service.split;
 
 import com.largomodo.floppyconvert.format.CopierFormat;
 import com.largomodo.floppyconvert.snes.RomType;
-import com.largomodo.floppyconvert.snes.SnesInterleaver;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -14,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 class SplitStrategyFactoryTest {
 
-    private final SplitStrategyFactory factory = new SplitStrategyFactory(new SnesInterleaver());
+    private final SplitStrategyFactory factory = new SplitStrategyFactory();
 
     @ParameterizedTest
     @MethodSource("strategyMatrix")
@@ -26,18 +25,15 @@ class SplitStrategyFactoryTest {
 
     static Stream<Arguments> strategyMatrix() {
         return Stream.of(
-                Arguments.of(CopierFormat.GD3, RomType.HiROM,   Gd3HiRomSplitStrategy.class),
-                Arguments.of(CopierFormat.GD3, RomType.ExHiROM, Gd3HiRomSplitStrategy.class),
-                Arguments.of(CopierFormat.GD3, RomType.LoROM,   StandardSplitStrategy.class),
+                // GD3 uses one strategy for both map types because padding and interleaving precede the split.
+                Arguments.of(CopierFormat.GD3, RomType.HiROM,   Gd3SplitStrategy.class),
+                Arguments.of(CopierFormat.GD3, RomType.LoROM,   Gd3SplitStrategy.class),
                 Arguments.of(CopierFormat.UFO, RomType.HiROM,   UfoHiRomSplitStrategy.class),
-                Arguments.of(CopierFormat.UFO, RomType.ExHiROM, UfoHiRomSplitStrategy.class),
                 Arguments.of(CopierFormat.UFO, RomType.LoROM,   StandardSplitStrategy.class),
                 Arguments.of(CopierFormat.FIG, RomType.LoROM,   StandardSplitStrategy.class),
                 Arguments.of(CopierFormat.FIG, RomType.HiROM,   StandardSplitStrategy.class),
-                Arguments.of(CopierFormat.FIG, RomType.ExHiROM, StandardSplitStrategy.class),
                 Arguments.of(CopierFormat.SWC, RomType.LoROM,   StandardSplitStrategy.class),
-                Arguments.of(CopierFormat.SWC, RomType.HiROM,   StandardSplitStrategy.class),
-                Arguments.of(CopierFormat.SWC, RomType.ExHiROM, StandardSplitStrategy.class)
+                Arguments.of(CopierFormat.SWC, RomType.HiROM,   StandardSplitStrategy.class)
         );
     }
 }

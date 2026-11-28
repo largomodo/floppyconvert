@@ -1,11 +1,15 @@
 package com.largomodo.floppyconvert;
 
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import com.largomodo.floppyconvert.core.BatchRunner;
 import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory;
 import com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory.DspChipset;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -145,6 +149,34 @@ class FloppyConvertRecursionTest {
             long directChildCount = stream.filter(Files::isDirectory).count();
             assertEquals(1, directChildCount, "Output root should have exactly one direct child directory");
         }
+    }
+
+    @Test
+    // The token sits between path and message so failures.log can be filtered with a plain grep.
+    void testBatchFailureLineCarriesCategoryToken(@TempDir Path tempDir) throws Exception {
+        Path inputRoot = tempDir.resolve("input");
+        Files.createDirectories(inputRoot);
+        // 33 Mbit LoROM: ucon64 refuses it, so GD3 fails with SIZE
+        Path tooBig = SyntheticRomFactory.generateLoRom(33, 0, DspChipset.ABSENT, "TOOBIG33L", inputRoot);
+
+        ch.qos.logback.classic.Logger batchLogger =
+                (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(BatchRunner.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        batchLogger.addAppender(appender);
+        int exitCode;
+        try {
+            exitCode = new CommandLine(new FloppyConvert())
+                    .setCaseInsensitiveEnumValuesAllowed(true)
+                    .execute(inputRoot.toString(), "--output-dir", tempDir.resolve("output").toString(), "--format", "gd3");
+        } finally {
+            batchLogger.detachAppender(appender);
+        }
+
+        assertEquals(1, exitCode, "A failed ROM makes the batch exit with 1");
+        String expectedPrefix = "FAILED: " + inputRoot.relativize(tooBig) + " - SIZE - ";
+        assertTrue(appender.list.stream().anyMatch(event -> event.getFormattedMessage().startsWith(expectedPrefix)),
+                "failures.log line must carry the SIZE token between path and message: " + appender.list);
     }
 
     @Test

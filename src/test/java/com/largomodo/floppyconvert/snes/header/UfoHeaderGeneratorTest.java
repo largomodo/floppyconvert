@@ -190,10 +190,22 @@ class UfoHeaderGeneratorTest {
         assertEquals(8, sizeMbit, "8 Mbit ROM (1MB) should have size code 8");
     }
 
+    @Property
+    void extendedHiRomHeaderEqualsPlainHiRomHeader(@ForAll("hiRomRom") SnesRom plain) {
+        SnesRom extended = new SnesRom(plain.rawData(), RomType.HiROM, plain.sramSize(), plain.title(), plain.hasDsp(),
+                plain.region(), plain.maker(), plain.version(), plain.checksum(), plain.complement(),
+                SnesRom.EXTENDED_BASE, false, false);
+
+        assertArrayEquals(
+                generator.generateHeader(plain, 512 * 1024, 0, true, (byte) 0x00),
+                generator.generateHeader(extended, 512 * 1024, 0, true, (byte) 0x00),
+                "Extended HiROM must produce the same UFO header as HiROM");
+    }
+
     @Provide
     Arbitrary<SnesRom> snesRom() {
         return Combinators.combine(
-                Arbitraries.of(RomType.LoROM, RomType.HiROM, RomType.ExHiROM),
+                Arbitraries.of(RomType.LoROM, RomType.HiROM),
                 romSize(),
                 sramSize(),
                 hasDsp()
@@ -203,7 +215,7 @@ class UfoHeaderGeneratorTest {
     @Provide
     Arbitrary<SnesRom> hiRomRom() {
         return Combinators.combine(
-                Arbitraries.of(RomType.HiROM, RomType.ExHiROM),
+                Arbitraries.just(RomType.HiROM),
                 romSize(),
                 sramSize(),
                 hasDsp()
@@ -273,7 +285,7 @@ class UfoHeaderGeneratorTest {
     @Provide
     Arbitrary<SnesRom> hiRomWithSram() {
         return Combinators.combine(
-                Arbitraries.of(RomType.HiROM, RomType.ExHiROM),
+                Arbitraries.just(RomType.HiROM),
                 romSize(),
                 Arbitraries.integers().between(16384, 262144),
                 hasDsp()

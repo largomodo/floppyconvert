@@ -42,6 +42,20 @@ class CopierFormatTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"SF4SUP.078", "SF12ACTA.078", "SF8ABC_XA.078", "SF96SOEL.078", "sf4.078", "SF16CHRB.078"})
+    // Split output is collected by name, so the filter must accept every shape ucon64 writes, including the
+    // unlettered single-part form.
+    void gd3SplitPartFilter_acceptsUcon64PartNames(String name) {
+        assertTrue(CopierFormat.GD3.getSplitPartFilter().test(new java.io.File(name)), name);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"foo.078", "SF.078", "SF4SUP.079", "SF4TOOLONGNAME.078", "game.sfc"})
+    void gd3SplitPartFilter_rejectsOtherFiles(String name) {
+        assertFalse(CopierFormat.GD3.getSplitPartFilter().test(new java.io.File(name)), name);
+    }
+
+    @ParameterizedTest
     @CsvSource({".Swc,SWC", "Ufo,UFO", ".FiG,FIG"})
     void fromFileExtension_mixedCase_caseInsensitive(String extension, String expectedFormat) {
         Optional<CopierFormat> result = CopierFormat.fromFileExtension(extension);

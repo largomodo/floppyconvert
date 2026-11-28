@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 
 /**
  * Factory for generating synthetic SNES ROM files for E2E testing.
@@ -22,11 +21,16 @@ public class SyntheticRomFactory {
     private static final int LOROM_HEADER_OFFSET = 0x7FB0;
     private static final int HIROM_HEADER_OFFSET = 0xFFB0;
     private static final int EXHIROM_HEADER_OFFSET = 0x40FFB0;
+    private static final int EXLOROM_HEADER_OFFSET = 0x407FB0;
     private static final byte MAP_TYPE_LOROM = 0x20;
     private static final byte MAP_TYPE_LOROM_DSP = 0x23;
     private static final byte MAP_TYPE_HIROM = 0x21;
     private static final byte MAP_TYPE_HIROM_DSP = 0x25;
     private static final byte MAP_TYPE_EXHIROM = 0x25;
+    private static final int FILL_BLOCK_BYTES = 0x8000;
+    private static final long LCG_MULTIPLIER = 6364136223846793005L;
+    private static final long LCG_INCREMENT = 1442695040888963407L;
+    private static final long SEED_BLOCK_MIX = 0x9E3779B97F4A7C15L;
 
     /**
      * Generates a LoROM file with specified parameters.
@@ -91,6 +95,23 @@ public class SyntheticRomFactory {
     }
 
     /**
+     * Generates a LoROM file whose internal header carries a raw chipset byte (offset 0x26).
+     * Needed for chipset values that {@link DspChipset} cannot express, such as 0xF6 (Seta DSP).
+     *
+     * @param sizeMbit    ROM size in megabits
+     * @param sramSizeKb  SRAM size in kilobytes (use SRAM_* constants)
+     * @param chipsetByte raw value written at internal header offset 0x26
+     * @param title       Custom 21-character ASCII title
+     * @param outputDir   directory to write the ROM file
+     * @return Path to the generated ROM file
+     * @throws IOException if file writing fails
+     */
+    public static Path generateLoRom(int sizeMbit, int sramSizeKb, int chipsetByte, String title, Path outputDir) throws IOException {
+        String filename = String.format("synthetic_lorom_%dmbit_%dkb_chip%02x.sfc", sizeMbit, sramSizeKb, chipsetByte);
+        return generateRom(sizeMbit, sramSizeKb, MAP_TYPE_LOROM, (byte) chipsetByte, LOROM_HEADER_OFFSET, title, outputDir.resolve(filename));
+    }
+
+    /**
      * Generates a HiROM file with custom title.
      *
      * @param sizeMbit   ROM size in megabits (8, 12, 16, etc.)
@@ -111,10 +132,11 @@ public class SyntheticRomFactory {
     }
 
     /**
-     * Generates an ExHiROM file with custom title.
-     * ExHiROM header at 0x40FFB0, map mode 0x25 per SNES dev docs (same as HiROM+DSP; extended memory map differentiates at runtime).
+     * Generates an extended HiROM file with custom title.
+     * The header is written at 0xFFB0 and at 0x40FFB0, map mode 0x25 per SNES dev docs (same as HiROM+DSP;
+     * extended memory map differentiates at runtime).
      *
-     * @param sizeMbit   ROM size in megabits (48-64 typical range)
+     * @param sizeMbit   ROM size in megabits (40-64)
      * @param sramSizeKb SRAM size in kilobytes (use SRAM_* constants)
      * @param dsp        DSP chipset presence
      * @param title      Custom 21-character ASCII title
@@ -123,43 +145,99 @@ public class SyntheticRomFactory {
      * @throws IOException if file writing fails
      */
     public static Path generateExHiRom(int sizeMbit, int sramSizeKb, DspChipset dsp, String title, Path outputDir) throws IOException {
-        if (sizeMbit < 48 || sizeMbit > 64) {
-            throw new IllegalArgumentException("ExHiROM requires 48-64 Mbit (hardware constraint per Gd3HardwareValidator)");
+        if (sizeMbit < 40 || sizeMbit > 64) {
+            throw new IllegalArgumentException("extended HiROM requires 40-64 Mbit (hardware constraint per Gd3HardwareValidator)");
         }
         boolean hasDsp = (dsp == DspChipset.PRESENT);
         byte mapType = MAP_TYPE_EXHIROM;
         byte romType = hasDsp ? (byte) 0x03 : (byte) 0x00;
         String filename = String.format("synthetic_exhirom_%dmbit_%dkb%s.sfc",
                 sizeMbit, sramSizeKb, hasDsp ? "_dsp" : "");
-        return generateRom(sizeMbit, sramSizeKb, mapType, romType, EXHIROM_HEADER_OFFSET, title, outputDir.resolve(filename));
+        return generateRom(sizeMbit, sramSizeKb, mapType, romType,
+                new int[]{HIROM_HEADER_OFFSET, EXHIROM_HEADER_OFFSET}, title, outputDir.resolve(filename));
+    }
+
+    /**
+     * Generates an extended LoROM file with custom title (header at 0x7FB0 and at 0x407FB0).
+     *
+     * @param sizeMbit   ROM size in megabits (40-64)
+     * @param sramSizeKb SRAM size in kilobytes (use SRAM_* constants)
+     * @param dsp        DSP chipset presence
+     * @param title      Custom 21-character ASCII title
+     * @param outputDir  directory to write the ROM file
+     * @return Path to the generated ROM file
+     * @throws IOException if file writing fails
+     */
+    public static Path generateExLoRom(int sizeMbit, int sramSizeKb, DspChipset dsp, String title, Path outputDir) throws IOException {
+        if (sizeMbit < 40 || sizeMbit > 64) {
+            throw new IllegalArgumentException("Extended LoROM requires 40-64 Mbit (hardware constraint per Gd3HardwareValidator)");
+        }
+        boolean hasDsp = (dsp == DspChipset.PRESENT);
+        byte mapType = hasDsp ? MAP_TYPE_LOROM_DSP : MAP_TYPE_LOROM;
+        byte romType = hasDsp ? (byte) 0x03 : (byte) 0x00;
+        String filename = String.format("synthetic_exlorom_%dmbit_%dkb%s.sfc",
+                sizeMbit, sramSizeKb, hasDsp ? "_dsp" : "");
+        return generateRom(sizeMbit, sramSizeKb, mapType, romType,
+                new int[]{LOROM_HEADER_OFFSET, EXLOROM_HEADER_OFFSET}, title, outputDir.resolve(filename));
     }
 
     private static Path generateRom(int sizeMbit, int sramSizeKb, byte mapType, byte romType,
                                     int headerOffset, String title, Path outputPath) throws IOException {
+        return generateRom(sizeMbit, sramSizeKb, mapType, romType, new int[]{headerOffset}, title, outputPath);
+    }
+
+    // Extended ROMs carry the same header at several offsets, as real carts do: the base-0 copy is what a
+    // legacy reader scores, the 0x400000-based copy is what the extended probe finds. The fill is seeded
+    // with the last offset so a single-header ROM and its two-header sibling share every body byte. (ref: DL-024)
+    private static Path generateRom(int sizeMbit, int sramSizeKb, byte mapType, byte romType,
+                                    int[] headerOffsets, String title, Path outputPath) throws IOException {
         int sizeBytes = sizeMbit * 1024 * 1024 / 8;
         byte[] data = new byte[sizeBytes];
-        Arrays.fill(data, (byte) 0xFF);
+        fillBody(data, sizeMbit, headerOffsets[headerOffsets.length - 1]);
 
-        writeString(data, headerOffset + 0x10, title, 21);
+        for (int headerOffset : headerOffsets) {
+            writeString(data, headerOffset + 0x10, title, 21);
 
-        data[headerOffset + 0x25] = mapType;
-        data[headerOffset + 0x26] = romType;
-        data[headerOffset + 0x27] = calculateRomSizeByte(sizeMbit);
-        data[headerOffset + 0x28] = calculateSramSizeByte(sramSizeKb);
-        data[headerOffset + 0x29] = 0x01;
-        data[headerOffset + 0x2A] = 0x01;
-        data[headerOffset + 0x2B] = 0x00;
+            data[headerOffset + 0x25] = mapType;
+            data[headerOffset + 0x26] = romType;
+            data[headerOffset + 0x27] = calculateRomSizeByte(sizeMbit);
+            data[headerOffset + 0x28] = calculateSramSizeByte(sramSizeKb);
+            data[headerOffset + 0x29] = 0x01;
+            data[headerOffset + 0x2A] = 0x01;
+            data[headerOffset + 0x2B] = 0x00;
+        }
 
         int checksum = calculateChecksum(data);
         int complement = checksum ^ 0xFFFF;
-        writeWord(data, headerOffset + 0x2C, complement);
-        writeWord(data, headerOffset + 0x2E, checksum);
+        for (int headerOffset : headerOffsets) {
+            writeWord(data, headerOffset + 0x2C, complement);
+            writeWord(data, headerOffset + 0x2E, checksum);
 
-        data[headerOffset + 0x3C] = (byte) 0x00;
-        data[headerOffset + 0x3D] = (byte) 0x80;
+            data[headerOffset + 0x3C] = (byte) 0x00;
+            data[headerOffset + 0x3D] = (byte) 0x80;
+        }
 
         Files.write(outputPath, data);
         return outputPath;
+    }
+
+    // A repeating fill gives a 20 Mbit ROM only 2 distinct 32 KB blocks out of 80, so a wrong interleave
+    // or split order would still compare equal. One LCG stream per 32 KB block (the unit both interleave
+    // schemes move) makes every block unique; seeding with sizeMbit and headerOffset also keeps a LoROM and
+    // a HiROM fixture of the same size apart. Long arithmetic is bit-identical on every JVM and OS, which
+    // the committed digest tables rely on. (ref: DL-023)
+    private static void fillBody(byte[] data, int sizeMbit, int headerOffset) {
+        for (int start = 0, block = 0; start < data.length; start += FILL_BLOCK_BYTES, block++) {
+            long state = ((long) block * SEED_BLOCK_MIX) ^ ((long) sizeMbit << 32) ^ headerOffset;
+            int end = Math.min(start + FILL_BLOCK_BYTES, data.length);
+            for (int i = start; i < end; i += 4) {
+                state = state * LCG_MULTIPLIER + LCG_INCREMENT;
+                int word = (int) (state >>> 32);
+                for (int k = 0; k < 4 && i + k < end; k++) {
+                    data[i + k] = (byte) (word >>> (8 * k));
+                }
+            }
+        }
     }
 
     private static byte calculateRomSizeByte(int sizeMbit) {

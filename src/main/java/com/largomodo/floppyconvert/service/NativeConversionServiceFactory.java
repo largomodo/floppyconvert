@@ -4,6 +4,7 @@ import com.largomodo.floppyconvert.core.DiskTemplateFactory;
 import com.largomodo.floppyconvert.service.fat.Fat12FormatFactory;
 import com.largomodo.floppyconvert.service.fat.Fat12ImageWriter;
 import com.largomodo.floppyconvert.service.split.SplitStrategyFactory;
+import com.largomodo.floppyconvert.snes.Gd3Memory;
 import com.largomodo.floppyconvert.snes.SnesInterleaver;
 import com.largomodo.floppyconvert.snes.SnesRomReader;
 import com.largomodo.floppyconvert.snes.header.HeaderGeneratorFactory;
@@ -16,17 +17,30 @@ import com.largomodo.floppyconvert.snes.header.HeaderGeneratorFactory;
  */
 public class NativeConversionServiceFactory implements ConversionServiceFactory {
 
+    // Held here because the ConversionServiceFactory interface lives in core, which knows nothing of copier DRAM.
+    private final Gd3Memory gd3Memory;
+
+    public NativeConversionServiceFactory() {
+        this(Gd3Memory.DEFAULT);
+    }
+
+    /**
+     * @param gd3Memory DRAM of the Game Doctor the GD3 output targets. Held here, not in the
+     *                  ConversionServiceFactory interface, so core stays free of copier configuration. (ref: DL-014)
+     */
+    public NativeConversionServiceFactory(Gd3Memory gd3Memory) {
+        this.gd3Memory = gd3Memory;
+    }
+
     @Override
     public RomSplitter createRomSplitter() {
         SnesRomReader reader = new SnesRomReader();
         SnesInterleaver interleaver = new SnesInterleaver();
         HeaderGeneratorFactory headerFactory = new HeaderGeneratorFactory();
-        // SplitStrategyFactory takes interleaver so Gd3HiRomSplitStrategy can be wired
-        // at construction time (constructor injection, one allocation per factory).
-        // Dependency direction: service.split depends on snes (SnesInterleaver); core does not
-        // depend on service.split. Inversion would break the ConversionFacade abstraction. (ref: DL-005)
-        SplitStrategyFactory strategyFactory = new SplitStrategyFactory(interleaver);
-        return new NativeRomSplitter(reader, headerFactory, strategyFactory);
+        // The splitter owns GD3 padding and interleaving, so the interleaver goes to it and the strategy
+        // factory stays free of snes collaborators.
+        SplitStrategyFactory strategyFactory = new SplitStrategyFactory();
+        return new NativeRomSplitter(reader, headerFactory, strategyFactory, interleaver, gd3Memory);
     }
 
     @Override

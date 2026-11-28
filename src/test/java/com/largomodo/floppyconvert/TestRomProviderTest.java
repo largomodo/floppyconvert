@@ -1,6 +1,7 @@
 package com.largomodo.floppyconvert;
 
 import com.largomodo.floppyconvert.E2ETestRomRegistry.RomSpec;
+import com.largomodo.floppyconvert.format.CopierFormat;
 import com.largomodo.floppyconvert.snes.RomType;
 import com.largomodo.floppyconvert.snes.SnesRom;
 import com.largomodo.floppyconvert.snes.SnesRomReader;
@@ -43,7 +44,12 @@ class TestRomProviderTest {
         testRegistrySpec(E2ETestRomRegistry.STREET_FIGHTER_II, RomType.HiROM, 20, tempDir);
         testRegistrySpec(E2ETestRomRegistry.BREATH_OF_FIRE, RomType.LoROM, 12, tempDir);
         testRegistrySpec(E2ETestRomRegistry.ACTRAISER_2, RomType.HiROM, 12, tempDir);
-        testRegistrySpec(E2ETestRomRegistry.EXHIROM_48MBIT, RomType.ExHiROM, 48, tempDir);
+        testRegistrySpec(E2ETestRomRegistry.EXHIROM_48MBIT, RomType.HiROM, 48, tempDir);
+
+        SnesRom extended = reader.load(
+                TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.EXHIROM_48MBIT, Files.createDirectories(tempDir.resolve("extended-48"))),
+                CopierFormat.GD3);
+        assertEquals(SnesRom.EXTENDED_BASE, extended.headerBase(), "48 Mbit registry spec must carry the extended header");
     }
 
     @Test
@@ -85,13 +91,14 @@ class TestRomProviderTest {
         Path romPath = switch (spec.type()) {
             case LoROM -> SyntheticRomFactory.generateLoRom(
                     spec.sizeMbit(), spec.sramSizeKb(), spec.hasDsp(), spec.title(), syntheticDir);
-            case HiROM -> SyntheticRomFactory.generateHiRom(
-                    spec.sizeMbit(), spec.sramSizeKb(), spec.hasDsp(), spec.title(), syntheticDir);
-            case ExHiROM -> SyntheticRomFactory.generateExHiRom(
+            case HiROM -> spec.extended()
+                    ? SyntheticRomFactory.generateExHiRom(
+                    spec.sizeMbit(), spec.sramSizeKb(), spec.hasDsp(), spec.title(), syntheticDir)
+                    : SyntheticRomFactory.generateHiRom(
                     spec.sizeMbit(), spec.sramSizeKb(), spec.hasDsp(), spec.title(), syntheticDir);
         };
 
-        SnesRom rom = reader.load(romPath);
+        SnesRom rom = reader.load(romPath, CopierFormat.GD3);
         assertEquals(expectedType, rom.type(), "Generated ROM should have correct type");
         assertEquals(spec.title(), rom.title(), "Generated ROM should have correct title");
     }

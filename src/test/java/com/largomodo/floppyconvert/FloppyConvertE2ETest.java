@@ -78,7 +78,8 @@ class FloppyConvertE2ETest {
         NativeRomSplitter splitter = new NativeRomSplitter(
                 new SnesRomReader(),
                 new HeaderGeneratorFactory(),
-                new SplitStrategyFactory(interleaver)
+                new SplitStrategyFactory(),
+                interleaver
         );
         Fat12ImageWriter writer = new Fat12ImageWriter();
         DefaultConversionFacade facade = new DefaultConversionFacade(splitter, writer);
@@ -152,7 +153,7 @@ class FloppyConvertE2ETest {
         try (var stream = Files.list(outputDir)) {
             String formatPattern = switch (format) {
                 case UFO -> ".*\\.(\\d+)gm$";
-                case GD3 -> "SF\\d+[A-Z_]+\\.078$";
+                case GD3 -> "(?i)SF\\d{1,2}[^.]{0,6}\\.078$";
                 default -> ".*\\.\\d+$";
             };
 
@@ -610,7 +611,8 @@ class FloppyConvertE2ETest {
     }
 
     @Test
-    void testGd3_20MbitHiRom_NoForceSplit_E2E() throws Exception {
+    // A 20 Mbit HiROM is padded to 24 Mbit, so its part names carry 24.
+    void testGd3_20MbitHiRom_PadsTo24Mbit_E2E() throws Exception {
         Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.STREET_FIGHTER_II, tempDir);
 
         RomProcessor processor = createProcessor();
@@ -683,8 +685,8 @@ class FloppyConvertE2ETest {
     }
 
     @Test
-    void testGd3AcceptsExHiRom() throws Exception {
-        Path romFile = tempDir.resolve("exhirom.sfc");
+    void testGd3AcceptsExtendedHiRom() throws Exception {
+        Path romFile = tempDir.resolve("extended_hirom.sfc");
         byte[] romData = new byte[48 * SnesConstants.MBIT];
         int headerOffset = 0x40FFB0;
         romData[headerOffset + 0x15] = 0x25;
@@ -704,8 +706,8 @@ class FloppyConvertE2ETest {
     }
 
     @Test
-    void testGd3_48MbitExHiRom_E2E() throws Exception {
-        // Generate 48Mbit ExHiROM via TestRomProvider (synthetic-only, no real ROM)
+    void testGd3_48MbitExtendedHiRom_E2E() throws Exception {
+        // Generate 48Mbit extended HiROM (headers at 0xFFB0 and 0x40FFB0) via TestRomProvider (synthetic-only, no real ROM)
         Path romPath = TestRomProvider.getRomOrSynthetic(E2ETestRomRegistry.EXHIROM_48MBIT, tempDir);
 
         RomProcessor processor = createProcessor();
