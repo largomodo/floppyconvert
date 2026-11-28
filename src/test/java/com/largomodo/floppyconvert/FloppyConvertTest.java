@@ -14,6 +14,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -127,40 +128,21 @@ class FloppyConvertTest {
     }
 
     @Test
-    void testGd3DramDefaultsTo64() throws IOException {
-        Path testFile = tempDir.resolve("test.sfc");
-        Files.createFile(testFile);
-
-        FloppyConvert floppyConvert = new FloppyConvert();
-        new CommandLine(floppyConvert).parseArgs(testFile.toAbsolutePath().toString());
-
-        assertEquals(64, floppyConvert.gd3Dram);
-    }
-
-    @Test
-    void testGd3Dram128IsAccepted() throws Exception {
-        Path romSource = SyntheticRomFactory.generateLoRom(4, 0, DspChipset.ABSENT, "DRAM128", tempDir);
+    // The DRAM fitted to the user's Game Doctor is not asked for: a 96 Mbit game converts like any other.
+    void testGd3Converts96MbitLoRomWithoutExtraOptions() throws Exception {
+        Path romSource = SyntheticRomFactory.generateLoRom(96, 0, DspChipset.ABSENT, "LOROM96", tempDir);
         Path testFile = tempDir.resolve("game.sfc");
         Files.copy(romSource, testFile);
+        Path out = Files.createDirectory(tempDir.resolve("out"));
 
-        FloppyConvert floppyConvert = new FloppyConvert();
-        new CommandLine(floppyConvert).setCaseInsensitiveEnumValuesAllowed(true).parseArgs(
-                testFile.toAbsolutePath().toString(), "--format", "gd3", "--gd3-dram", "128", "-o", tempDir.toString());
+        int exitCode = new CommandLine(new FloppyConvert()).setCaseInsensitiveEnumValuesAllowed(true).execute(
+                testFile.toAbsolutePath().toString(), "--format", "gd3", "-o", out.toString());
 
-        assertDoesNotThrow(floppyConvert::call);
-    }
-
-    @Test
-    // picocli binds --gd3-dram as an int, so the supported values are validated explicitly; a bad value is a
-    // usage error like any other.
-    void testGd3DramOutsideSupportedValuesIsAParameterError() throws IOException {
-        Path testFile = tempDir.resolve("test.sfc");
-        Files.createFile(testFile);
-
-        int exitCode = new CommandLine(new FloppyConvert()).execute(
-                testFile.toAbsolutePath().toString(), "--gd3-dram", "48");
-
-        assertEquals(2, exitCode, "An unsupported DRAM size is a command line error");
+        assertEquals(0, exitCode);
+        // 96 Mbit is twelve 8 Mbit parts, one per 1.44 MB disk
+        try (Stream<Path> files = Files.list(out)) {
+            assertEquals(12, files.filter(p -> p.getFileName().toString().endsWith(".img")).count());
+        }
     }
 
     @Test

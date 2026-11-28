@@ -11,7 +11,6 @@ import com.largomodo.floppyconvert.format.CopierFormat;
 import com.largomodo.floppyconvert.service.NativeConversionServiceFactory;
 import com.largomodo.floppyconvert.service.RomSplitter;
 import com.largomodo.floppyconvert.snes.Gd3Layout;
-import com.largomodo.floppyconvert.snes.Gd3Memory;
 import com.largomodo.floppyconvert.snes.SnesInterleaver;
 import com.largomodo.floppyconvert.snes.InvalidChecksumException;
 import com.largomodo.floppyconvert.snes.InvalidRomHeaderException;
@@ -72,7 +71,7 @@ class Gd3ParityTest {
             input = interleavedCopy(input, row);
         }
 
-        Result ours = convertWithOurs(input, row.id(), row.dramMbit());
+        Result ours = convertWithOurs(input, row.id());
         Result expected = Gd3ParityExpectations.expected(row.twinOf() != null ? row.twinOf() : row.id());
 
         if (expected instanceof Rejected) {
@@ -94,11 +93,18 @@ class Gd3ParityTest {
     @MethodSource("rows")
     void committedExpectationAgreesWithLiveUcon64(Row row) throws Exception {
         assumeFalse(REGENERATE, "regenerate mode prints table rows instead of asserting");
-        assumeTrue(row.liveOracle() == LiveOracle.UCON64, () -> "live layer skipped: " + row.exemptReason());
+        assumeTrue(row.liveOracle() == LiveOracle.UCON64 || row.pinsOwnOutput(),
+                () -> "live layer skipped: " + row.exemptReason());
         Path binary = Ucon64Oracle.locateOrSkip(Files.createDirectories(tempDir.resolve("oracle")));
         Path input = materializeOrSkip(row);
 
         Result live = Ucon64Oracle.convert(binary, input, row.preHeadered(), tempDir.resolve("live"));
+
+        if (row.pinsOwnOutput()) {
+            // The row may pin our own output only because uCON64 has none to compare with
+            assertInstanceOf(Rejected.class, live, "uCON64 now converts " + row.id() + ": make it a UCON64 row");
+            return;
+        }
 
         assertEquals(Gd3ParityExpectations.expected(row.id()), live,
                 "Committed table for " + row.id() + " drifted from live uCON64 output");
@@ -122,7 +128,9 @@ class Gd3ParityTest {
             }
             Result result;
             if (row.liveOracle() == LiveOracle.EXEMPT) {
-                result = new Converted(hardwareSetDigests(row));
+                result = row.pinsOwnOutput()
+                        ? convertWithOurs(input.get(), "regen-" + row.id())
+                        : new Converted(hardwareSetDigests(row));
             } else {
                 result = Ucon64Oracle.convert(binary, input.get(), row.preHeadered(), tempDir.resolve("live-" + row.id()));
             }
@@ -159,8 +167,7 @@ class Gd3ParityTest {
         for (Path rom : roms) {
             Path work = tempDir.resolve("sweep-" + counter++);
             Result live = Ucon64Oracle.convert(binary, rom, false, work);
-            // ucon64 has no DRAM limit, so the sweep converts for the largest Game Doctor
-            Result ours = convertWithOurs(rom, "sweep-out-" + counter, 128);
+            Result ours = convertWithOurs(rom, "sweep-out-" + counter);
             String verdict = classify(binary, rom, work, live, ours);
             if (verdict != null) {
                 byClass.computeIfAbsent(verdict, k -> new ArrayList<>()).add(rom.toString());
@@ -217,9 +224,8 @@ class Gd3ParityTest {
         return input.get();
     }
 
-    // The splitter is built for the row DRAM, because 96 Mbit rows are only accepted at 128.
-    private Result convertWithOurs(Path input, String outputName, int dramMbit) throws IOException {
-        RomSplitter splitter = new NativeConversionServiceFactory(Gd3Memory.of(dramMbit)).createRomSplitter();
+    private Result convertWithOurs(Path input, String outputName) throws IOException {
+        RomSplitter splitter = new NativeConversionServiceFactory().createRomSplitter();
         Path out = Files.createDirectories(tempDir.resolve("ours-" + outputName));
         try {
             List<File> files = splitter.split(input.toFile(), out, CopierFormat.GD3);

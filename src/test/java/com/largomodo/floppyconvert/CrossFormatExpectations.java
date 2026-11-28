@@ -522,7 +522,7 @@ public final class CrossFormatExpectations {
                     new PartDigest("synthetic_exhirom_64mbit_0kb.7", "b537ba073f9605a67ef9bd44378ecc592a01c096"),
                     new PartDigest("synthetic_exhirom_64mbit_0kb.8", "f1e98a29be46cf360ad242f388551f0006d80409")
             )),
-            Map.entry("lorom-96-reject|FIG", List.of(
+            Map.entry("lorom-96|FIG", List.of(
                     new PartDigest("synthetic_lorom_96mbit_0kb.1", "93b6dd4d753dd71d39f8a639bc418b5952502e52"),
                     new PartDigest("synthetic_lorom_96mbit_0kb.2", "a17443451e226d353c3fa5d180cc232063c6cd2d"),
                     new PartDigest("synthetic_lorom_96mbit_0kb.3", "7aaa9629ef72fdd9c5b0f3b3504e72b9f611a1ff"),
@@ -532,7 +532,7 @@ public final class CrossFormatExpectations {
                     new PartDigest("synthetic_lorom_96mbit_0kb.7", "dab8bd17d907a646eabcf96d5b8e3fb1d7f5f871"),
                     new PartDigest("synthetic_lorom_96mbit_0kb.8", "ba42e8abd92c1e8dc9163b0b2cdbb5ca31d45262")
             )),
-            Map.entry("lorom-96-reject|SWC", List.of(
+            Map.entry("lorom-96|SWC", List.of(
                     new PartDigest("synthetic_lorom_96mbit_0kb.1", "e49e74b4db0cc38f8d9ff9b13d2d867e7d1ee023"),
                     new PartDigest("synthetic_lorom_96mbit_0kb.2", "de679267eb44bddcaf269080bcd83c7d76d85f6e"),
                     new PartDigest("synthetic_lorom_96mbit_0kb.3", "144e9cb91b0d7d0b145ec1a040723e90d807fad5"),
@@ -865,7 +865,7 @@ public final class CrossFormatExpectations {
             Map.entry("exhirom-40|UFO", "UFO hardware does not support HiROM > 32Mbit: ROM is 40 Mbit"),
             Map.entry("exhirom-48|UFO", "UFO hardware does not support HiROM > 32Mbit: ROM is 48 Mbit"),
             Map.entry("exhirom-64|UFO", "UFO hardware does not support HiROM > 32Mbit: ROM is 64 Mbit"),
-            Map.entry("lorom-96-reject|UFO", "UFO hardware supports max 9 parts (36Mbit) for LoROM: ROM is 96 Mbit"),
+            Map.entry("lorom-96|UFO", "UFO hardware supports max 9 parts (36Mbit) for LoROM: ROM is 96 Mbit"),
             Map.entry("real-tales-of-phantasia-lcase-48|UFO", "UFO hardware does not support HiROM > 32Mbit: ROM is 48 Mbit"),
             Map.entry("real-bahamut-lagoon-near-64|UFO", "UFO hardware does not support HiROM > 32Mbit: ROM is 64 Mbit"),
             Map.entry("real-trials-of-mana-48|UFO", "UFO hardware does not support HiROM > 32Mbit: ROM is 48 Mbit"),

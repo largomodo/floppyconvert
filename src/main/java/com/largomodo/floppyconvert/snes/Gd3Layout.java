@@ -8,10 +8,9 @@ import java.util.Locale;
  * so a size rule fixed in one place cannot drift from the others; none of them derives sizes from the raw byte
  * count itself; {@link #isLoRom96Size} is the one size test the reader needs before a {@code SnesRom} exists.
  * <p>
- * Pure function of the ROM; DRAM capacity only decides accept or reject and is not an input. Literal port of
+ * Pure function of the ROM; the DRAM fitted to the target Game Doctor is not an input. Literal port of
  * ucon64 {@code snes_convert_to_gd} (snes.c 1733-1897, line numbers checked against the ucon64 2.2.3 source),
- * including its rejections and wording. Keeping DRAM out of the inputs lets the header generator and the splitter
- * ask for a layout without threading configuration through.
+ * including its rejections and wording.
  * <p>
  * The rules form a chain: reader detection (header base, interleave) feeds the layout, and the layout feeds the
  * header map, interleaver, splitter and file name. Size classes build on one another (padding up to 32 Mbit, then
@@ -65,7 +64,7 @@ public record Gd3Layout(int totalParts4Mbit, int paddedSize, PadStrategy padStra
     }
 
     /**
-     * @return true for the 96 Mbit LoROM class, which only a 128 Mbit Game Doctor can hold
+     * @return true for the 96 Mbit LoROM class, which only a Game Doctor with 128 Mbit of DRAM can load
      */
     public boolean isLoRom96() {
         return loRom96;
@@ -83,13 +82,11 @@ public record Gd3Layout(int totalParts4Mbit, int paddedSize, PadStrategy padStra
                 || parts == 10 || parts == 12 || parts == 16;
         if (!sizeConvertible) {
             // %.5f keeps byte resolution, so 32 Mbit + 1 byte reads 32.00001; the message is ucon64's wording.
-            // Every layout rejection is a SIZE failure: no Game Doctor configuration converts it, unlike a HARDWARE
-            // failure, which a larger --gd3-dram would resolve.
-            throw new UnsupportedHardwareException(UnsupportedHardwareException.Reason.SIZE, String.format(Locale.ROOT,
+            throw new UnsupportedHardwareException(String.format(Locale.ROOT,
                     "ROM size is %.5f Mbit -- conversion not yet implemented/verified", (double) size / SnesConstants.MBIT));
         }
         if (parts > 8 && !rom.isExtended()) {
-            throw new UnsupportedHardwareException(UnsupportedHardwareException.Reason.SIZE,
+            throw new UnsupportedHardwareException(
                     "Normal ROM > 32 Mbit -- conversion not yet implemented");
         }
 
@@ -131,7 +128,7 @@ public record Gd3Layout(int totalParts4Mbit, int paddedSize, PadStrategy padStra
 
     private static Gd3Layout ofLoRom(SnesRom rom, int size, int parts) {
         if (parts > 8 && !rom.isExtended() && parts != LOROM_96_PARTS) {
-            throw new UnsupportedHardwareException(UnsupportedHardwareException.Reason.SIZE,
+            throw new UnsupportedHardwareException(
                     "LoROM > 32 Mbit -- cannot convert");
         }
         // LoROM is never padded, never interleaved and never truncated

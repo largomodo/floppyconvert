@@ -7,7 +7,6 @@ import com.largomodo.floppyconvert.service.split.SplitStrategyFactory;
 import com.largomodo.floppyconvert.service.split.UfoHiRomChunker;
 import com.largomodo.floppyconvert.snes.Gd3HardwareValidator;
 import com.largomodo.floppyconvert.snes.Gd3Layout;
-import com.largomodo.floppyconvert.snes.Gd3Memory;
 import com.largomodo.floppyconvert.snes.HardwareValidator;
 import com.largomodo.floppyconvert.snes.SnesConstants;
 import com.largomodo.floppyconvert.snes.SnesInterleaver;
@@ -60,16 +59,6 @@ public class NativeRomSplitter implements RomSplitter {
     private final HeaderGeneratorFactory headerFactory;
     private final SplitStrategyFactory strategyFactory;
     private final SnesInterleaver interleaver;
-    // DRAM capacity handed to the GD3 validator; other formats ignore it.
-    private final Gd3Memory gd3Memory;
-
-    /**
-     * Constructs a NativeRomSplitter for a Game Doctor with the default DRAM capacity.
-     */
-    public NativeRomSplitter(SnesRomReader reader, HeaderGeneratorFactory headerFactory,
-                             SplitStrategyFactory strategyFactory, SnesInterleaver interleaver) {
-        this(reader, headerFactory, strategyFactory, interleaver, Gd3Memory.DEFAULT);
-    }
 
     /**
      * Constructs a NativeRomSplitter with required dependencies.
@@ -78,15 +67,13 @@ public class NativeRomSplitter implements RomSplitter {
      * @param headerFactory   Factory for format-specific header generators
      * @param strategyFactory Factory for per-format split strategies
      * @param interleaver     GD3 padding and interleaving, applied in prepareData (ref: DL-007)
-     * @param gd3Memory       DRAM capacity the GD3 validator checks against (ref: DL-014)
      */
     public NativeRomSplitter(SnesRomReader reader, HeaderGeneratorFactory headerFactory,
-                             SplitStrategyFactory strategyFactory, SnesInterleaver interleaver, Gd3Memory gd3Memory) {
+                             SplitStrategyFactory strategyFactory, SnesInterleaver interleaver) {
         this.reader = reader;
         this.headerFactory = headerFactory;
         this.strategyFactory = strategyFactory;
         this.interleaver = interleaver;
-        this.gd3Memory = gd3Memory;
     }
 
     @Override
@@ -169,7 +156,7 @@ public class NativeRomSplitter implements RomSplitter {
     private HardwareValidator createValidator(CopierFormat format) {
         return switch (format) {
             case UFO -> new UfoHardwareValidator();
-            case GD3 -> new Gd3HardwareValidator(gd3Memory);
+            case GD3 -> new Gd3HardwareValidator();
             case FIG, SWC -> (rom, fmt) -> { };
         };
     }

@@ -11,7 +11,6 @@ import com.largomodo.floppyconvert.service.ConversionServiceFactory;
 import com.largomodo.floppyconvert.service.DefaultConversionFacade;
 import com.largomodo.floppyconvert.service.NativeConversionServiceFactory;
 import com.largomodo.floppyconvert.service.SnesFailureClassifier;
-import com.largomodo.floppyconvert.snes.Gd3Memory;
 import com.largomodo.floppyconvert.util.SnesRomMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,7 +56,7 @@ import java.util.concurrent.Callable;
                         " in two halves and every other ROM in 8 Mbit parts. A file that already is a Game Doctor file is split as it is.",
                 "",
                 "In batch mode a ROM that fails is logged to failures.log as 'FAILED: <path> - <CATEGORY> - <message>'," +
-                        " CATEGORY being CHECKSUM, SIZE, HARDWARE (needs a larger --gd3-dram), HEADER or OTHER."
+                        " CATEGORY being CHECKSUM, SIZE, HEADER or OTHER."
         },
         exitCodeListHeading = "%nExit Codes:%n",
         exitCodeList = {
@@ -100,18 +99,6 @@ public class FloppyConvert implements Callable<Integer> {
     CopierFormat format;
     private CopierFormat effectiveFormat;
 
-    @Option(names = "--gd3-dram", defaultValue = "64",
-            description = {
-                    "DRAM of the target Game Doctor in Mbit, for --format GD3: 32, 64 or 128.",
-                    "A 96 Mbit game needs 128 (Game Doctor SF7).",
-                    "Default: ${DEFAULT-VALUE}"
-            })
-    // An int rather than an enum: picocli enum constants cannot be the numerals 32, 64 and 128. validateInput
-    // checks the value and reports a bad one as a usage error (exit code 2).
-    int gd3Dram;
-    // Built from --gd3-dram during input validation, after picocli has bound the option.
-    private Gd3Memory gd3Memory;
-
     @Spec
     CommandSpec spec;
     @Option(names = {"-v", "--verbose"}, description = "Enable verbose output")
@@ -129,8 +116,8 @@ public class FloppyConvert implements Callable<Integer> {
      * Composition root: the one place that wires the conversion pipeline together.
      * Both single-file and batch mode use it.
      */
-    private static RomProcessor createProcessor(Gd3Memory gd3Memory) {
-        ConversionServiceFactory serviceFactory = new NativeConversionServiceFactory(gd3Memory);
+    private static RomProcessor createProcessor() {
+        ConversionServiceFactory serviceFactory = new NativeConversionServiceFactory();
         ConversionFacade facade = new DefaultConversionFacade(
                 serviceFactory.createRomSplitter(),
                 serviceFactory.createFloppyImageWriter());
@@ -202,7 +189,7 @@ public class FloppyConvert implements Callable<Integer> {
 
         try {
             // A fixed workspace suffix is enough: nothing else converts concurrently in this mode.
-            createProcessor(gd3Memory).processRom(inputPath, outputDir.toPath(), "single", format, true);
+            createProcessor().processRom(inputPath, outputDir.toPath(), "single", format, true);
             return 0;
         } catch (CleanupException e) {
             // Logged with the exception so the suppressed cleanup failures reach the log file
@@ -218,7 +205,7 @@ public class FloppyConvert implements Callable<Integer> {
      */
     private int runBatch() {
         // Batch mode classifies failures with the snes-aware classifier; single-file mode has no log line to classify.
-        BatchRunner.Result result = new BatchRunner(createProcessor(gd3Memory), new SnesFailureClassifier())
+        BatchRunner.Result result = new BatchRunner(createProcessor(), new SnesFailureClassifier())
                 .run(inputPath.toPath(), outputDir.toPath(), format);
         return result.isClean() ? 0 : 1;
     }
@@ -274,11 +261,6 @@ public class FloppyConvert implements Callable<Integer> {
         if (!inputPath.canRead()) {
             throw new ParameterException(spec.commandLine(),
                     "Input path is not readable (check permissions): " + inputPath.getAbsolutePath());
-        }
-        try {
-            gd3Memory = Gd3Memory.of(gd3Dram);
-        } catch (IllegalArgumentException e) {
-            throw new ParameterException(spec.commandLine(), "Invalid value for --gd3-dram: " + e.getMessage());
         }
     }
 

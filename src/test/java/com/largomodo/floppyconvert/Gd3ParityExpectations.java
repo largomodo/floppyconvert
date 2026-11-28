@@ -25,6 +25,11 @@ import static com.largomodo.floppyconvert.snes.generators.SyntheticRomFactory.SR
  * Committed oracle for GD3 parity: one row per fixture with the ordered (part name, SHA1) list uCON64 2.2.3
  * produces. Digests only, no ROM bytes, so nothing copyrighted is committed. (ref: DL-004)
  * <p>
+ * EXEMPT rows are the exception, because uCON64 does not produce their expected output: their digests are a
+ * hardware-verified part set, the linear twin's output, or, for a ROM uCON64 rejects and no hardware set covers
+ * ({@link Row#pinsOwnOutput()}), our own output pinned as a regression guard. Regenerating such a row after a
+ * splitter change blesses the change, so review its digests by hand.
+ * <p>
  * Each row carries known-gap tags from the vocabulary G1..G14. While a row has tags, Gd3ParityTest asserts
  * that our output still differs and reports the tags; the milestone that closes a gap removes its tag. (ref: DL-005)
  * <p>
@@ -57,34 +62,30 @@ public final class Gd3ParityExpectations {
     }
 
     /**
-     * @param dramMbit      Game Doctor DRAM the row converts with (DL-028)
      * @param exemptReason  why the live ucon64 layer skips the row; non-null only for EXEMPT rows
-     * @param hardwareParts repo-relative directory of the hardware-verified part set that defines an EXEMPT row's digests
+     * @param hardwareParts repo-relative directory of the hardware-verified part set that defines an EXEMPT row's digests;
+     *                      null when the row pins our own output instead
      * @param preHeadered   input already carries a GD3 header, so ucon64 runs only {@code -s}
      * @param twinOf        id of the linear row whose output this row must reproduce from an interleaved copy of
      *                      the same ROM; null for ordinary rows
      */
-    public record Row(String id, Source source, Set<Gap> gaps, int dramMbit, LiveOracle liveOracle,
+    public record Row(String id, Source source, Set<Gap> gaps, LiveOracle liveOracle,
                       String exemptReason, String hardwareParts, boolean preHeadered, String twinOf) {
 
         Row(String id, Source source) {
-            this(id, source, Set.of(), 64, LiveOracle.UCON64, null, null, false, null);
+            this(id, source, Set.of(), LiveOracle.UCON64, null, null, false, null);
         }
 
         Row tagged(Gap... tags) {
-            return new Row(id, source, Set.copyOf(Arrays.asList(tags)), dramMbit, liveOracle, exemptReason, hardwareParts, preHeadered, twinOf);
-        }
-
-        Row dram(int mbit) {
-            return new Row(id, source, gaps, mbit, liveOracle, exemptReason, hardwareParts, preHeadered, twinOf);
+            return new Row(id, source, Set.copyOf(Arrays.asList(tags)), liveOracle, exemptReason, hardwareParts, preHeadered, twinOf);
         }
 
         Row exempt(String reason, String partsDir) {
-            return new Row(id, source, gaps, dramMbit, LiveOracle.EXEMPT, reason, partsDir, preHeadered, twinOf);
+            return new Row(id, source, gaps, LiveOracle.EXEMPT, reason, partsDir, preHeadered, twinOf);
         }
 
         Row asPreHeadered() {
-            return new Row(id, source, gaps, dramMbit, liveOracle, exemptReason, hardwareParts, true, twinOf);
+            return new Row(id, source, gaps, liveOracle, exemptReason, hardwareParts, true, twinOf);
         }
 
         /**
@@ -92,8 +93,16 @@ public final class Gd3ParityExpectations {
          * {@code --gd3} output, so the live layer skips it. (ref: DL-028)
          */
         Row interleavedTwin() {
-            return new Row(id + "-interleaved-twin", source, Set.of(), dramMbit, LiveOracle.EXEMPT,
+            return new Row(id + "-interleaved-twin", source, Set.of(), LiveOracle.EXEMPT,
                     "expected output is the linear twin's, not ucon64 --gd3 output", null, false, id);
+        }
+
+        /**
+         * @return true for an EXEMPT row that uCON64 rejects and no hardware set covers: its digests are our own
+         *         output, and the live layer checks only that uCON64 still rejects the ROM
+         */
+        boolean pinsOwnOutput() {
+            return liveOracle == LiveOracle.EXEMPT && hardwareParts == null && twinOf == null;
         }
 
         @Override
@@ -138,8 +147,10 @@ public final class Gd3ParityExpectations {
             exHiRom("exhirom-40", 40),
             exHiRom("exhirom-48", 48),
             exHiRom("exhirom-64", 64),
-            // ucon64 rejects 96 Mbit LoROM; so do we at the default DRAM
-            synthetic("lorom-96-reject", dir -> SyntheticRomFactory.generateLoRom(96, SRAM_0KB, DspChipset.ABSENT, dir)),
+            // ucon64 rejects 96 Mbit LoROM ("LoROM > 32 Mbit -- cannot convert"); we convert it, so the row pins
+            // our own output and the live layer skips it.
+            synthetic("lorom-96", dir -> SyntheticRomFactory.generateLoRom(96, SRAM_0KB, DspChipset.ABSENT, dir))
+                    .exempt("ucon64 rejects 96 Mbit LoROM; digests are our own output", null),
 
             real("real-chrono-trigger-32", E2ETestRomRegistry.CHRONO_TRIGGER),
             real("real-super-mario-world-4", E2ETestRomRegistry.SUPER_MARIO_WORLD),
@@ -158,15 +169,15 @@ public final class Gd3ParityExpectations {
             real("real-wizardry-vi", E2ETestRomRegistry.WIZARDRY_VI),
             real("real-daikaijuu-monogatari-2", E2ETestRomRegistry.DAIKAIJUU_MONOGATARI_2),
             // 96 Mbit pre-decompressed builds: ucon64 rejects the .sfc, so the expected digests are the
-            // hardware-verified sets, and the live layer skips these rows. They need 128 Mbit of DRAM.
-            real("real-star-ocean-neviksti-96", E2ETestRomRegistry.STAR_OCEAN_NEVIKSTI).dram(128)
+            // hardware-verified sets, and the live layer skips these rows.
+            real("real-star-ocean-neviksti-96", E2ETestRomRegistry.STAR_OCEAN_NEVIKSTI)
                     .exempt("ucon64 rejects 96 Mbit LoROM; digests are the hardware-verified snes/SF96soe_sf7/parts", "snes/SF96soe_sf7/parts"),
-            realBody("real-sf96sfa2-body-as-sfc", E2ETestRomRegistry.GD3_SF96SFA2, "SF96SFA2-body.sfc").dram(128)
+            realBody("real-sf96sfa2-body-as-sfc", E2ETestRomRegistry.GD3_SF96SFA2, "SF96SFA2-body.sfc")
                     .exempt("ucon64 rejects 96 Mbit LoROM; digests are the hardware-verified snes/SF96SFA2_sf7/parts", "snes/SF96SFA2_sf7/parts"),
             // Pre-headered GD3 files: ucon64 runs only -s
             real("real-sf48tal-pre-headered", E2ETestRomRegistry.GD3_SF48TAL).asPreHeadered(),
-            real("real-sf96soe-pre-headered", E2ETestRomRegistry.GD3_SF96SOE).asPreHeadered().dram(128),
-            real("real-sf96sfa2-pre-headered", E2ETestRomRegistry.GD3_SF96SFA2).asPreHeadered().dram(128)
+            real("real-sf96soe-pre-headered", E2ETestRomRegistry.GD3_SF96SOE).asPreHeadered(),
+            real("real-sf96sfa2-pre-headered", E2ETestRomRegistry.GD3_SF96SFA2).asPreHeadered()
     );
 
     // GENERATED-BEGIN: pasted from Gd3ParityTest#regenerate (uCON64 2.2.3)
@@ -422,6 +433,20 @@ public final class Gd3ParityExpectations {
                     new PartDigest("SF96SOEK.078", "585b51699cd787e8ab1e241d7babcc8209bda00e"),
                     new PartDigest("SF96SOEL.078", "e09fa50726c8fde34e84e69f2ae4174a9b6b7e3f")
             )),
+            Map.entry("lorom-96", List.of(
+                    new PartDigest("SF96SYNA.078", "5ddc89a35722e9b138d40584ae22f6eacb2fd480"),
+                    new PartDigest("SF96SYNB.078", "4134000555757f039726dbbbafb03b41a3dea5e6"),
+                    new PartDigest("SF96SYNC.078", "773198902c5bef097693088c62afeee016f22f22"),
+                    new PartDigest("SF96SYND.078", "0077dae950fe04cbdcef3106be70ebe2a44c683c"),
+                    new PartDigest("SF96SYNE.078", "15317e833535d4242b11ae0d8ca6b4a31179ed77"),
+                    new PartDigest("SF96SYNF.078", "197303c3ffc6bfced47477674ad0e7b0b3c01cdf"),
+                    new PartDigest("SF96SYNG.078", "c311abc1111e7ed61658d83686c5408972868f8f"),
+                    new PartDigest("SF96SYNH.078", "193ccb234f72144473a9ca20c9d9ccee896f7a39"),
+                    new PartDigest("SF96SYNI.078", "4e90cbc4847ad1e1077c67a27bc0e2de29a2f05f"),
+                    new PartDigest("SF96SYNJ.078", "a47ae4e4369e67deb4e8a1d953e53e1f3a03ffeb"),
+                    new PartDigest("SF96SYNK.078", "459540f58f6c974c12e00515bda3ea801c7e4fd4"),
+                    new PartDigest("SF96SYNL.078", "4953bcd265fc728da71dd932cf5ee26f02df33d4")
+            )),
             Map.entry("real-sf96sfa2-pre-headered", List.of(
                     new PartDigest("SF96SFAA.078", "b24d5573cc3234ef6216a559401d4c454367a97f"),
                     new PartDigest("SF96SFAB.078", "260bd0cd05176332788ba678ac6b6cab475ce8fb"),
@@ -439,7 +464,6 @@ public final class Gd3ParityExpectations {
     );
 
     private static final Map<String, String> REJECTIONS = Map.ofEntries(
-            Map.entry("lorom-96-reject", "ERROR: LoROM > 32 Mbit -- cannot convert"),
             Map.entry("real-daikaijuu-monogatari-2", "ERROR: ROM size is 44.00000 Mbit -- conversion not yet implemented/verified")
     );
     // GENERATED-END
@@ -448,7 +472,8 @@ public final class Gd3ParityExpectations {
     }
 
     /**
-     * @return what uCON64 (or, for EXEMPT rows, the verified hardware set) produces for the row
+     * @return what uCON64 produces for the row; for EXEMPT rows the verified hardware set or, when the row
+     *         {@linkplain Row#pinsOwnOutput() pins our own output}, that output
      * @throws IllegalStateException when the row has no committed expectation yet
      */
     public static Result expected(String rowId) {

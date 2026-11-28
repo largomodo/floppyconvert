@@ -25,8 +25,6 @@ public class UfoHardwareValidator implements HardwareValidator {
                     String.format("%d bytes (< 1 Mbit)", sizeBytes) :
                     String.format("%d Mbit", sizeBytes / SnesConstants.MBIT);
             throw new UnsupportedHardwareException(
-                    // UFO has no larger configuration to try, so every refusal is SIZE.
-                    UnsupportedHardwareException.Reason.SIZE,
                     String.format("UFO hardware does not support HiROM > 32Mbit: ROM is %s", sizeStr)
             );
         }
@@ -34,7 +32,6 @@ public class UfoHardwareValidator implements HardwareValidator {
         if (!rom.isHiRom() && rom.rawData().length > 9 * 4 * SnesConstants.MBIT) {
             int sizeMbit = rom.rawData().length / SnesConstants.MBIT;
             throw new UnsupportedHardwareException(
-                UnsupportedHardwareException.Reason.SIZE,
                 String.format("UFO hardware supports max 9 parts (36Mbit) for LoROM: ROM is %d Mbit", sizeMbit)
             );
         }

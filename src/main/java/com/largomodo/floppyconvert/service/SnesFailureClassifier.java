@@ -22,10 +22,8 @@ public class SnesFailureClassifier implements FailureClassifier {
             if (current instanceof InvalidChecksumException) {
                 return FailureCategory.CHECKSUM;
             }
-            if (current instanceof UnsupportedHardwareException unsupported) {
-                return unsupported.reason() == UnsupportedHardwareException.Reason.HARDWARE
-                        ? FailureCategory.HARDWARE
-                        : FailureCategory.SIZE;
+            if (current instanceof UnsupportedHardwareException) {
+                return FailureCategory.SIZE;
             }
             if (current instanceof InvalidRomHeaderException) {
                 return FailureCategory.HEADER;

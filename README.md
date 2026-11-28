@@ -62,42 +62,9 @@ FloppyConvert splits SNES ROMs into format-specific chunks with the appropriate 
 | UFO | Super UFO | `.1gm`, `.2gm`, `.3gm` | `game.1gm`, `game.2gm` |
 | GD3 | Game Doctor SF3/SF6/SF7 | SF-Code (`.078`) | `SF16CHRA.078`, `SF16CHRB.078` |
 
-### Game Doctor (GD3)
-
-GD3 output is byte-identical to [uCON64](https://ucon64.sourceforge.io/) 2.2.3 (`ucon64 --gd3` followed by `ucon64 -s`) for every ROM uCON64 converts: 512-byte header on the first part, padded and interleaved body, parts cut as uCON64 cuts them. Three classes uCON64 cannot convert are handled in addition: 96 Mbit pre-decompressed builds (Star Ocean, Street Fighter Alpha 2), files that already carry a Game Doctor header, and interleaved input.
-
-| ROM | Sizes | Padding and interleave | Parts |
-|-----|-------|------------------------|-------|
-| HiROM | 2-3 Mbit | rounded up to 1 Mbit, interleaved | two halves |
-| HiROM | 4, 8 Mbit | none, interleaved | two halves |
-| HiROM | 10 Mbit | padded to 12 Mbit, the holes mirror the half before them | two 6 Mbit halves |
-| HiROM | 12, 16 Mbit | none, interleaved | two halves |
-| HiROM | 20 Mbit | padded to 24 Mbit (mirrored), interleaved in a 16 Mbit and an 8 Mbit region | three 8 Mbit parts |
-| HiROM | 24 Mbit | none, two-region interleave | three 8 Mbit parts |
-| HiROM | 28 Mbit | zero-padded to 32 Mbit | four 8 Mbit parts |
-| HiROM | 32 Mbit | none, interleaved | four 8 Mbit parts |
-| Extended HiROM (header 4 MB in) | 40, 48, 64 Mbit | none, expansion placed before the 32 Mbit base | 8 Mbit parts; 40 Mbit follows uCON64 but is untested on hardware |
-| LoROM | up to 32 Mbit | none, never padded or interleaved | 8 Mbit parts |
-| Extended LoROM | 40-64 Mbit | none | 8 Mbit parts |
-| LoROM | 96 Mbit | none; needs `--gd3-dram 128` | twelve 8 Mbit parts |
-
-The 10, 12, 20 and 28 Mbit HiROM layouts follow uCON64 and replace the layouts earlier versions wrote for those sizes, some of which may have booted on a Game Doctor SF7. They are unverified on hardware: re-test those sizes on an SF7 before relying on them.
-
-The 96 Mbit Star Ocean header sets its SRAM bytes (header byte 0x29 = 0x08 and map entry 19 = 0x00) from a single Game Doctor file. Saving and loading on an SF7 is untested: a Star Ocean conversion may boot but fail to save. Street Fighter Alpha 2 has no SRAM.
-
-Other sizes are refused with uCON64's wording (for example `ROM size is 32.00001 Mbit -- conversion not yet implemented/verified`). A ROM needs at most 16 parts of 4 Mbit; the 96 Mbit class is the exception.
-
-`--gd3-dram {32,64,128}` sets the DRAM of the target Game Doctor in Mbit (default 64). A ROM whose padded size exceeds it fails with category `HARDWARE`; the 96 Mbit class needs 128, the capacity of the SF7. DRAM only decides whether a ROM is accepted; the layout of the output does not depend on it. Other values are a usage error (exit code 2).
-
-Part names follow uCON64: `sf`, the size in Mbit of the padded image, and the first three characters of the input file name (a space or `.` after the size digits becomes `_`), cut to 6 characters below 10 Mbit and 7 from 10 Mbit. A single part has no letter (`SF4SUP.078`). Several parts get a letter, after an `X` for HiROM below 10 Mbit and after `_` for LoROM below 10 Mbit (`SF8ABCXA.078`, `SF12ACTA.078`). uCON64 gives both parts of a multi-part LoROM below 10 Mbit the same name, so the second would overwrite the first; the `_` keeps them apart, the only place where a name differs from uCON64's.
-
-Input that is already a Game Doctor file (`GAME DOCTOR SF 3` header) is split as it is, with its own header on part A. Interleaved input is detected as uCON64 detects it; interleaved extended HiROM (48 Mbit) is recognised only for the ROMs on uCON64's CRC list (Tales of Phantasia, Dai Kaiju Monogatari 2, Trials of Mana).
-
-A ROM whose SNES checksum and complement do not sum to 0xFFFF is refused with category `CHECKSUM` in every format; FIG, SWC and UFO refuse the same ROMs. Copier headers on the input are dropped; uCON64's NSRT header block is not carried over.
-
 ### Batch failures
 
-In batch mode a ROM that fails is logged to `failures.log` as `FAILED: <path> - <CATEGORY> - <message>`. The category is one of `CHECKSUM` (invalid SNES checksum/complement pair), `SIZE` (no copier converts this size), `HARDWARE` (a larger `--gd3-dram` would convert it), `HEADER` (no internal header) or `OTHER`.
+In batch mode a ROM that fails is logged to `failures.log` as `FAILED: <path> - <CATEGORY> - <message>`. The category is one of `CHECKSUM` (invalid SNES checksum/complement pair), `SIZE` (the target format cannot hold this ROM size or layout), `HEADER` (no internal header) or `OTHER`.
 
 ## Testing
 
@@ -132,7 +99,7 @@ GD3 parity tests (`Gd3ParityTest`) also use these local-only inputs, resolved fr
 
 ### GD3 parity testing
 
-`Gd3ParityTest` compares, per part, the name and SHA1 of floppyconvert's GD3 output with the SHA1 table in `Gd3ParityExpectations`, which was generated from uCON64 2.2.3. Parts are compared one by one because comparing reassembled bytes would hide split and naming errors. CI runs the synthetic fixtures only, so the table is the oracle there; rows built from real ROMs are skipped when the ROM is absent. When a uCON64 2.2.3 binary is present at `src/test/resources/ucon64` (Linux x86-64, ignored by `src/test/resources/.gitignore` and never committed) the same test also compares the table with live uCON64 output; the live layer is skipped unless `ucon64 --version` reports `uCON64 2.2.3`. The binary used for the committed table has SHA1 `403b8868a51565ed23c6c304d859cbc9a50c7dc4` and reports `uCON64 2.2.3 WIP UNIX (Linux)`; to rebuild it run `cd ucon64-svn/src && ./configure && make` and copy `src/ucon64` to `src/test/resources/ucon64`.
+`Gd3ParityTest` compares, per part, the name and SHA1 of floppyconvert's GD3 output with the SHA1 table in `Gd3ParityExpectations`, which was generated from uCON64 2.2.3. Rows uCON64 cannot produce are the exception: they hold the digests of a hardware-verified part set or, for the synthetic 96 Mbit LoROM that uCON64 rejects, of floppyconvert's own output. Parts are compared one by one because comparing reassembled bytes would hide split and naming errors. CI runs the synthetic fixtures only, so the table is the oracle there; rows built from real ROMs are skipped when the ROM is absent. When a uCON64 2.2.3 binary is present at `src/test/resources/ucon64` (Linux x86-64, ignored by `src/test/resources/.gitignore` and never committed) the same test also compares the table with live uCON64 output; the live layer is skipped unless `ucon64 --version` reports `uCON64 2.2.3`. The binary used for the committed table has SHA1 `403b8868a51565ed23c6c304d859cbc9a50c7dc4` and reports `uCON64 2.2.3 WIP UNIX (Linux)`; to rebuild it run `cd ucon64-svn/src && ./configure && make` and copy `src/ucon64` to `src/test/resources/ucon64`.
 
 - `-Dgd3.parity.regenerate=true` prints the table source from live uCON64 (`Gd3ParityTest#regenerate`) or from the code under test (`CrossFormatStabilityTest#regenerate`) instead of asserting.
 - `-Dgd3.parity.sweepDir=<dir>` converts every ROM under `<dir>` with both tools and reports mismatches as DETECTION, LAYOUT, HEADER, NAME or REJECT.

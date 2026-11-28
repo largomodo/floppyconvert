@@ -81,13 +81,13 @@ class HardwareValidatorTest {
     }
 
     @Test
-    void gd3Rejects72MbitExtendedHiRomAsSize() {
+    void gd3Rejects72MbitExtendedHiRom() {
         SnesRom rom = createExHiRom(72 * SnesConstants.MBIT);
 
         UnsupportedHardwareException e = assertThrows(UnsupportedHardwareException.class,
                 () -> new Gd3HardwareValidator().validate(rom, CopierFormat.GD3));
 
-        assertEquals(UnsupportedHardwareException.Reason.SIZE, e.reason());
+        assertTrue(e.getMessage().contains("conversion not yet implemented"), e.getMessage());
     }
 
     private SnesRom createLoRom96(int sramSize, String id) {
@@ -97,63 +97,30 @@ class HardwareValidatorTest {
         return new SnesRom(data, RomType.LoROM, sramSize, "TEST 96", false, 0, 0, 0, 0x0001, 0xFFFE);
     }
 
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(ints = {32, 64})
-    // The 96 Mbit class needs 128 Mbit of DRAM; the message names the option.
-    void gd3Rejects96MbitBelow128MbitDram(int dramMbit) {
+    @Test
+    void gd3Accepts96MbitWithoutSram() {
+        assertDoesNotThrow(() -> new Gd3HardwareValidator().validate(createLoRom96(0, "XXXXX"), CopierFormat.GD3));
+    }
+
+    @Test
+    void gd3Accepts96MbitStarOceanWithSram() {
+        assertDoesNotThrow(() -> new Gd3HardwareValidator().validate(createLoRom96(8192, "B4ARF"), CopierFormat.GD3));
+    }
+
+    @Test
+    void gd3Rejects96MbitWithSramThatIsNotStarOcean() {
         UnsupportedHardwareException e = assertThrows(UnsupportedHardwareException.class,
-                () -> new Gd3HardwareValidator(Gd3Memory.of(dramMbit)).validate(createLoRom96(0, "XXXXX"), CopierFormat.GD3));
+                () -> new Gd3HardwareValidator().validate(createLoRom96(8192, "XXXXX"), CopierFormat.GD3));
 
-        assertEquals(UnsupportedHardwareException.Reason.HARDWARE, e.reason());
-        assertTrue(e.getMessage().contains("--gd3-dram 128"), e.getMessage());
+        assertTrue(e.getMessage().contains("only converted for Star Ocean"), e.getMessage());
     }
 
     @Test
-    void gd3Accepts96MbitWithoutSramAt128MbitDram() {
-        assertDoesNotThrow(() -> new Gd3HardwareValidator(Gd3Memory.of(128))
-                .validate(createLoRom96(0, "XXXXX"), CopierFormat.GD3));
-    }
-
-    @Test
-    void gd3Accepts96MbitStarOceanWithSramAt128MbitDram() {
-        assertDoesNotThrow(() -> new Gd3HardwareValidator(Gd3Memory.of(128))
-                .validate(createLoRom96(8192, "B4ARF"), CopierFormat.GD3));
-    }
-
-    @Test
-    void gd3Rejects96MbitWithSramThatIsNotStarOceanAsSize() {
-        UnsupportedHardwareException e = assertThrows(UnsupportedHardwareException.class,
-                () -> new Gd3HardwareValidator(Gd3Memory.of(128)).validate(createLoRom96(8192, "XXXXX"), CopierFormat.GD3));
-
-        assertEquals(UnsupportedHardwareException.Reason.SIZE, e.reason());
-    }
-
-    @Test
-    void gd3Rejects64MbitExtendedAtDram32AsHardware() {
-        UnsupportedHardwareException e = assertThrows(UnsupportedHardwareException.class,
-                () -> new Gd3HardwareValidator(Gd3Memory.of(32))
-                        .validate(createExHiRom(64 * SnesConstants.MBIT), CopierFormat.GD3));
-
-        assertEquals(UnsupportedHardwareException.Reason.HARDWARE, e.reason());
-    }
-
-    @Test
-    void gd3Rejects96MbitLoRomAsHardwareAndNamesTheOption() {
-        SnesRom rom = createLoRom(96 * SnesConstants.MBIT);
-
-        UnsupportedHardwareException e = assertThrows(UnsupportedHardwareException.class,
-                () -> new Gd3HardwareValidator().validate(rom, CopierFormat.GD3));
-
-        assertEquals(UnsupportedHardwareException.Reason.HARDWARE, e.reason());
-        assertTrue(e.getMessage().contains("--gd3-dram 128"), e.getMessage());
-    }
-
-    @Test
-    void gd3SizeRejectionsCarryReasonSize() {
+    void gd3RejectsNonExtendedHiRomAbove32Mbit() {
         UnsupportedHardwareException e = assertThrows(UnsupportedHardwareException.class,
                 () -> new Gd3HardwareValidator().validate(createHiRom(33 * SnesConstants.MBIT), CopierFormat.GD3));
 
-        assertEquals(UnsupportedHardwareException.Reason.SIZE, e.reason());
+        assertTrue(e.getMessage().contains("conversion not yet implemented"), e.getMessage());
     }
 
     @Test
